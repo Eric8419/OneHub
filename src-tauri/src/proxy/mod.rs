@@ -406,7 +406,7 @@ async fn chat_completions_handler(
     // Handle SSE streaming
     if is_streaming {
         let stream = upstream_resp.bytes_stream().map(|r| {
-            r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+            r.map_err(|e| std::io::Error::other(e))
         });
         let body = Body::from_stream(stream);
 
@@ -552,7 +552,7 @@ async fn anthropic_handler(
 
     if is_streaming {
         let stream = upstream_resp.bytes_stream().map(|r| {
-            r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+            r.map_err(|e| std::io::Error::other(e))
         });
         let body = Body::from_stream(stream);
 
