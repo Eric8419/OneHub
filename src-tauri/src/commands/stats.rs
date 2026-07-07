@@ -1,8 +1,8 @@
-use crate::types::RequestRecord;
 use crate::proxy;
+use crate::types::RequestRecord;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use std::collections::HashMap;
 
 #[derive(serde::Serialize)]
 pub struct UsageStats {
@@ -89,7 +89,11 @@ pub async fn get_daily_usage(
 
     let mut result: Vec<DailyUsage> = daily
         .into_iter()
-        .map(|(date, (count, tokens))| DailyUsage { date, count, tokens })
+        .map(|(date, (count, tokens))| DailyUsage {
+            date,
+            count,
+            tokens,
+        })
         .collect();
     result.sort_by(|a, b| a.date.cmp(&b.date));
     Ok(result)

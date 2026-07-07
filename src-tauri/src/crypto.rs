@@ -25,11 +25,9 @@ fn get_or_create_key(app_handle: &tauri::AppHandle) -> Result<[u8; KEY_LEN], Str
     if key_path.exists() {
         // Load existing key
         let encoded = std::fs::read_to_string(&key_path).map_err(|e| e.to_string())?;
-        let decoded = base64::Engine::decode(
-            &base64::engine::general_purpose::STANDARD,
-            encoded.trim(),
-        )
-        .map_err(|e| format!("Failed to decode encryption key: {}", e))?;
+        let decoded =
+            base64::Engine::decode(&base64::engine::general_purpose::STANDARD, encoded.trim())
+                .map_err(|e| format!("Failed to decode encryption key: {}", e))?;
 
         if decoded.len() != KEY_LEN {
             return Err("Invalid encryption key length".into());
@@ -41,10 +39,7 @@ fn get_or_create_key(app_handle: &tauri::AppHandle) -> Result<[u8; KEY_LEN], Str
         // Generate new key
         let mut key = [0u8; KEY_LEN];
         OsRng.fill_bytes(&mut key);
-        let encoded = base64::Engine::encode(
-            &base64::engine::general_purpose::STANDARD,
-            key,
-        );
+        let encoded = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, key);
 
         // Write key file (create parent dir if needed)
         if let Some(parent) = key_path.parent() {
@@ -114,11 +109,8 @@ pub fn decrypt(encoded: &str, app_handle: &tauri::AppHandle) -> Result<String, S
     let key = get_or_create_key(app_handle)?;
     let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| e.to_string())?;
 
-    let combined = base64::Engine::decode(
-        &base64::engine::general_purpose::STANDARD,
-        encoded,
-    )
-    .map_err(|e| format!("Failed to decode encrypted data: {}", e))?;
+    let combined = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, encoded)
+        .map_err(|e| format!("Failed to decode encrypted data: {}", e))?;
 
     if combined.len() < NONCE_LEN {
         return Err("Invalid encrypted data: too short".into());
@@ -172,10 +164,13 @@ mod tests {
         combined.extend_from_slice(&nonce_bytes);
         combined.extend_from_slice(&ciphertext);
 
-        let encoded_str = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, combined);
+        let encoded_str =
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, combined);
 
         // Now decode and decrypt
-        let decoded = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &encoded_str).unwrap();
+        let decoded =
+            base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &encoded_str)
+                .unwrap();
         let decrypted_nonce = Nonce::from_slice(&decoded[..NONCE_LEN]);
         let decrypted_ct = &decoded[NONCE_LEN..];
         let decrypted = cipher.decrypt(decrypted_nonce, decrypted_ct).unwrap();

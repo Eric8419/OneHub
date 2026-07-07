@@ -144,7 +144,9 @@ pub fn start(config: SharedState, port: u16) -> Result<(), String> {
 
         eprintln!("[proxy] Server started on 127.0.0.1:{}", port);
         axum::serve(listener, app.into_make_service())
-            .with_graceful_shutdown(async { rx.await.ok(); })
+            .with_graceful_shutdown(async {
+                rx.await.ok();
+            })
             .await
             .ok();
         eprintln!("[proxy] Server stopped");
@@ -181,15 +183,27 @@ pub fn status() -> ProxyStatus {
                     uptime_secs: handle.started_at.elapsed().as_secs(),
                 }
             } else {
-                ProxyStatus { running: false, port: 0, uptime_secs: 0 }
+                ProxyStatus {
+                    running: false,
+                    port: 0,
+                    uptime_secs: 0,
+                }
             }
         }
-        Err(_) => ProxyStatus { running: false, port: 0, uptime_secs: 0 },
+        Err(_) => ProxyStatus {
+            running: false,
+            port: 0,
+            uptime_secs: 0,
+        },
     }
 }
 
 /// Update providers and aggregations in shared state.
-pub async fn update_config(state: &SharedState, providers: Vec<Provider>, aggregations: Vec<Aggregation>) {
+pub async fn update_config(
+    state: &SharedState,
+    providers: Vec<Provider>,
+    aggregations: Vec<Aggregation>,
+) {
     let mut cfg = state.write().await;
     cfg.providers = providers;
     cfg.aggregations = aggregations;
@@ -239,7 +253,9 @@ fn require_auth(headers: &HeaderMap, state: &ProxyConfig) -> Result<(), (StatusC
         eprintln!("[proxy] Auth failed: expected token, got '{}'", provided);
         Err((
             StatusCode::UNAUTHORIZED,
-            Json(json!({"error": "Unauthorized. Provide a valid auth token via Authorization: Bearer <token> header."})),
+            Json(
+                json!({"error": "Unauthorized. Provide a valid auth token via Authorization: Bearer <token> header."}),
+            ),
         ))
     }
 }
@@ -253,10 +269,15 @@ fn check_rate_limit(state: &mut ProxyConfig) -> Result<(), (StatusCode, Json<Val
     let window = std::time::Duration::from_secs(60);
 
     // Remove timestamps older than 1 minute
-    state.request_timestamps.retain(|t| now.duration_since(*t) < window);
+    state
+        .request_timestamps
+        .retain(|t| now.duration_since(*t) < window);
 
     if state.request_timestamps.len() >= state.rate_limit_per_minute as usize {
-        eprintln!("[proxy] Rate limit exceeded: {} requests/minute", state.rate_limit_per_minute);
+        eprintln!(
+            "[proxy] Rate limit exceeded: {} requests/minute",
+            state.rate_limit_per_minute
+        );
         return Err((
             StatusCode::TOO_MANY_REQUESTS,
             Json(json!({"error": "Rate limit exceeded. Try again later."})),
@@ -285,7 +306,12 @@ fn is_streaming_request(body: &Value) -> bool {
         .unwrap_or(false)
 }
 
-fn standard_error_body(status: StatusCode, provider_name: &str, request_id: &str, message: &str) -> Value {
+fn standard_error_body(
+    status: StatusCode,
+    provider_name: &str,
+    request_id: &str,
+    message: &str,
+) -> Value {
     json!({
         "error": {
             "message": message,
@@ -319,12 +345,16 @@ async fn chat_completions_handler(
         check_rate_limit(&mut cfg)?;
     }
 
-    let model_name = body.get("model").and_then(|m| m.as_str()).unwrap_or("unknown");
+    let model_name = body
+        .get("model")
+        .and_then(|m| m.as_str())
+        .unwrap_or("unknown");
     let request_id = Uuid::new_v4().to_string();
     let is_streaming = is_streaming_request(&body);
 
     // Route: find aggregation → pick model → find provider
-    let route = route_request(&state, model_name, "chat").await
+    let route = route_request(&state, model_name, "chat")
+        .await
         .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": e}))))?;
 
     let provider_name = route.provider.name.clone();
@@ -350,13 +380,19 @@ async fn chat_completions_handler(
         .timeout(std::time::Duration::from_secs(timeout_secs))
         .build()
         .map_err(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Failed to create HTTP client: {}", e)})))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("Failed to create HTTP client: {}", e)})),
+            )
         })?;
 
     // Build the upstream request
     let req_builder = client
         .post(&upstream_url)
-        .header("Authorization", format!("Bearer {}", route.provider.api_key))
+        .header(
+            "Authorization",
+            format!("Bearer {}", route.provider.api_key),
+        )
         .header("Content-Type", "application/json")
         .json(&upstream_body);
 
@@ -364,20 +400,31 @@ async fn chat_completions_handler(
         Ok(r) => r,
         Err(e) => {
             let err_msg = format!("Upstream request failed: {}", e);
-            record_request(&state, RequestRecord {
-                id: request_id.clone(),
-                timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-                model: selected_model.clone(),
-                provider: provider_name.clone(),
-                r#type: "Chat Completion".into(),
-                tokens: 0,
-                status: "error".into(),
-                latency_ms: start.elapsed().as_millis() as i64,
-                error_category: "upstream_connection_error".into(),
-            }, &route.aggregation_name).await;
-            return Err((StatusCode::BAD_GATEWAY, Json(standard_error_body(
-                StatusCode::BAD_GATEWAY, &provider_name, &request_id, &sanitize_error(&err_msg),
-            ))));
+            record_request(
+                &state,
+                RequestRecord {
+                    id: request_id.clone(),
+                    timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                    model: selected_model.clone(),
+                    provider: provider_name.clone(),
+                    r#type: "Chat Completion".into(),
+                    tokens: 0,
+                    status: "error".into(),
+                    latency_ms: start.elapsed().as_millis() as i64,
+                    error_category: "upstream_connection_error".into(),
+                },
+                &route.aggregation_name,
+            )
+            .await;
+            return Err((
+                StatusCode::BAD_GATEWAY,
+                Json(standard_error_body(
+                    StatusCode::BAD_GATEWAY,
+                    &provider_name,
+                    &request_id,
+                    &sanitize_error(&err_msg),
+                )),
+            ));
         }
     };
 
@@ -387,41 +434,57 @@ async fn chat_completions_handler(
     // Handle upstream error responses
     if !status.is_success() {
         let err_text = upstream_resp.text().await.unwrap_or_default();
-        record_request(&state, RequestRecord {
-            id: request_id.clone(),
-            timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-            model: selected_model.clone(),
-            provider: provider_name.clone(),
-            r#type: "Chat Completion".into(),
-            tokens: 0,
-            status: format!("upstream_{}", status.as_u16()),
-            latency_ms,
-            error_category: "upstream_error".into(),
-        }, &route.aggregation_name).await;
-        return Err((status, Json(standard_error_body(
-            status, &provider_name, &request_id, &sanitize_error(&err_text),
-        ))));
+        record_request(
+            &state,
+            RequestRecord {
+                id: request_id.clone(),
+                timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                model: selected_model.clone(),
+                provider: provider_name.clone(),
+                r#type: "Chat Completion".into(),
+                tokens: 0,
+                status: format!("upstream_{}", status.as_u16()),
+                latency_ms,
+                error_category: "upstream_error".into(),
+            },
+            &route.aggregation_name,
+        )
+        .await;
+        return Err((
+            status,
+            Json(standard_error_body(
+                status,
+                &provider_name,
+                &request_id,
+                &sanitize_error(&err_text),
+            )),
+        ));
     }
 
     // Handle SSE streaming
     if is_streaming {
-        let stream = upstream_resp.bytes_stream().map(|r| {
-            r.map_err(std::io::Error::other)
-        });
+        let stream = upstream_resp
+            .bytes_stream()
+            .map(|r| r.map_err(std::io::Error::other));
         let body = Body::from_stream(stream);
 
         // Record streaming request (token count will be incomplete; estimate from first chunks)
-        record_request(&state, RequestRecord {
-            id: request_id.clone(),
-            timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-            model: selected_model.clone(),
-            provider: provider_name.clone(),
-            r#type: "Chat Completion (streaming)".into(),
-            tokens: 0,
-            status: "streaming".into(),
-            latency_ms,
-            error_category: String::new(),
-        }, &route.aggregation_name).await;
+        record_request(
+            &state,
+            RequestRecord {
+                id: request_id.clone(),
+                timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                model: selected_model.clone(),
+                provider: provider_name.clone(),
+                r#type: "Chat Completion (streaming)".into(),
+                tokens: 0,
+                status: "streaming".into(),
+                latency_ms,
+                error_category: String::new(),
+            },
+            &route.aggregation_name,
+        )
+        .await;
 
         let response = Response::builder()
             .header("content-type", "text/event-stream")
@@ -429,7 +492,12 @@ async fn chat_completions_handler(
             .header("connection", "keep-alive")
             .header("x-request-id", &request_id)
             .body(body)
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": e.to_string()})),
+                )
+            })?;
         return Ok(response);
     }
 
@@ -438,25 +506,36 @@ async fn chat_completions_handler(
         Ok(v) => v,
         Err(e) => {
             let err_msg = format!("Failed to parse upstream response: {}", e);
-            return Err((StatusCode::BAD_GATEWAY, Json(standard_error_body(
-                StatusCode::BAD_GATEWAY, &provider_name, &request_id, &err_msg,
-            ))));
+            return Err((
+                StatusCode::BAD_GATEWAY,
+                Json(standard_error_body(
+                    StatusCode::BAD_GATEWAY,
+                    &provider_name,
+                    &request_id,
+                    &err_msg,
+                )),
+            ));
         }
     };
 
     let tokens = count_tokens_from_response(&resp_json);
 
-    record_request(&state, RequestRecord {
-        id: request_id,
-        timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-        model: selected_model,
-        provider: provider_name,
-        r#type: "Chat Completion".into(),
-        tokens,
-        status: "success".into(),
-        latency_ms,
-        error_category: String::new(),
-    }, &route.aggregation_name).await;
+    record_request(
+        &state,
+        RequestRecord {
+            id: request_id,
+            timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            model: selected_model,
+            provider: provider_name,
+            r#type: "Chat Completion".into(),
+            tokens,
+            status: "success".into(),
+            latency_ms,
+            error_category: String::new(),
+        },
+        &route.aggregation_name,
+    )
+    .await;
 
     Ok(Json(resp_json).into_response())
 }
@@ -474,17 +553,24 @@ async fn anthropic_handler(
         check_rate_limit(&mut cfg)?;
     }
 
-    let model_name = body.get("model").and_then(|m| m.as_str()).unwrap_or("unknown");
+    let model_name = body
+        .get("model")
+        .and_then(|m| m.as_str())
+        .unwrap_or("unknown");
     let request_id = Uuid::new_v4().to_string();
     let is_streaming = is_streaming_request(&body);
 
-    let route = route_request(&state, model_name, "chat").await
+    let route = route_request(&state, model_name, "chat")
+        .await
         .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": e}))))?;
 
     let provider_name = route.provider.name.clone();
     let selected_model = route.model.clone();
 
-    let upstream_url = format!("{}/v1/messages", route.provider.api_base.trim_end_matches('/'));
+    let upstream_url = format!(
+        "{}/v1/messages",
+        route.provider.api_base.trim_end_matches('/')
+    );
 
     let mut upstream_body = body.clone();
     upstream_body["model"] = json!(selected_model);
@@ -498,7 +584,10 @@ async fn anthropic_handler(
         .timeout(std::time::Duration::from_secs(timeout_secs))
         .build()
         .map_err(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Failed to create HTTP client: {}", e)})))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("Failed to create HTTP client: {}", e)})),
+            )
         })?;
 
     let req_builder = client
@@ -512,20 +601,31 @@ async fn anthropic_handler(
         Ok(r) => r,
         Err(e) => {
             let err_msg = format!("Upstream request failed: {}", e);
-            record_request(&state, RequestRecord {
-                id: request_id.clone(),
-                timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-                model: selected_model.clone(),
-                provider: provider_name.clone(),
-                r#type: "Anthropic".into(),
-                tokens: 0,
-                status: "error".into(),
-                latency_ms: start.elapsed().as_millis() as i64,
-                error_category: "upstream_connection_error".into(),
-            }, &route.aggregation_name).await;
-            return Err((StatusCode::BAD_GATEWAY, Json(standard_error_body(
-                StatusCode::BAD_GATEWAY, &provider_name, &request_id, &sanitize_error(&err_msg),
-            ))));
+            record_request(
+                &state,
+                RequestRecord {
+                    id: request_id.clone(),
+                    timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                    model: selected_model.clone(),
+                    provider: provider_name.clone(),
+                    r#type: "Anthropic".into(),
+                    tokens: 0,
+                    status: "error".into(),
+                    latency_ms: start.elapsed().as_millis() as i64,
+                    error_category: "upstream_connection_error".into(),
+                },
+                &route.aggregation_name,
+            )
+            .await;
+            return Err((
+                StatusCode::BAD_GATEWAY,
+                Json(standard_error_body(
+                    StatusCode::BAD_GATEWAY,
+                    &provider_name,
+                    &request_id,
+                    &sanitize_error(&err_msg),
+                )),
+            ));
         }
     };
 
@@ -534,39 +634,55 @@ async fn anthropic_handler(
 
     if !status.is_success() {
         let err_text = upstream_resp.text().await.unwrap_or_default();
-        record_request(&state, RequestRecord {
-            id: request_id.clone(),
-            timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-            model: selected_model.clone(),
-            provider: provider_name.clone(),
-            r#type: "Anthropic".into(),
-            tokens: 0,
-            status: format!("upstream_{}", status.as_u16()),
-            latency_ms,
-            error_category: "upstream_error".into(),
-        }, &route.aggregation_name).await;
-        return Err((status, Json(standard_error_body(
-            status, &provider_name, &request_id, &sanitize_error(&err_text),
-        ))));
+        record_request(
+            &state,
+            RequestRecord {
+                id: request_id.clone(),
+                timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                model: selected_model.clone(),
+                provider: provider_name.clone(),
+                r#type: "Anthropic".into(),
+                tokens: 0,
+                status: format!("upstream_{}", status.as_u16()),
+                latency_ms,
+                error_category: "upstream_error".into(),
+            },
+            &route.aggregation_name,
+        )
+        .await;
+        return Err((
+            status,
+            Json(standard_error_body(
+                status,
+                &provider_name,
+                &request_id,
+                &sanitize_error(&err_text),
+            )),
+        ));
     }
 
     if is_streaming {
-        let stream = upstream_resp.bytes_stream().map(|r| {
-            r.map_err(std::io::Error::other)
-        });
+        let stream = upstream_resp
+            .bytes_stream()
+            .map(|r| r.map_err(std::io::Error::other));
         let body = Body::from_stream(stream);
 
-        record_request(&state, RequestRecord {
-            id: request_id.clone(),
-            timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-            model: selected_model.clone(),
-            provider: provider_name.clone(),
-            r#type: "Anthropic (streaming)".into(),
-            tokens: 0,
-            status: "streaming".into(),
-            latency_ms,
-            error_category: String::new(),
-        }, &route.aggregation_name).await;
+        record_request(
+            &state,
+            RequestRecord {
+                id: request_id.clone(),
+                timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                model: selected_model.clone(),
+                provider: provider_name.clone(),
+                r#type: "Anthropic (streaming)".into(),
+                tokens: 0,
+                status: "streaming".into(),
+                latency_ms,
+                error_category: String::new(),
+            },
+            &route.aggregation_name,
+        )
+        .await;
 
         let response = Response::builder()
             .header("content-type", "text/event-stream")
@@ -574,7 +690,12 @@ async fn anthropic_handler(
             .header("connection", "keep-alive")
             .header("x-request-id", &request_id)
             .body(body)
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": e.to_string()})),
+                )
+            })?;
         return Ok(response);
     }
 
@@ -582,25 +703,36 @@ async fn anthropic_handler(
         Ok(v) => v,
         Err(e) => {
             let err_msg = format!("Failed to parse upstream response: {}", e);
-            return Err((StatusCode::BAD_GATEWAY, Json(standard_error_body(
-                StatusCode::BAD_GATEWAY, &provider_name, &request_id, &err_msg,
-            ))));
+            return Err((
+                StatusCode::BAD_GATEWAY,
+                Json(standard_error_body(
+                    StatusCode::BAD_GATEWAY,
+                    &provider_name,
+                    &request_id,
+                    &err_msg,
+                )),
+            ));
         }
     };
 
     let tokens = count_tokens_from_anthropic_response(&resp_json);
 
-    record_request(&state, RequestRecord {
-        id: request_id,
-        timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-        model: selected_model,
-        provider: provider_name,
-        r#type: "Anthropic".into(),
-        tokens,
-        status: "success".into(),
-        latency_ms,
-        error_category: String::new(),
-    }, &route.aggregation_name).await;
+    record_request(
+        &state,
+        RequestRecord {
+            id: request_id,
+            timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            model: selected_model,
+            provider: provider_name,
+            r#type: "Anthropic".into(),
+            tokens,
+            status: "success".into(),
+            latency_ms,
+            error_category: String::new(),
+        },
+        &route.aggregation_name,
+    )
+    .await;
 
     Ok(Json(resp_json).into_response())
 }
@@ -615,7 +747,8 @@ async fn route_request(
     let cfg = state.read().await;
 
     // 1. Try direct model match (model name → provider)
-    let direct_hit = cfg.providers
+    let direct_hit = cfg
+        .providers
         .iter()
         .flat_map(|p| p.models.iter().map(move |m| (p, m)))
         .find(|(_, m)| m.name == model_or_agg)
@@ -630,13 +763,15 @@ async fn route_request(
     }
 
     // 2. Try aggregation match
-    let agg = cfg.aggregations
+    let agg = cfg
+        .aggregations
         .iter()
         .find(|a| a.enabled && a.name == model_or_agg);
 
     match agg {
         Some(aggregation) => {
-            let model_names: Vec<&str> = aggregation.models
+            let model_names: Vec<&str> = aggregation
+                .models
                 .split(',')
                 .map(|s| s.trim())
                 .filter(|s| !s.is_empty())
@@ -665,12 +800,7 @@ async fn route_request(
     }
 }
 
-fn pick_model(
-    strategy: &str,
-    agg_name: &str,
-    model_names: &[&str],
-    cfg: &ProxyConfig,
-) -> String {
+fn pick_model(strategy: &str, agg_name: &str, model_names: &[&str], cfg: &ProxyConfig) -> String {
     match strategy {
         s if s.contains("随机") => {
             let nanos = std::time::SystemTime::now()
@@ -684,7 +814,9 @@ fn pick_model(
             let mut best = model_names[0].to_string();
             let mut best_latency = f64::MAX;
             for name in model_names {
-                let avg = cfg.latency_history.get(*name)
+                let avg = cfg
+                    .latency_history
+                    .get(*name)
                     .map(|v| v.iter().sum::<f64>() / v.len() as f64)
                     .unwrap_or(0.0);
                 if avg < best_latency && avg > 0.0 {
@@ -694,9 +826,7 @@ fn pick_model(
             }
             best
         }
-        s if s.contains("顺序") => {
-            model_names[0].to_string()
-        }
+        s if s.contains("顺序") => model_names[0].to_string(),
         _ => {
             // Round Robin (default)
             let idx = cfg.round_robin_index.get(agg_name).copied().unwrap_or(0);
@@ -710,13 +840,18 @@ fn pick_model(
 
 /// Record a request and advance the Round Robin index for the
 /// aggregation that was matched (not all aggregations).
-async fn record_request(state: &SharedState, record: RequestRecord, aggregation_name: &Option<String>) {
+async fn record_request(
+    state: &SharedState,
+    record: RequestRecord,
+    aggregation_name: &Option<String>,
+) {
     let mut cfg = state.write().await;
 
     // Advance Round Robin counter — only for the matched aggregation
     if let Some(agg_name) = aggregation_name {
         if let Some(agg) = cfg.aggregations.iter().find(|a| a.name == *agg_name) {
-            let model_names: Vec<&str> = agg.models
+            let model_names: Vec<&str> = agg
+                .models
                 .split(',')
                 .map(|s| s.trim())
                 .filter(|s| !s.is_empty())
@@ -736,10 +871,12 @@ async fn record_request(state: &SharedState, record: RequestRecord, aggregation_
         .or_default()
         .push(latency);
     // Trim latency history
-    let trimmed: HashMap<String, Vec<f64>> = cfg.latency_history.iter()
+    let trimmed: HashMap<String, Vec<f64>> = cfg
+        .latency_history
+        .iter()
         .map(|(k, v)| {
             if v.len() > 100 {
-                (k.clone(), v[v.len()-100..].to_vec())
+                (k.clone(), v[v.len() - 100..].to_vec())
             } else {
                 (k.clone(), v.clone())
             }
@@ -953,17 +1090,22 @@ mod tests {
             drop(cfg);
 
             // Record a request against agg-1
-            record_request(&state, RequestRecord {
-                id: "r1".into(),
-                timestamp: "2026-01-01".into(),
-                model: "gpt-4".into(),
-                provider: "OpenAI".into(),
-                r#type: "Chat Completion".into(),
-                tokens: 100,
-                status: "success".into(),
-                latency_ms: 500,
-                error_category: String::new(),
-            }, &Some("agg-1".into())).await;
+            record_request(
+                &state,
+                RequestRecord {
+                    id: "r1".into(),
+                    timestamp: "2026-01-01".into(),
+                    model: "gpt-4".into(),
+                    provider: "OpenAI".into(),
+                    r#type: "Chat Completion".into(),
+                    tokens: 100,
+                    status: "success".into(),
+                    latency_ms: 500,
+                    error_category: String::new(),
+                },
+                &Some("agg-1".into()),
+            )
+            .await;
 
             // Check that only agg-1 advanced (0→1), agg-2 stays at 0
             let cfg = state.read().await;
@@ -980,30 +1122,33 @@ mod tests {
         rt.block_on(async {
             let mut cfg = state.write().await;
             cfg.round_robin_index.insert("agg-1".into(), 0);
-            cfg.aggregations = vec![
-                Aggregation {
-                    id: "a1".into(),
-                    name: "agg-1".into(),
-                    models: "gpt-4".into(),
-                    strategy: "轮询 (Round Robin)".into(),
-                    priority: "P0".into(),
-                    enabled: true,
-                },
-            ];
+            cfg.aggregations = vec![Aggregation {
+                id: "a1".into(),
+                name: "agg-1".into(),
+                models: "gpt-4".into(),
+                strategy: "轮询 (Round Robin)".into(),
+                priority: "P0".into(),
+                enabled: true,
+            }];
             drop(cfg);
 
             // Record with None aggregation (direct model match)
-            record_request(&state, RequestRecord {
-                id: "r1".into(),
-                timestamp: "2026-01-01".into(),
-                model: "gpt-4".into(),
-                provider: "OpenAI".into(),
-                r#type: "Chat Completion".into(),
-                tokens: 100,
-                status: "success".into(),
-                latency_ms: 500,
-                error_category: String::new(),
-            }, &None).await;
+            record_request(
+                &state,
+                RequestRecord {
+                    id: "r1".into(),
+                    timestamp: "2026-01-01".into(),
+                    model: "gpt-4".into(),
+                    provider: "OpenAI".into(),
+                    r#type: "Chat Completion".into(),
+                    tokens: 100,
+                    status: "success".into(),
+                    latency_ms: 500,
+                    error_category: String::new(),
+                },
+                &None,
+            )
+            .await;
 
             // RR index should remain unchanged
             let cfg = state.read().await;

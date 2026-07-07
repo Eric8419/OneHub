@@ -1,10 +1,10 @@
-use crate::types::{Aggregation, Provider};
 use crate::crypto;
 use crate::proxy;
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use crate::types::{Aggregation, Provider};
 use std::path::PathBuf;
+use std::sync::Arc;
 use tauri::Manager;
+use tokio::sync::RwLock;
 
 // ── Persistence Helpers ───────────────────────────────────────
 
@@ -19,7 +19,11 @@ fn data_dir(app_handle: &tauri::AppHandle) -> PathBuf {
     path
 }
 
-fn save_to_file<T: serde::Serialize>(app_handle: &tauri::AppHandle, filename: &str, data: &T) -> Result<(), String> {
+fn save_to_file<T: serde::Serialize>(
+    app_handle: &tauri::AppHandle,
+    filename: &str,
+    data: &T,
+) -> Result<(), String> {
     let path = data_dir(app_handle).join(filename);
     let json = serde_json::to_string_pretty(data).map_err(|e| e.to_string())?;
     std::fs::write(&path, json).map_err(|e| e.to_string())?;
@@ -27,7 +31,10 @@ fn save_to_file<T: serde::Serialize>(app_handle: &tauri::AppHandle, filename: &s
     Ok(())
 }
 
-fn load_from_file<T: serde::de::DeserializeOwned>(app_handle: &tauri::AppHandle, filename: &str) -> Result<Option<T>, String> {
+fn load_from_file<T: serde::de::DeserializeOwned>(
+    app_handle: &tauri::AppHandle,
+    filename: &str,
+) -> Result<Option<T>, String> {
     let path = data_dir(app_handle).join(filename);
     if path.exists() {
         let json = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
@@ -124,7 +131,9 @@ pub async fn load_aggregations(
     proxy_state: tauri::State<'_, Arc<RwLock<proxy::ProxyConfig>>>,
 ) -> Result<Vec<Aggregation>, String> {
     // Try loading from disk first
-    if let Some(aggregations) = load_from_file::<Vec<Aggregation>>(&app_handle, "aggregations.json")? {
+    if let Some(aggregations) =
+        load_from_file::<Vec<Aggregation>>(&app_handle, "aggregations.json")?
+    {
         // Update in-memory state
         let prov_list = {
             let cfg = proxy_state.read().await;
@@ -203,7 +212,13 @@ pub async fn update_proxy_runtime_config(
     max_body_size: u64,
     proxy_state: tauri::State<'_, Arc<RwLock<proxy::ProxyConfig>>>,
 ) -> Result<(), String> {
-    proxy::update_runtime_config(&proxy_state, rate_limit_per_minute, api_timeout_secs, max_body_size).await;
+    proxy::update_runtime_config(
+        &proxy_state,
+        rate_limit_per_minute,
+        api_timeout_secs,
+        max_body_size,
+    )
+    .await;
     Ok(())
 }
 

@@ -108,10 +108,7 @@ fn data_dir(app_handle: &tauri::AppHandle) -> PathBuf {
 }
 
 #[tauri::command]
-pub fn save_settings(
-    app_handle: tauri::AppHandle,
-    settings: AppSettings,
-) -> Result<(), String> {
+pub fn save_settings(app_handle: tauri::AppHandle, settings: AppSettings) -> Result<(), String> {
     let path = data_dir(&app_handle).join("settings.json");
     let json = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
     std::fs::write(&path, json).map_err(|e| e.to_string())?;
@@ -120,9 +117,7 @@ pub fn save_settings(
 }
 
 #[tauri::command]
-pub fn load_settings(
-    app_handle: tauri::AppHandle,
-) -> Result<AppSettings, String> {
+pub fn load_settings(app_handle: tauri::AppHandle) -> Result<AppSettings, String> {
     let path = data_dir(&app_handle).join("settings.json");
     if path.exists() {
         let json = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
