@@ -77,8 +77,8 @@ impl MetricsStore {
             Some(d) => d,
             None => return Ok(0),
         };
-        let cutoff = chrono::Utc::now().date_naive()
-            - chrono::Duration::days(retention_days as i64);
+        let cutoff =
+            chrono::Utc::now().date_naive() - chrono::Duration::days(retention_days as i64);
         let mut removed = 0usize;
 
         let entries = match std::fs::read_dir(&dir) {

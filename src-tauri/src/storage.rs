@@ -30,9 +30,7 @@ pub fn write_json_atomic<T: serde::Serialize + ?Sized>(
 
     let tmp_path = path.with_extension(format!(
         "{}.tmp",
-        path.extension()
-            .and_then(|s| s.to_str())
-            .unwrap_or("json")
+        path.extension().and_then(|s| s.to_str()).unwrap_or("json")
     ));
     {
         let mut file = std::fs::File::create(&tmp_path).map_err(|e| e.to_string())?;
@@ -40,12 +38,14 @@ pub fn write_json_atomic<T: serde::Serialize + ?Sized>(
         file.sync_all().map_err(|e| e.to_string())?;
     }
 
-    std::fs::rename(&tmp_path, path).or_else(|_| {
-        if path.exists() {
-            std::fs::remove_file(path)?;
-        }
-        std::fs::rename(&tmp_path, path)
-    }).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp_path, path)
+        .or_else(|_| {
+            if path.exists() {
+                std::fs::remove_file(path)?;
+            }
+            std::fs::rename(&tmp_path, path)
+        })
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 

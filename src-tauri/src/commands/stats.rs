@@ -147,7 +147,11 @@ fn range_days(range: &str) -> i64 {
 
 fn percent_change(current: f64, previous: f64) -> f64 {
     if previous == 0.0 {
-        if current == 0.0 { 0.0 } else { 100.0 }
+        if current == 0.0 {
+            0.0
+        } else {
+            100.0
+        }
     } else {
         round1(((current - previous) / previous) * 100.0)
     }

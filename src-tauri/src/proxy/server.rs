@@ -75,12 +75,15 @@ pub async fn start(state: SharedAppState, host: String, port: u16) -> Result<(),
             .with_state(state);
 
         eprintln!("[proxy] Server started on {}:{}", task_host, port);
-        axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
-            .with_graceful_shutdown(async {
-                rx.await.ok();
-            })
-            .await
-            .ok();
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .with_graceful_shutdown(async {
+            rx.await.ok();
+        })
+        .await
+        .ok();
         eprintln!("[proxy] Server stopped");
     });
 
@@ -278,7 +281,9 @@ fn check_body_size(body: &Value, max_body_size: u64) -> Result<(), (StatusCode, 
     if max_body_size == 0 {
         return Ok(());
     }
-    let size = serde_json::to_vec(body).map(|v| v.len() as u64).unwrap_or(0);
+    let size = serde_json::to_vec(body)
+        .map(|v| v.len() as u64)
+        .unwrap_or(0);
     if size > max_body_size {
         Err((
             StatusCode::PAYLOAD_TOO_LARGE,

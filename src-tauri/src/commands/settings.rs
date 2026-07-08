@@ -14,8 +14,8 @@ use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 
 use crate::paths;
-use crate::proxy::{self, SharedAppState};
 use crate::proxy::state::UpstreamProxySettings;
+use crate::proxy::{self, SharedAppState};
 use crate::storage;
 
 /// Application settings. All fields are camelCase for direct
