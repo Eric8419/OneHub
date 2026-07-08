@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title" shape-rendering="crispEdges">
+  <title id="title">Melody Hub pixel companion favicon</title>
+  <rect width="64" height="64" fill="#F7F8FA"/>
+  <rect x="4" y="4" width="56" height="56" fill="none" stroke="#151515" stroke-width="2"/>
+  <g fill="#151515">
+    <rect x="30" y="7" width="4" height="4"/>
+    <rect x="32" y="11" width="2" height="4"/>
+    <rect x="18" y="12" width="28" height="4"/>
+    <rect x="16" y="16" width="4" height="6"/>
+    <rect x="44" y="16" width="4" height="6"/>
+    <rect x="12" y="24" width="4" height="12"/>
+    <rect x="48" y="24" width="4" height="12"/>
+    <rect x="18" y="20" width="28" height="4"/>
+    <rect x="16" y="24" width="4" height="16"/>
+    <rect x="44" y="24" width="4" height="16"/>
+    <rect x="20" y="40" width="24" height="4"/>
+    <rect x="24" y="28" width="4" height="4"/>
+    <rect x="36" y="28" width="4" height="4"/>
+    <rect x="28" y="35" width="2" height="2"/>
+    <rect x="31" y="34" width="2" height="4"/>
+    <rect x="34" y="35" width="2" height="2"/>
+  </g>
+  <g fill="#E7EBF0">
+    <rect x="20" y="24" width="24" height="16"/>
+  </g>
+  <g fill="#151515">
+    <rect x="24" y="28" width="4" height="4"/>
+    <rect x="36" y="28" width="4" height="4"/>
+    <rect x="28" y="35" width="2" height="2"/>
+    <rect x="31" y="34" width="2" height="4"/>
+    <rect x="34" y="35" width="2" height="2"/>
+  </g>
+  <rect x="31" y="34" width="2" height="4" fill="#8FB7D9"/>
+</svg>

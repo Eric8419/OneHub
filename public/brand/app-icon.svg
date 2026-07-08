@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc" shape-rendering="crispEdges">
+  <title id="title">Melody Hub pixel companion icon</title>
+  <desc id="desc">A cute grayscale pixel tech companion wearing headphones with audio bars on its face.</desc>
+  <rect width="1024" height="1024" fill="#F7F8FA"/>
+  <rect x="64" y="64" width="896" height="896" fill="none" stroke="#151515" stroke-width="32"/>
+  <g fill="#CBD2DB">
+    <rect x="288" y="768" width="448" height="64"/>
+    <rect x="224" y="832" width="576" height="32"/>
+  </g>
+  <g fill="#151515">
+    <rect x="480" y="112" width="64" height="64"/>
+    <rect x="512" y="176" width="32" height="64"/>
+    <rect x="288" y="224" width="448" height="64"/>
+    <rect x="240" y="288" width="80" height="112"/>
+    <rect x="704" y="288" width="80" height="112"/>
+    <rect x="176" y="432" width="80" height="192"/>
+    <rect x="768" y="432" width="80" height="192"/>
+    <rect x="288" y="368" width="448" height="80"/>
+    <rect x="240" y="448" width="80" height="256"/>
+    <rect x="704" y="448" width="80" height="256"/>
+    <rect x="320" y="704" width="384" height="80"/>
+  </g>
+  <g fill="#E7EBF0">
+    <rect x="320" y="448" width="384" height="256"/>
+    <rect x="224" y="480" width="32" height="112"/>
+    <rect x="768" y="480" width="32" height="112"/>
+  </g>
+  <g fill="#AAB4C0">
+    <rect x="320" y="448" width="384" height="32"/>
+    <rect x="320" y="672" width="384" height="32"/>
+    <rect x="288" y="448" width="32" height="256"/>
+    <rect x="704" y="448" width="32" height="256"/>
+  </g>
+  <g fill="#151515">
+    <rect x="384" y="496" width="80" height="80"/>
+    <rect x="560" y="496" width="80" height="80"/>
+    <rect x="432" y="624" width="32" height="32"/>
+    <rect x="496" y="592" width="32" height="80"/>
+    <rect x="560" y="624" width="32" height="32"/>
+  </g>
+  <g fill="#FFFFFF">
+    <rect x="400" y="496" width="16" height="16"/>
+    <rect x="576" y="496" width="16" height="16"/>
+  </g>
+  <g fill="#8FB7D9">
+    <rect x="496" y="128" width="32" height="32"/>
+    <rect x="496" y="592" width="32" height="80"/>
+  </g>
+  <g fill="#6E7681">
+    <rect x="224" y="624" width="32" height="32"/>
+    <rect x="768" y="624" width="32" height="32"/>
+  </g>
+</svg>

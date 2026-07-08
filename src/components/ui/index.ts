@@ -1,7 +1,8 @@
 export { Button } from './Button';
 export { Card, CardTitle, CardDesc } from './Card';
 export { Input } from './Input';
-export { Select } from './Select';
+export { Dropdown } from './Dropdown';
+export type { DropdownOption } from './Dropdown';
 export { Switch } from './Switch';
 export { Tag } from './Tag';
 export { Tabs } from './Tabs';
@@ -10,3 +11,8 @@ export { ToastContainer, toast } from './Toast';
 export { FormField } from './FormField';
 export { FormGrid } from './FormGrid';
 export { SectionTitle } from './SectionTitle';
+export { FlexRow } from './FlexRow';
+export { FlexBetween } from './FlexBetween';
+export { ConfirmDialog } from './ConfirmDialog';
+export { AnimatedContent, CountUpValue, SpotlightCard, ShinyText, Skeleton } from './ReactBits';
+export { Stepper } from './Stepper';

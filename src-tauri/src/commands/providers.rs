@@ -1,229 +1,143 @@
-use crate::crypto;
-use crate::proxy;
+// ═══════════════════════════════════════════════════════════════
+// Melody Hub — Provider & aggregation commands
+// ═══════════════════════════════════════════════════════════════
+// Thin Tauri command wrappers around the storage + proxy layers.
+// Persistence (with API-key encryption) lives in `storage.rs`;
+// runtime config updates live in `proxy::update_routing_config`.
+// ═══════════════════════════════════════════════════════════════
+
+use crate::proxy::{self, SharedAppState};
+use crate::storage;
 use crate::types::{Aggregation, Provider};
-use std::path::PathBuf;
-use std::sync::Arc;
-use tauri::Manager;
-use tokio::sync::RwLock;
 
-// ── Persistence Helpers ───────────────────────────────────────
+// ── Provider profiles + connection test ─────────────────────
 
-fn data_dir(app_handle: &tauri::AppHandle) -> PathBuf {
-    let mut path = app_handle.path().app_data_dir().unwrap_or_else(|_| {
-        let mut fallback = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        fallback.push("melody-hub_data");
-        fallback
-    });
-    path.push("melody-hub");
-    std::fs::create_dir_all(&path).ok();
-    path
+use crate::proxy::adapter::{self, ConnectionTestResult, ProfileEntry};
+
+/// List curated provider profiles for the "add provider" dropdown.
+/// Lets users pick a known provider instead of typing a base URL.
+#[tauri::command]
+pub fn list_provider_profiles() -> Vec<ProfileEntry> {
+    adapter::profile_entries()
 }
 
-fn save_to_file<T: serde::Serialize>(
-    app_handle: &tauri::AppHandle,
-    filename: &str,
-    data: &T,
-) -> Result<(), String> {
-    let path = data_dir(app_handle).join(filename);
-    let json = serde_json::to_string_pretty(data).map_err(|e| e.to_string())?;
-    std::fs::write(&path, json).map_err(|e| e.to_string())?;
-    println!("[persist] Saved {} to {:?}", filename, path);
-    Ok(())
+/// Test a provider connection by sending a real lightweight request.
+/// Replaces the frontend's simulated test. Returns a classified
+/// result (success / model count / structured error).
+#[tauri::command]
+pub async fn test_provider_connection(
+    flavor: String,
+    api_base: String,
+    api_key: String,
+    state: tauri::State<'_, SharedAppState>,
+) -> Result<ConnectionTestResult, String> {
+    // Use the configured API timeout, clamped to a sensible test
+    // window so a slow connection test doesn't hang the UI.
+    let configured = state.runtime.read().await.api_timeout_secs;
+    let timeout_secs = configured.clamp(5, 15);
+    Ok(adapter::test_connection(&flavor, &api_base, &api_key, timeout_secs).await)
 }
 
-fn load_from_file<T: serde::de::DeserializeOwned>(
-    app_handle: &tauri::AppHandle,
-    filename: &str,
-) -> Result<Option<T>, String> {
-    let path = data_dir(app_handle).join(filename);
-    if path.exists() {
-        let json = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        let data: T = serde_json::from_str(&json).map_err(|e| e.to_string())?;
-        println!("[persist] Loaded {} from {:?}", filename, path);
-        Ok(Some(data))
-    } else {
-        Ok(None)
-    }
+/// Fetch available models from providers that expose a model-list
+/// endpoint. Returns a friendly message and an empty list for
+/// protocols that require manual model entry.
+#[tauri::command]
+pub async fn fetch_provider_models(
+    flavor: String,
+    api_base: String,
+    api_key: String,
+    state: tauri::State<'_, SharedAppState>,
+) -> Result<adapter::FetchModelsResult, String> {
+    let configured = state.runtime.read().await.api_timeout_secs;
+    let timeout_secs = configured.clamp(5, 20);
+    Ok(adapter::fetch_models(&flavor, &api_base, &api_key, timeout_secs).await)
 }
 
-// ── Commands ──────────────────────────────────────────────────
+// ── Provider commands ───────────────────────────────────────
 
-/// Save providers list (persists to disk and updates proxy shared state)
+/// Save providers (persist encrypted + update routing state).
 #[tauri::command]
 pub async fn save_providers(
     app_handle: tauri::AppHandle,
     providers: Vec<Provider>,
-    proxy_state: tauri::State<'_, Arc<RwLock<proxy::ProxyConfig>>>,
+    state: tauri::State<'_, SharedAppState>,
 ) -> Result<(), String> {
-    let agg_list = {
-        let cfg = proxy_state.read().await;
-        cfg.aggregations.clone()
-    };
-    proxy::update_config(&proxy_state, providers.clone(), agg_list).await;
-
-    // Encrypt API keys before persisting to disk
-    let encrypted_providers: Vec<Provider> = providers
-        .into_iter()
-        .map(|mut p| {
-            if !p.api_key.is_empty() {
-                p.api_key = crypto::encrypt(&p.api_key, &app_handle).unwrap_or_default();
-            }
-            p
-        })
-        .collect();
-
-    save_to_file(&app_handle, "providers.json", &encrypted_providers)?;
+    let agg_list = state.routing.read().await.aggregations.clone();
+    storage::save_providers(&app_handle, &providers)?;
+    proxy::update_routing_config(state.inner(), providers, agg_list).await;
     Ok(())
 }
 
-/// Load providers list (from disk, falls back to proxy state)
+/// Load providers (decrypt + update routing state).
 #[tauri::command]
 pub async fn load_providers(
     app_handle: tauri::AppHandle,
-    proxy_state: tauri::State<'_, Arc<RwLock<proxy::ProxyConfig>>>,
+    state: tauri::State<'_, SharedAppState>,
 ) -> Result<Vec<Provider>, String> {
-    // Try loading from disk first
-    if let Some(providers) = load_from_file::<Vec<Provider>>(&app_handle, "providers.json")? {
-        // Decrypt API keys
-        let decrypted_providers: Vec<Provider> = providers
-            .into_iter()
-            .map(|mut p| {
-                if !p.api_key.is_empty() {
-                    p.api_key = crypto::decrypt(&p.api_key, &app_handle).unwrap_or(p.api_key);
-                }
-                p
-            })
-            .collect();
-
-        // Update in-memory state with decrypted keys
-        let agg_list = {
-            let cfg = proxy_state.read().await;
-            cfg.aggregations.clone()
-        };
-        proxy::update_config(&proxy_state, decrypted_providers.clone(), agg_list).await;
-        return Ok(decrypted_providers);
-    }
-    // Fallback to proxy state
-    let cfg = proxy_state.read().await;
-    Ok(cfg.providers.clone())
+    let providers = storage::load_providers(&app_handle)?;
+    let agg_list = state.routing.read().await.aggregations.clone();
+    proxy::update_routing_config(state.inner(), providers.clone(), agg_list).await;
+    Ok(providers)
 }
 
-/// Save aggregations (persists to disk and updates proxy shared state)
+// ── Aggregation commands ────────────────────────────────────
+
+/// Save aggregations (persist + update routing state).
 #[tauri::command]
 pub async fn save_aggregations(
     app_handle: tauri::AppHandle,
     aggregations: Vec<Aggregation>,
-    proxy_state: tauri::State<'_, Arc<RwLock<proxy::ProxyConfig>>>,
+    state: tauri::State<'_, SharedAppState>,
 ) -> Result<(), String> {
-    let prov_list = {
-        let cfg = proxy_state.read().await;
-        cfg.providers.clone()
-    };
-    proxy::update_config(&proxy_state, prov_list, aggregations.clone()).await;
-    save_to_file(&app_handle, "aggregations.json", &aggregations)?;
+    let prov_list = state.routing.read().await.providers.clone();
+    storage::save_aggregations(&app_handle, &aggregations)?;
+    proxy::update_routing_config(state.inner(), prov_list, aggregations).await;
     Ok(())
 }
 
-/// Load aggregations (from disk, falls back to proxy state)
+/// Load aggregations (persist + update routing state).
 #[tauri::command]
 pub async fn load_aggregations(
     app_handle: tauri::AppHandle,
-    proxy_state: tauri::State<'_, Arc<RwLock<proxy::ProxyConfig>>>,
+    state: tauri::State<'_, SharedAppState>,
 ) -> Result<Vec<Aggregation>, String> {
-    // Try loading from disk first
-    if let Some(aggregations) =
-        load_from_file::<Vec<Aggregation>>(&app_handle, "aggregations.json")?
-    {
-        // Update in-memory state
-        let prov_list = {
-            let cfg = proxy_state.read().await;
-            cfg.providers.clone()
-        };
-        proxy::update_config(&proxy_state, prov_list, aggregations.clone()).await;
-        return Ok(aggregations);
-    }
-    // Fallback to proxy state
-    let cfg = proxy_state.read().await;
-    Ok(cfg.aggregations.clone())
+    let aggregations = storage::load_aggregations(&app_handle)?;
+    let prov_list = state.routing.read().await.providers.clone();
+    proxy::update_routing_config(state.inner(), prov_list, aggregations.clone()).await;
+    Ok(aggregations)
 }
 
-/// Start the proxy server
+// ── Proxy lifecycle commands ────────────────────────────────
+
 #[tauri::command]
 pub async fn start_proxy(
+    host: Option<String>,
     port: u16,
-    proxy_state: tauri::State<'_, Arc<RwLock<proxy::ProxyConfig>>>,
+    state: tauri::State<'_, SharedAppState>,
 ) -> Result<(), String> {
-    proxy::start(proxy_state.inner().clone(), port)
+    proxy::start(
+        state.inner().clone(),
+        host.unwrap_or_else(|| "127.0.0.1".into()),
+        port,
+    )
+    .await
 }
 
-/// Stop the proxy server
 #[tauri::command]
-pub fn stop_proxy() -> Result<(), String> {
-    proxy::stop()
+pub async fn stop_proxy(state: tauri::State<'_, SharedAppState>) -> Result<(), String> {
+    proxy::flush_metrics(state.inner()).await;
+    proxy::stop().await
 }
 
-/// Get proxy server status
 #[tauri::command]
 pub fn get_proxy_status() -> crate::types::ProxyStatus {
     proxy::status()
 }
 
-/// Get the current auth token from proxy config
+/// Exit the application.
 #[tauri::command]
-pub async fn get_proxy_auth(
-    proxy_state: tauri::State<'_, Arc<RwLock<proxy::ProxyConfig>>>,
-) -> Result<serde_json::Value, String> {
-    let cfg = proxy_state.read().await;
-    Ok(serde_json::json!({
-        "authToken": cfg.auth_token,
-        "corsEnabled": cfg.cors_enabled,
-    }))
-}
-
-/// Update the proxy's auth settings
-#[tauri::command]
-pub async fn update_proxy_auth(
-    auth_token: String,
-    cors_enabled: bool,
-    proxy_state: tauri::State<'_, Arc<RwLock<proxy::ProxyConfig>>>,
-) -> Result<(), String> {
-    proxy::update_auth_config(&proxy_state, auth_token, cors_enabled).await;
-    Ok(())
-}
-
-/// Get proxy runtime config (rate limit, timeout, etc.)
-#[tauri::command]
-pub async fn get_proxy_runtime_config(
-    proxy_state: tauri::State<'_, Arc<RwLock<proxy::ProxyConfig>>>,
-) -> Result<serde_json::Value, String> {
-    let cfg = proxy_state.read().await;
-    Ok(serde_json::json!({
-        "rateLimitPerMinute": cfg.rate_limit_per_minute,
-        "apiTimeoutSecs": cfg.api_timeout_secs,
-        "maxBodySize": cfg.max_body_size,
-    }))
-}
-
-/// Update proxy runtime config (rate limit, timeout, etc.)
-#[tauri::command]
-pub async fn update_proxy_runtime_config(
-    rate_limit_per_minute: u32,
-    api_timeout_secs: u64,
-    max_body_size: u64,
-    proxy_state: tauri::State<'_, Arc<RwLock<proxy::ProxyConfig>>>,
-) -> Result<(), String> {
-    proxy::update_runtime_config(
-        &proxy_state,
-        rate_limit_per_minute,
-        api_timeout_secs,
-        max_body_size,
-    )
-    .await;
-    Ok(())
-}
-
-/// Exit the application
-#[tauri::command]
-pub fn exit_app() {
+pub async fn exit_app(state: tauri::State<'_, SharedAppState>) -> Result<(), String> {
+    proxy::flush_metrics(state.inner()).await;
+    let _ = proxy::stop().await;
     std::process::exit(0);
 }

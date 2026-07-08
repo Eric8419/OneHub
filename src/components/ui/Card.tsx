@@ -5,12 +5,16 @@ interface CardProps {
   style?: React.CSSProperties;
   className?: string;
   padding?: string;
+  onMouseEnter?: React.MouseEventHandler<HTMLDivElement>;
+  onMouseLeave?: React.MouseEventHandler<HTMLDivElement>;
 }
 
-export const Card: React.FC<CardProps> = ({ children, style, className = '', padding }) => {
+export const Card: React.FC<CardProps> = ({ children, style, className = '', padding, onMouseEnter, onMouseLeave }) => {
   return (
     <div
       className={`ds-card ${className}`}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       style={{
         background: 'var(--bg-base-secondary)',
         border: '1px solid var(--border-neutral-l1)',

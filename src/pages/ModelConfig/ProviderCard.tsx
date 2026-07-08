@@ -1,7 +1,39 @@
 import { useState } from 'react';
 import { useProviderStore } from '../../store/providerStore';
-import { Tag } from '../../components/ui';
-import { ChevronDown, ChevronRight, Pencil, Trash2, Bot } from 'lucide-react';
+import type { Model, Provider } from '../../types/provider';
+import { ConfirmDialog, SpotlightCard, Tag, toast, Dropdown } from '../../components/ui';
+import { ChevronRight, Pencil, Trash2, Bot, Copy, Power, PowerOff, Loader2 } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
+
+const API_FLAVOR_OPTIONS = [
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'openai-compatible', label: 'OpenAI 兼容' },
+];
+
+const errorMessage = (e: unknown, fallback: string) =>
+  e instanceof Error ? e.message : e ? String(e) : fallback;
+
+const modelIdFromName = (value: string) =>
+  value.trim().toLowerCase().replace(/[^a-z0-9._:/-]+/g, '-').replace(/^-+|-+$/g, '') || crypto.randomUUID?.() || Date.now().toString(36);
+
+const describeModelCapabilities = (model: Model) => {
+  const tags: string[] = [];
+  if (model.contextWindow) tags.push(`${model.contextWindow.toLocaleString()} ctx`);
+  if (model.maxOutputTokens) tags.push(`${model.maxOutputTokens.toLocaleString()} out`);
+  if (model.supportsVision) tags.push('视觉');
+  if (model.supportsReasoning) tags.push('思考');
+  if (model.supportsReasoningEffort) tags.push('强度');
+  return tags;
+};
+
+const STATUS_CONFIG: Record<string, { tagVariant: 'green' | 'orange' | 'danger' | 'neutral'; label: string; cardStatus: string }> = {
+  connected:    { tagVariant: 'green',   label: '已连接',     cardStatus: 'normal' },
+  configuring: { tagVariant: 'orange',  label: '配置中',     cardStatus: 'unconfigured' },
+  error:       { tagVariant: 'danger',  label: '连接失败',   cardStatus: 'failed' },
+  disabled:    { tagVariant: 'neutral', label: '已禁用',     cardStatus: 'disabled' },
+  testing:     { tagVariant: 'orange',  label: '测试中',     cardStatus: 'testing' },
+};
 
 export const ProviderCard: React.FC<{ providerId: string }> = ({ providerId }) => {
   const provider = useProviderStore(s => s.providers.find(p => p.id === providerId));
@@ -9,36 +41,111 @@ export const ProviderCard: React.FC<{ providerId: string }> = ({ providerId }) =
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editKey, setEditKey] = useState('');
+  const [editApiBase, setEditApiBase] = useState('');
+  const [editApiFlavor, setEditApiFlavor] = useState('openai');
+  const [editModelsText, setEditModelsText] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!provider) return null;
+
+  const statusCfg = STATUS_CONFIG[provider.status] || STATUS_CONFIG.configuring;
 
   const handleEdit = () => {
     setEditKey(provider.apiKey);
+    setEditApiBase(provider.apiBase);
+    setEditApiFlavor(provider.apiFlavor || 'openai');
+    setEditModelsText(provider.models.map(m => m.name).join('\n'));
     setEditing(true);
   };
 
-  const handleSaveKey = async () => {
+  const handleSaveProvider = async (status?: Provider['status']) => {
     try {
+      const modelNames = editModelsText
+        .split(/[,，\n]/)
+        .map(s => s.trim())
+        .filter(Boolean);
       await updateProvider(provider.id, {
         apiKey: editKey,
-        status: editKey ? 'connected' : 'configuring',
+        apiBase: editApiBase.trim(),
+        apiFlavor: editApiFlavor,
+        models: modelNames.map(m => {
+          const existing = provider.models.find(model => model.name === m || model.id === m || model.id === modelIdFromName(m));
+          return { ...existing, id: existing?.id || modelIdFromName(m), name: m };
+        }),
+        status: status || 'configuring',
       });
       setEditing(false);
     } catch (e) {
-      console.error('Failed to save API key:', e);
+      console.error('Failed to save provider:', e);
     }
   };
 
-  if (!provider) return null;
+  const handleTestConnection = async () => {
+    setTesting(true);
+    try {
+      const result = await invoke<{ success: boolean; message: string }>('test_provider_connection', {
+        flavor: editApiFlavor,
+        apiBase: editApiBase,
+        apiKey: editKey,
+      });
+      if (result.success) {
+        toast(result.message || '连接成功', 'success');
+        await handleSaveProvider('connected');
+      } else {
+        toast(result.message || '连接失败', 'error');
+        await updateProvider(provider.id, { status: 'error' });
+      }
+    } catch (e: unknown) {
+      toast(errorMessage(e, '连接测试失败'), 'error');
+      await updateProvider(provider.id, { status: 'error' });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleCopyKey = () => {
+    if (provider.apiKey) {
+      navigator.clipboard.writeText(provider.apiKey).then(() => {
+        toast('API Key 已复制', 'success');
+      }).catch(() => {
+        toast('复制失败', 'error');
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await useProviderStore.getState().removeProvider(provider.id);
+      toast(`已删除提供商「${provider.name}」`, 'info');
+      setConfirmDelete(false);
+    } catch (e) {
+      console.error('Failed to remove provider:', e);
+    }
+  };
+
+  const handleToggleEnabled = async () => {
+    const newStatus = provider.status === 'disabled' ? 'connected' : 'disabled';
+    try {
+      await updateProvider(provider.id, { status: newStatus });
+      toast(newStatus === 'disabled' ? `已禁用「${provider.name}」` : `已启用「${provider.name}」`, 'success');
+    } catch (e) {
+      console.error('Failed to toggle provider:', e);
+    }
+  };
+
+  const isDisabled = provider.status === 'disabled';
 
   return (
-    <div
-      className="mc-provider-card"
+    <SpotlightCard
+      padding="0"
+      variant={statusCfg.cardStatus === 'failed' ? 'danger' : 'neutral'}
+      className={statusCfg.cardStatus !== 'normal' ? `rb-card-status--${statusCfg.cardStatus}` : ''}
       style={{
-        background: 'var(--bg-base-secondary)',
-        border: '1px solid var(--border-neutral-l1)',
-        borderRadius: 'var(--radius-12)',
         overflow: 'hidden',
+        opacity: isDisabled ? 0.7 : 1,
+        filter: isDisabled ? 'saturate(0.7)' : 'none',
+        transition: 'opacity var(--transition-normal, 0.2s) ease, filter var(--transition-normal, 0.2s) ease',
       }}
     >
       {/* Header */}
@@ -58,59 +165,84 @@ export const ProviderCard: React.FC<{ providerId: string }> = ({ providerId }) =
               fontSize: 'var(--heading-xs-font-size)',
               fontWeight: 'var(--heading-xs-font-weight)',
               lineHeight: 'var(--heading-xs-line-height)',
-              color: 'var(--text-default)',
+              color: isDisabled ? 'var(--text-disabled)' : 'var(--text-default)',
+              transition: 'color var(--transition-normal, 0.2s) ease',
             }}
           >
             {provider.name}
           </span>
-          <Tag variant={provider.status === 'connected' ? 'green' : 'orange'} style={{ border: 'none' }}>
-            {provider.status === 'connected' ? '已连接' : '配置中'}
-          </Tag>
+          {provider.status === 'testing' ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--spacer-4)', padding: '0 var(--spacer-8)', borderRadius: 'var(--radius-4)', fontSize: 'var(--body-xs-font-size)', background: 'var(--status-primary-surface-l1)', color: 'var(--status-primary-default)' }}>
+              <Loader2 size={10} style={{ animation: 'spin 0.6s linear infinite' }} />
+              测试中
+            </span>
+          ) : (
+            <Tag variant={statusCfg.tagVariant} style={{ border: 'none' }}>
+              {statusCfg.label}
+            </Tag>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 'var(--spacer-4)' }}>
           <button
             className="mc-icon-btn"
+            aria-label={isDisabled ? '启用提供商' : '禁用提供商'}
+            title={isDisabled ? '启用' : '禁用'}
+            onClick={handleToggleEnabled}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 28, height: 28,
+              borderRadius: 'var(--radius-6)', border: 'none',
+              background: 'transparent',
+              color: isDisabled ? 'var(--status-success-default)' : 'var(--icon-tertiary)',
+              cursor: 'pointer',
+              transition: 'background var(--transition-fast, 0.12s) ease, color var(--transition-fast, 0.12s) ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; e.currentTarget.style.color = isDisabled ? 'var(--status-success-hover)' : 'var(--status-error-default)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = isDisabled ? 'var(--status-success-default)' : 'var(--icon-tertiary)'; }}
+          >
+            {isDisabled ? <PowerOff size={14} /> : <Power size={14} />}
+          </button>
+          <button
+            className="mc-icon-btn"
+            aria-label="编辑提供商"
             title="编辑"
             onClick={handleEdit}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 28,
-              height: 28,
-              borderRadius: 'var(--radius-6)',
-              border: 'none',
+              width: 28, height: 28,
+              borderRadius: 'var(--radius-6)', border: 'none',
               background: 'transparent',
               color: 'var(--icon-tertiary)',
               cursor: 'pointer',
+              transition: 'background var(--transition-fast, 0.12s) ease, color var(--transition-fast, 0.12s) ease',
             }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; e.currentTarget.style.color = 'var(--icon-default)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--icon-tertiary)'; }}
           >
             <Pencil size={14} />
           </button>
           <button
             className="mc-icon-btn"
+            aria-label="删除提供商"
             title="删除"
-            onClick={async () => {
-              if (window.confirm(`确定删除提供商「${provider.name}」？`)) {
-                try {
-                  await useProviderStore.getState().removeProvider(provider.id);
-                } catch (e) {
-                  console.error('Failed to remove provider:', e);
-                }
-              }
-            }}
+            onClick={() => setConfirmDelete(true)}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 28,
-              height: 28,
-              borderRadius: 'var(--radius-6)',
-              border: 'none',
+              width: 28, height: 28,
+              borderRadius: 'var(--radius-6)', border: 'none',
               background: 'transparent',
               color: 'var(--icon-tertiary)',
               cursor: 'pointer',
+              transition: 'background var(--transition-fast, 0.12s) ease, color var(--transition-fast, 0.12s) ease',
             }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--status-error-surface-l1)'; e.currentTarget.style.color = 'var(--status-error-default)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--icon-tertiary)'; }}
           >
             <Trash2 size={14} />
           </button>
@@ -147,16 +279,33 @@ export const ProviderCard: React.FC<{ providerId: string }> = ({ providerId }) =
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)', flexShrink: 0 }}>API Key</span>
           {provider.apiKey ? (
-            <span
-              style={{
-                fontSize: 'var(--body-xs-font-size)',
-                color: 'var(--text-secondary)',
-                textAlign: 'right',
-                fontFamily: 'var(--code-terminal-font-family)',
-              }}
-            >
-              {provider.apiKey ? `${provider.apiKey.slice(0, 8)}...` : ''}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-4)' }}>
+              <span
+                style={{
+                  fontSize: 'var(--body-xs-font-size)',
+                  color: 'var(--text-secondary)',
+                  textAlign: 'right',
+                  fontFamily: 'var(--code-terminal-font-family)',
+                }}
+              >
+                {provider.apiKey ? `${provider.apiKey.slice(0, 8)}...` : ''}
+              </span>
+              <button
+                title="复制 API Key"
+                onClick={handleCopyKey}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 20, height: 20, border: 'none', background: 'transparent',
+                  color: 'var(--icon-tertiary)', cursor: 'pointer', borderRadius: 'var(--radius-4)',
+                  padding: 0,
+                  transition: 'color var(--transition-fast, 0.12s) ease',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = 'var(--icon-brand)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = 'var(--icon-tertiary)'; }}
+              >
+                <Copy size={12} />
+              </button>
+            </div>
           ) : (
             <span
               onClick={handleEdit}
@@ -177,11 +326,79 @@ export const ProviderCard: React.FC<{ providerId: string }> = ({ providerId }) =
           <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)', flexShrink: 0 }}>模型数量</span>
           <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)' }}>{provider.models.length}</span>
         </div>
+
+        {/* Error summary for failed status */}
+        {provider.status === 'error' && (
+          <div
+            style={{
+              padding: 'var(--spacer-8) var(--spacer-12)',
+              borderRadius: 'var(--radius-6)',
+              background: 'var(--status-error-surface-l1)',
+              color: 'var(--status-error-default)',
+              fontSize: 'var(--body-xs-font-size)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--spacer-6)',
+              marginTop: 'var(--spacer-4)',
+            }}
+          >
+            <span>连接异常，请检查 API Key 和 Base URL 是否正确</span>
+          </div>
+        )}
+
+        {/* Unconfigured hint */}
+        {provider.status === 'configuring' && (
+          <div
+            style={{
+              padding: 'var(--spacer-8) var(--spacer-12)',
+              borderRadius: 'var(--radius-6)',
+              background: 'var(--status-alert-surface-l1)',
+              color: 'var(--status-alert-default)',
+              fontSize: 'var(--body-xs-font-size)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--spacer-6)',
+              marginTop: 'var(--spacer-4)',
+            }}
+          >
+            <span>尚未配置 API Key，点击编辑完成配置</span>
+          </div>
+        )}
       </div>
 
-      {/* Divider + Toggle */}
+      {/* API Key Editing */}
       {editing && (
-        <div style={{ padding: 'var(--spacer-8) var(--spacer-16) var(--spacer-8)' }}>
+        <div style={{ padding: '0 var(--spacer-16) var(--spacer-12)', display: 'flex', flexDirection: 'column', gap: 'var(--spacer-8)' }}>
+          <input
+            type="text"
+            value={editApiBase}
+            onChange={e => setEditApiBase(e.target.value)}
+            placeholder="API Base URL"
+            style={{
+              height: 32, padding: '0 var(--spacer-12)',
+              borderRadius: 'var(--radius-8)', border: '1px solid var(--border-neutral-l1)',
+              background: 'var(--bg-white)', color: 'var(--text-default)',
+              fontSize: 'var(--body-sm-font-size)', outline: 'none',
+            }}
+          />
+          <Dropdown
+            options={API_FLAVOR_OPTIONS}
+            value={editApiFlavor}
+            onChange={setEditApiFlavor}
+            size="sm"
+          />
+          <textarea
+            value={editModelsText}
+            onChange={e => setEditModelsText(e.target.value)}
+            placeholder="模型列表，每行或逗号分隔"
+            style={{
+              minHeight: 72, padding: 'var(--spacer-8) var(--spacer-12)',
+              borderRadius: 'var(--radius-8)', border: '1px solid var(--border-neutral-l1)',
+              background: 'var(--bg-white)', color: 'var(--text-default)',
+              fontSize: 'var(--body-sm-font-size)', outline: 'none',
+              resize: 'vertical', fontFamily: 'var(--font-family-mono)',
+            }}
+          />
           <div style={{ display: 'flex', gap: 'var(--spacer-8)', alignItems: 'center' }}>
             <input
               type="password"
@@ -196,15 +413,33 @@ export const ProviderCard: React.FC<{ providerId: string }> = ({ providerId }) =
               }}
             />
             <button
-              onClick={handleSaveKey}
+              onClick={() => handleSaveProvider()}
               style={{
                 height: 32, padding: '0 var(--spacer-12)',
                 borderRadius: 'var(--radius-8)', border: 'none',
                 background: 'var(--bg-brand)', color: 'var(--text-onbrand)',
                 cursor: 'pointer', fontSize: 'var(--body-sm-font-size)',
+                fontFamily: 'inherit',
+                transition: 'background var(--transition-fast, 0.12s) ease',
               }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-brand-hover)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-brand)'; }}
             >
               保存
+            </button>
+            <button
+              onClick={handleTestConnection}
+              disabled={testing || !editApiBase.trim() || !editKey.trim()}
+              style={{
+                height: 32, padding: '0 var(--spacer-12)',
+                borderRadius: 'var(--radius-8)', border: 'none',
+                background: 'var(--status-success-default)', color: 'var(--text-onbrand)',
+                cursor: testing ? 'wait' : 'pointer', fontSize: 'var(--body-sm-font-size)',
+                fontFamily: 'inherit',
+                opacity: testing ? 0.7 : 1,
+              }}
+            >
+              {testing ? '测试中...' : '测试并保存'}
             </button>
             <button
               onClick={() => setEditing(false)}
@@ -213,13 +448,19 @@ export const ProviderCard: React.FC<{ providerId: string }> = ({ providerId }) =
                 borderRadius: 'var(--radius-8)', border: '1px solid var(--border-neutral-l1)',
                 background: 'transparent', color: 'var(--text-secondary)',
                 cursor: 'pointer', fontSize: 'var(--body-sm-font-size)',
+                fontFamily: 'inherit',
+                transition: 'background var(--transition-fast, 0.12s) ease',
               }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
             >
               取消
             </button>
           </div>
         </div>
       )}
+
+      {/* Divider + Toggle model list */}
       <div style={{ height: 1, background: 'var(--border-neutral-l1)', margin: '0 var(--spacer-16)' }} />
       <div
         className="mc-provider-card__toggle"
@@ -233,45 +474,89 @@ export const ProviderCard: React.FC<{ providerId: string }> = ({ providerId }) =
           color: 'var(--text-tertiary)',
           fontSize: 'var(--body-xs-font-size)',
           lineHeight: 'var(--body-xs-line-height)',
-          transition: 'color 0.15s ease',
+          transition: 'color var(--transition-fast, 0.12s) ease, background var(--transition-fast, 0.12s) ease',
         }}
+        onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
+        onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-tertiary)'; e.currentTarget.style.background = 'transparent'; }}
       >
-        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <span
+          style={{
+            display: 'inline-flex',
+            transition: 'transform var(--transition-normal, 0.2s) ease',
+            transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+          }}
+        >
+          <ChevronRight size={12} />
+        </span>
         <span>{expanded ? '收起模型列表' : '展开模型列表'}</span>
       </div>
 
       {/* Model list */}
-      {expanded && (
-        <div
-          className="mc-provider-card__models"
-          style={{
-            padding: 'var(--spacer-8) var(--spacer-16) var(--spacer-12)',
-            borderTop: '1px solid var(--border-neutral-l1)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--spacer-6)',
-            background: 'var(--bg-white)',
-          }}
-        >
-          {provider.models.map(model => (
-            <div
-              key={model.id}
-              className="mc-model-item"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--spacer-8)',
-                fontSize: 'var(--body-sm-font-size)',
-                lineHeight: 'var(--body-sm-line-height)',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              <Bot size={14} style={{ color: 'var(--icon-tertiary)' }} />
-              <span>{model.name}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+      <div
+        className="mc-provider-card__models"
+        style={{
+          maxHeight: expanded ? 500 : 0,
+          overflow: 'hidden',
+          transition: 'max-height var(--transition-normal, 0.2s) ease, opacity var(--transition-fast, 0.12s) ease',
+          opacity: expanded ? 1 : 0,
+          padding: expanded ? 'var(--spacer-8) var(--spacer-16) var(--spacer-12)' : '0 var(--spacer-16)',
+          borderTop: expanded ? '1px solid var(--border-neutral-l1)' : 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: expanded ? 'var(--spacer-6)' : 0,
+          background: 'var(--bg-white)',
+        }}
+      >
+        {provider.models.map(model => {
+          const capabilityTags = describeModelCapabilities(model);
+          return (
+          <div
+            key={model.id}
+            className="mc-model-item"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--spacer-8)',
+              flexWrap: 'wrap',
+              fontSize: 'var(--body-sm-font-size)',
+              lineHeight: 'var(--body-sm-line-height)',
+              color: isDisabled ? 'var(--text-disabled)' : 'var(--text-secondary)',
+            }}
+          >
+            <Bot size={14} style={{ color: isDisabled ? 'var(--icon-disabled)' : 'var(--icon-tertiary)' }} />
+            <span>{model.name}</span>
+            {capabilityTags.map(tag => (
+              <span
+                key={tag}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  height: 20,
+                  padding: '0 var(--spacer-6)',
+                  borderRadius: 'var(--radius-6)',
+                  background: 'var(--bg-overlay-l1)',
+                  color: isDisabled ? 'var(--text-disabled)' : 'var(--text-tertiary)',
+                  fontSize: 'var(--body-xs-font-size)',
+                }}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+          );
+        })}
+      </div>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        open={confirmDelete}
+        title="删除提供商"
+        message={`确定删除提供商「${provider.name}」？此操作不可撤销。`}
+        confirmLabel="删除"
+        variant="danger"
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
+    </SpotlightCard>
   );
 };

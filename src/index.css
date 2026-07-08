@@ -41,6 +41,13 @@
   --spacer-48: 48px;
   --spacer-64: 64px;
 
+  /* ── transitions ─────────────────────────────────────────── */
+  --transition-fast: 0.12s ease;
+  --transition-normal: 0.2s ease;
+  --transition-slow: 0.3s ease;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-soft-spring: cubic-bezier(0.2, 0.8, 0.2, 1);
+
   /* ── icon sizes ───────────────────────────────────────── */
   --icon-size-12: 12px;
   --icon-size-14: 14px;
@@ -213,6 +220,104 @@
   --chart-other: #737373;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Dark Theme (applied via data-theme="dark" on <html>)
+   ═══════════════════════════════════════════════════════════════ */
+[data-theme="dark"] {
+  /* ── bg ───────────────────────────────────────────────── */
+  --bg-base-default: #1A1A1A;
+  --bg-base-secondary: #252525;
+  --bg-base-tertiary: #333333;
+  --bg-overlay-l1: rgba(255, 255, 255, 0.06);
+  --bg-overlay-l2: rgba(255, 255, 255, 0.10);
+  --bg-overlay-l3: rgba(255, 255, 255, 0.14);
+  --bg-overlay-l4: rgba(255, 255, 255, 0.18);
+  --bg-white: #2A2A2A;
+  --bg-menu: #2A2A2A;
+  --bg-tooltip: #333333;
+  --bg-invert: #E5E5E5;
+  --bg-invert-hover: #D4D4D4;
+  --bg-invert-active: #A1A1A1;
+  --bg-invert-disabled: rgba(255, 255, 255, 0.10);
+
+  /* ── bg-brand ─────────────────────────────────────────── */
+  --bg-brand: #6A6FFF;
+  --bg-brand-hover: #8894FF;
+  --bg-brand-active: #4B3FE3;
+  --bg-brand-disabled: rgba(106, 111, 255, 0.30);
+  --bg-brand-popup: rgba(106, 111, 255, 0.20);
+
+  /* ── text ─────────────────────────────────────────────── */
+  --text-default: #E5E5E5;
+  --text-default-hover: #FFFFFF;
+  --text-secondary: #A1A1A1;
+  --text-tertiary: #737373;
+  --text-disabled: #525252;
+  --text-onbrand: #FFFFFF;
+  --text-onaccent: #FFFFFF;
+  --text-brand: #8894FF;
+  --text-brand-hover: #AAB7FF;
+
+  /* ── icon ─────────────────────────────────────────────── */
+  --icon-default: #E5E5E5;
+  --icon-secondary: #A1A1A1;
+  --icon-tertiary: #737373;
+  --icon-disabled: #525252;
+  --icon-brand: #8894FF;
+  --icon-onbrand: #FFFFFF;
+
+  /* ── border ───────────────────────────────────────────── */
+  --border-neutral-l1: rgba(255, 255, 255, 0.10);
+  --border-neutral-l2: rgba(255, 255, 255, 0.16);
+  --border-neutral-l3: rgba(255, 255, 255, 0.30);
+  --border-contrast: #FFFFFF;
+  --border-brand: #6A6FFF;
+
+  /* ── brand scale ──────────────────────────────────────── */
+  --brand-50: #1A1759;
+  --brand-100: #2C2290;
+  --brand-200: #3F31C6;
+  --brand-300: #4B3FE3;
+  --brand-400: #6A6FFF;
+  --brand-500: #8894FF;
+  --brand-600: #AAB7FF;
+  --brand-700: #CFD8FF;
+  --brand-800: #E5EAFF;
+  --brand-900: #F2F7FF;
+  --brand-grey-100: #252525;
+  --brand-grey-200: #333333;
+  --brand-grey-300: #404040;
+  --brand-grey-400: #525252;
+  --brand-grey-500: #737373;
+  --brand-grey-600: #A1A1A1;
+  --brand-grey-700: #D4D4D4;
+  --brand-grey-800: #E5E5E5;
+  --brand-grey-900: #F5F5F5;
+
+  /* ── status ───────────────────────────────────────────── */
+  --status-primary-default: #4C88FF;
+  --status-primary-hover: #6A9EFF;
+  --status-primary-active: #2F74FF;
+  --status-primary-surface-l1: rgba(47, 116, 255, 0.20);
+  --status-success-default: #2FB287;
+  --status-success-hover: #40C498;
+  --status-success-active: #15A877;
+  --status-success-surface-l1: rgba(64, 176, 139, 0.20);
+  --status-alert-default: #FEA900;
+  --status-alert-surface-l1: rgba(254, 169, 0, 0.20);
+  --status-warning-default: #E27900;
+  --status-warning-surface-l1: rgba(226, 121, 0, 0.20);
+  --status-error-default: #EA574C;
+  --status-error-hover: #F06B62;
+  --status-error-active: #E8463A;
+  --status-error-surface-l1: rgba(232, 70, 58, 0.20);
+}
+
+/* ── Smooth theme transition ──────────────────────────────── */
+html {
+  transition: background var(--transition-normal, 0.2s) ease, color var(--transition-normal, 0.2s) ease;
+}
+
 /* ── Global Reset ─────────────────────────────────────────── */
 *,
 *::before,
@@ -246,9 +351,313 @@ button {
   font-family: inherit;
 }
 
+/* ── Focus visible for keyboard accessibility ─────────────── */
+:focus-visible {
+  outline: 2px solid var(--bg-brand);
+  outline-offset: 2px;
+}
+
+/* ── Keyframes ───────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes rbEnter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--rb-distance, 8px)) scale(0.985);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes rbShine {
+  0% { background-position: 180% 50%; }
+  100% { background-position: -80% 50%; }
+}
+
+@keyframes rbPulseDot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.45); opacity: 0.62; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes skeletonPulse {
+  0%   { opacity: 0.6; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideOutDown {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(12px); }
+}
+
+@keyframes highlightFade {
+  0%   { background-color: var(--bg-brand-popup); }
+  100% { background-color: transparent; }
+}
+
+@keyframes ripple {
+  to { transform: scale(4); opacity: 0; }
+}
+
+.rb-animated-content {
+  animation: rbEnter var(--rb-duration, 360ms) var(--ease-out-expo) both;
+  animation-delay: var(--rb-delay, 0ms);
+}
+
+.rb-spotlight-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transition:
+    border-color var(--transition-normal),
+    box-shadow var(--transition-normal),
+    transform var(--transition-normal),
+    opacity var(--transition-normal);
+}
+
+/* Spotlight variant: danger — red glow instead of brand */
+.rb-spotlight-card[data-variant="danger"]::before {
+  background:
+    radial-gradient(
+      220px circle at var(--rb-x, 50%) var(--rb-y, 50%),
+      color-mix(in srgb, var(--status-error-default) 16%, transparent),
+      transparent 58%
+    ) !important;
+}
+
+.rb-spotlight-card[data-variant="kpi"] {
+  cursor: default;
+}
+
+.rb-spotlight-card[data-variant="danger"].is-active,
+.rb-spotlight-card[data-variant="danger"]:hover {
+  border-color: color-mix(in srgb, var(--status-error-default) 28%, var(--border-neutral-l1)) !important;
+}
+
+.rb-spotlight-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+  background:
+    radial-gradient(
+      220px circle at var(--rb-x, 50%) var(--rb-y, 50%),
+      color-mix(in srgb, var(--bg-brand) 16%, transparent),
+      transparent 58%
+    );
+}
+
+.rb-spotlight-card.is-active,
+.rb-spotlight-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--bg-brand) 28%, var(--border-neutral-l1));
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--text-default) 9%, transparent);
+}
+
+.rb-spotlight-card.is-active::before,
+.rb-spotlight-card:hover::before {
+  opacity: 1;
+}
+
+.rb-shiny-text {
+  color: inherit;
+}
+
+.rb-shiny-text.is-active {
+  background:
+    linear-gradient(
+      105deg,
+      currentColor 0%,
+      currentColor 36%,
+      color-mix(in srgb, var(--bg-brand) 72%, #ffffff) 48%,
+      currentColor 60%,
+      currentColor 100%
+    );
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: rbShine 3.4s var(--ease-soft-spring) infinite;
+}
+
+.rb-pulse-dot {
+  animation: rbPulseDot 1.8s ease-in-out infinite;
+}
+
+/* ── Skeleton loading ─────────────────────────────────────── */
+.rb-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-overlay-l1) 25%,
+    var(--bg-overlay-l2) 50%,
+    var(--bg-overlay-l1) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeletonPulse 1.4s ease-in-out infinite;
+}
+
+/* ── Changed value highlight ──────────────────────────────── */
+.rb-highlight-change {
+  animation: highlightFade 1.2s ease-out forwards;
+}
+
+/* ── Card status variants ─────────────────────────────────── */
+.rb-card-status--normal {
+  border-color: var(--border-neutral-l1) !important;
+}
+
+.rb-card-status--disabled {
+  opacity: 0.6;
+  border-color: var(--border-neutral-l1) !important;
+  filter: saturate(0.6);
+}
+
+.rb-card-status--failed {
+  border-color: var(--status-error-default) !important;
+  box-shadow: 0 0 0 1px var(--status-error-surface-l1);
+}
+
+.rb-card-status--unconfigured {
+  border-color: var(--status-alert-default) !important;
+}
+
+.rb-card-status--testing {
+  border-color: var(--status-primary-default) !important;
+  box-shadow: 0 0 0 1px var(--status-primary-surface-l1);
+}
+
+/* ── Status dot variants ──────────────────────────────────── */
+.rb-status-dot--running {
+  background: var(--status-success-default);
+  box-shadow: 0 0 0 2px var(--status-success-surface-l1);
+}
+
+.rb-status-dot--stopped {
+  background: var(--icon-disabled);
+}
+
+.rb-status-dot--error {
+  background: var(--status-error-default);
+  box-shadow: 0 0 0 2px var(--status-error-surface-l1);
+  animation: rbPulseDot 1.2s ease-in-out 3;
+}
+
+.rb-status-dot--checking {
+  background: var(--status-alert-default);
+  animation: rbPulseDot 0.8s ease-in-out infinite;
+}
+
+.ds-card {
+  transition:
+    border-color var(--transition-normal),
+    box-shadow var(--transition-normal),
+    transform var(--transition-normal),
+    background var(--transition-normal);
+}
+
 /* ── Scrollbar hidden utility ────────────────────────────── */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Themed scrollbars (global) ─────────────────────────────
+   Unified custom scrollbar across the whole app. Every scrollable
+   element (main viewport, tables, dropdowns, dialogs, etc.) gets
+   the same themed look automatically — no per-component opt-in
+   required. `.ds-scroll` is retained as an explicit alias for
+   documentation / consistency. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-overlay-l2) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--bg-overlay-l2);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background var(--transition-fast);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-overlay-l3);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background: var(--bg-overlay-l4);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+/* Hide the default arrow buttons so the bar stays a clean capsule */
+*::-webkit-scrollbar-button,
+*::-webkit-scrollbar-button:start,
+*::-webkit-scrollbar-button:end {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Elements that explicitly hide their scrollbar (lean layouts) keep
+   the opt-out via `.no-scrollbar`. */
+.ds-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-overlay-l2) transparent;
+}
+
+/* ── Dropdown entrance animation ─────────────────────────── */
+@keyframes dsDropdownIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
 
 /* ── Visual regression: table overflow & long text ──────── */
 .mc-table-wrapper {
@@ -280,8 +689,34 @@ button {
 }
 
 @media (max-width: 1024px) {
+  .dashboard-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .dashboard-chart-grid,
+  .mc-provider-grid {
+    grid-template-columns: 1fr !important;
+  }
+
   .settings-form-area {
     max-width: 100% !important;
     padding-left: var(--spacer-16) !important;
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1180px) {
+  .mc-provider-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
   }
 }

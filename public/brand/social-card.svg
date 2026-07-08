@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc" shape-rendering="crispEdges">
+  <title id="title">Melody Hub pixel companion social card</title>
+  <desc id="desc">A cute grayscale pixel tech companion social card for Melody Hub.</desc>
+  <rect width="1200" height="630" fill="#F7F8FA"/>
+  <rect x="48" y="48" width="1104" height="534" fill="none" stroke="#151515" stroke-width="12"/>
+  <g fill="#CBD2DB">
+    <rect x="826" y="472" width="248" height="24"/>
+    <rect x="788" y="496" width="324" height="16"/>
+  </g>
+  <g transform="translate(792 138) scale(1.52)">
+    <rect x="16" y="16" width="224" height="224" fill="none" stroke="#151515" stroke-width="8"/>
+    <g fill="#151515">
+      <rect x="120" y="24" width="16" height="16"/>
+      <rect x="128" y="40" width="8" height="16"/>
+      <rect x="72" y="48" width="112" height="16"/>
+      <rect x="64" y="64" width="16" height="24"/>
+      <rect x="176" y="64" width="16" height="24"/>
+      <rect x="48" y="96" width="16" height="48"/>
+      <rect x="192" y="96" width="16" height="48"/>
+      <rect x="72" y="80" width="112" height="16"/>
+      <rect x="64" y="96" width="16" height="64"/>
+      <rect x="176" y="96" width="16" height="64"/>
+      <rect x="80" y="160" width="96" height="16"/>
+    </g>
+    <rect x="80" y="96" width="96" height="64" fill="#E7EBF0"/>
+    <g fill="#151515">
+      <rect x="96" y="112" width="16" height="16"/>
+      <rect x="144" y="112" width="16" height="16"/>
+      <rect x="108" y="140" width="8" height="8"/>
+      <rect x="124" y="132" width="8" height="16"/>
+      <rect x="140" y="140" width="8" height="8"/>
+    </g>
+    <g fill="#8FB7D9">
+      <rect x="124" y="28" width="8" height="8"/>
+      <rect x="124" y="132" width="8" height="16"/>
+    </g>
+  </g>
+  <text x="92" y="234" fill="#151515" font-family="JetBrains Mono, Consolas, monospace" font-size="74" font-weight="900" letter-spacing="-1">MELODY HUB</text>
+  <text x="96" y="316" fill="#151515" font-family="JetBrains Mono, Consolas, monospace" font-size="25" font-weight="700" letter-spacing="1.5">MODEL ROUTING CONSOLE</text>
+  <text x="96" y="428" fill="#6E7681" font-family="JetBrains Mono, Consolas, monospace" font-size="20" font-weight="600">CUTE PIXEL CONTROL FOR MODEL ROUTING</text>
+  <rect x="96" y="468" width="216" height="16" fill="#151515"/>
+  <rect x="332" y="468" width="104" height="16" fill="#8FB7D9"/>
+  <rect x="456" y="468" width="168" height="16" fill="#CBD2DB"/>
+</svg>

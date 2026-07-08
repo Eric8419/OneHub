@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc" shape-rendering="crispEdges">
+  <title id="title">Melody Hub pixel companion mark</title>
+  <desc id="desc">Standalone cute pixel tech companion mark.</desc>
+  <rect width="256" height="256" fill="#F7F8FA"/>
+  <rect x="16" y="16" width="224" height="224" fill="none" stroke="#151515" stroke-width="8"/>
+  <g fill="#CBD2DB">
+    <rect x="72" y="192" width="112" height="16"/>
+    <rect x="56" y="208" width="144" height="8"/>
+  </g>
+  <g fill="#151515">
+    <rect x="120" y="24" width="16" height="16"/>
+    <rect x="128" y="40" width="8" height="16"/>
+    <rect x="72" y="48" width="112" height="16"/>
+    <rect x="64" y="64" width="16" height="24"/>
+    <rect x="176" y="64" width="16" height="24"/>
+    <rect x="48" y="96" width="16" height="48"/>
+    <rect x="192" y="96" width="16" height="48"/>
+    <rect x="72" y="80" width="112" height="16"/>
+    <rect x="64" y="96" width="16" height="64"/>
+    <rect x="176" y="96" width="16" height="64"/>
+    <rect x="80" y="160" width="96" height="16"/>
+    <rect x="96" y="112" width="16" height="16"/>
+    <rect x="144" y="112" width="16" height="16"/>
+    <rect x="108" y="140" width="8" height="8"/>
+    <rect x="124" y="132" width="8" height="16"/>
+    <rect x="140" y="140" width="8" height="8"/>
+  </g>
+  <g fill="#E7EBF0">
+    <rect x="80" y="96" width="96" height="64"/>
+    <rect x="56" y="104" width="8" height="32"/>
+    <rect x="192" y="104" width="8" height="32"/>
+  </g>
+  <g fill="#151515">
+    <rect x="96" y="112" width="16" height="16"/>
+    <rect x="144" y="112" width="16" height="16"/>
+    <rect x="108" y="140" width="8" height="8"/>
+    <rect x="124" y="132" width="8" height="16"/>
+    <rect x="140" y="140" width="8" height="8"/>
+  </g>
+  <g fill="#8FB7D9">
+    <rect x="124" y="28" width="8" height="8"/>
+    <rect x="124" y="132" width="8" height="16"/>
+  </g>
+</svg>

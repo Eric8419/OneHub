@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 128" role="img" aria-labelledby="title" shape-rendering="crispEdges">
+  <title id="title">Melody Hub pixel companion wordmark</title>
+  <rect width="600" height="128" fill="#F7F8FA"/>
+  <rect x="8" y="8" width="112" height="112" fill="#F7F8FA" stroke="#151515" stroke-width="4"/>
+  <g fill="#151515">
+    <rect x="60" y="18" width="8" height="8"/>
+    <rect x="64" y="26" width="4" height="8"/>
+    <rect x="36" y="32" width="56" height="8"/>
+    <rect x="30" y="40" width="10" height="14"/>
+    <rect x="88" y="40" width="10" height="14"/>
+    <rect x="22" y="58" width="10" height="24"/>
+    <rect x="96" y="58" width="10" height="24"/>
+    <rect x="36" y="50" width="56" height="10"/>
+    <rect x="30" y="60" width="10" height="32"/>
+    <rect x="88" y="60" width="10" height="32"/>
+    <rect x="40" y="92" width="48" height="10"/>
+    <rect x="48" y="66" width="10" height="10"/>
+    <rect x="70" y="66" width="10" height="10"/>
+    <rect x="54" y="82" width="4" height="4"/>
+    <rect x="62" y="78" width="4" height="10"/>
+    <rect x="70" y="82" width="4" height="4"/>
+  </g>
+  <rect x="40" y="60" width="48" height="32" fill="#E7EBF0"/>
+  <g fill="#151515">
+    <rect x="48" y="66" width="10" height="10"/>
+    <rect x="70" y="66" width="10" height="10"/>
+    <rect x="54" y="82" width="4" height="4"/>
+    <rect x="62" y="78" width="4" height="10"/>
+    <rect x="70" y="82" width="4" height="4"/>
+  </g>
+  <rect x="62" y="78" width="4" height="10" fill="#8FB7D9"/>
+  <text x="148" y="70" fill="#151515" font-family="JetBrains Mono, Consolas, monospace" font-size="42" font-weight="800" letter-spacing="0">MELODY HUB</text>
+  <text x="151" y="99" fill="#6E7681" font-family="JetBrains Mono, Consolas, monospace" font-size="14" font-weight="700" letter-spacing="4">MODEL ROUTING CONSOLE</text>
+</svg>

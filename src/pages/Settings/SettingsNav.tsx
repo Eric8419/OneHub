@@ -1,14 +1,15 @@
+import { useMemo } from 'react';
 import { useSettingsStore } from '../../store/settingsStore';
 import type { SettingsCategory } from '../../types/settings';
-import { Settings, Cloud, FileText, Shield, Sliders } from 'lucide-react';
+import { Settings, FileText, Shield, Sliders, Globe } from 'lucide-react';
 import { useT } from '../../i18n';
 
-const categories: { key: SettingsCategory; label: string; icon: React.ReactNode }[] = [
-  { key: 'general', label: '', icon: <Settings size={16} /> },
-  { key: 'proxy', label: '', icon: <Cloud size={16} /> },
-  { key: 'logging', label: '', icon: <FileText size={16} /> },
-  { key: 'security', label: '', icon: <Shield size={16} /> },
-  { key: 'advanced', label: '', icon: <Sliders size={16} /> },
+const categoryKeys: { key: SettingsCategory; icon: React.ReactNode }[] = [
+  { key: 'general', icon: <Settings size={16} /> },
+  { key: 'proxy', icon: <Globe size={16} /> },
+  { key: 'logging', icon: <FileText size={16} /> },
+  { key: 'security', icon: <Shield size={16} /> },
+  { key: 'advanced', icon: <Sliders size={16} /> },
 ];
 
 export const SettingsNav: React.FC = () => {
@@ -16,15 +17,18 @@ export const SettingsNav: React.FC = () => {
   const activeCategory = useSettingsStore(s => s.activeCategory);
   const setActiveCategory = useSettingsStore(s => s.setActiveCategory);
 
-  // Fill labels with i18n
-  const labelMap: Record<SettingsCategory, string> = {
+  const labelMap: Record<SettingsCategory, string> = useMemo(() => ({
     general: t('settings.general'),
     proxy: t('settings.proxy'),
     logging: t('settings.logging'),
     security: t('settings.security'),
     advanced: t('settings.advanced'),
-  };
-  categories.forEach(c => { c.label = labelMap[c.key]; });
+  }), [t]);
+
+  const categories = useMemo(() =>
+    categoryKeys.map(c => ({ ...c, label: labelMap[c.key] })),
+    [labelMap]
+  );
 
   return (
     <nav
@@ -60,7 +64,13 @@ export const SettingsNav: React.FC = () => {
               lineHeight: 'var(--body-base-line-height)',
               cursor: 'pointer',
               background: isActive ? 'var(--bg-overlay-l2)' : 'transparent',
-              transition: 'background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease',
+              transition: 'background-color var(--transition-fast, 0.12s) ease, color var(--transition-fast, 0.12s) ease, border-color var(--transition-fast, 0.12s) ease',
+            }}
+            onMouseEnter={e => {
+              if (!isActive) e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+            }}
+            onMouseLeave={e => {
+              if (!isActive) e.currentTarget.style.background = 'transparent';
             }}
           >
             <span

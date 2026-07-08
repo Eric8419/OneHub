@@ -1,20 +1,26 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
-import type { RequestRecord, ModelBreakdown, TimeRange } from '../types/stats';
+import type { RequestRecord, ModelBreakdown, TimeRange, UsageStats, DailyUsage } from '../types/stats';
 
-interface DailyUsage {
-  date: string;
-  count: number;
-  tokens: number;
-}
+const errorMessage = (e: unknown, fallback: string) =>
+  e instanceof Error ? e.message : e ? String(e) : fallback;
 
 interface StatsStore {
-  stats: { totalTokens: number; totalRequests: number; activeModels: number; avgResponseTime: number; tokenChange: number; requestChange: number; responseTimeChange: number; responseTimeTrend: 'up' | 'down' };
+  stats: UsageStats;
   modelBreakdown: ModelBreakdown[];
   recentRequests: RequestRecord[];
   heatmapData: number[][];
+  dailyUsage: DailyUsage[];
   timeRange: TimeRange;
   loading: boolean;
+  /** Per-area loading states */
+  statsLoading: boolean;
+  requestsLoading: boolean;
+  dailyUsageLoading: boolean;
+  /** Per-area error states */
+  statsError: string | null;
+  requestsError: string | null;
+  dailyUsageError: string | null;
   page: number;
   pageSize: number;
   setTimeRange: (range: TimeRange) => void;
@@ -22,26 +28,25 @@ interface StatsStore {
   fetchStats: () => Promise<void>;
   fetchRequests: () => Promise<void>;
   fetchDailyUsage: () => Promise<void>;
+  resetStats: () => Promise<void>;
 }
 
-const EMPTY_STATS = {
-  totalTokens: 0, totalRequests: 0, activeModels: 0, avgResponseTime: 0,
-  tokenChange: 0, requestChange: 0, responseTimeChange: 0, responseTimeTrend: 'up' as const,
+const EMPTY_STATS: UsageStats = {
+  totalTokens: 0,
+  totalRequests: 0,
+  activeModels: 0,
+  avgResponseTime: 0,
+  tokenChange: 0,
+  requestChange: 0,
+  responseTimeChange: 0,
+  responseTimeTrend: 'up',
 };
 
-/** Build a 52-week × 7-day heatmap grid from daily usage data.
- *  Returns a 7x52 array where each cell is 0-5 (intensity level). */
+/** Build a 52-week × 7-day heatmap grid from daily usage data. */
 function buildHeatmapFromDailyUsage(dailyData: DailyUsage[]): number[][] {
-  // Initialize empty 7x52 grid
   const grid: number[][] = Array.from({ length: 7 }, () => Array(52).fill(0));
-
   if (dailyData.length === 0) return grid;
-
-  // Find max count for scaling
   const maxCount = Math.max(...dailyData.map(d => d.count), 1);
-
-  // Map each day's count to a cell in the 52-week grid
-  // Use the most recent 364 days (52 weeks)
   const now = new Date();
   const dayMs = 24 * 60 * 60 * 1000;
 
@@ -49,84 +54,126 @@ function buildHeatmapFromDailyUsage(dailyData: DailyUsage[]): number[][] {
     const date = new Date(day.date);
     const diffDays = Math.floor((now.getTime() - date.getTime()) / dayMs);
     if (diffDays < 0 || diffDays >= 364) continue;
-
-    // Determine week column (0 = most recent week, 51 = oldest)
     const weekCol = 51 - Math.floor(diffDays / 7);
-    // Determine day row (0 = Monday, 6 = Sunday)
-    // JavaScript: 0=Sun, 1=Mon, ..., 6=Sat → adjust to Mon=0..Sun=6
     let dayRow = date.getDay() - 1;
-    if (dayRow < 0) dayRow = 6; // Sunday → row 6
-
+    if (dayRow < 0) dayRow = 6;
     if (weekCol >= 0 && weekCol < 52 && dayRow >= 0 && dayRow < 7) {
-      // Scale to 0-5
       const intensity = Math.min(5, Math.round((day.count / maxCount) * 5));
       grid[dayRow][weekCol] = intensity;
     }
   }
-
   return grid;
 }
 
-export const useStatsStore = create<StatsStore>((set) => ({
+/** Compute model breakdown percentages from request records. */
+function computeModelBreakdown(requests: RequestRecord[]): ModelBreakdown[] {
+  if (requests.length === 0) return [];
+  const counts: Record<string, number> = {};
+  for (const r of requests) counts[r.model] = (counts[r.model] || 0) + 1;
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const colorMap: Record<string, string> = {
+    'GPT-4o': 'var(--chart-gpt)', 'GPT-4o-mini': 'var(--chart-gpt)', 'GPT-4.1': 'var(--chart-gpt)',
+    'o3-mini': 'var(--chart-gpt)', 'o3': 'var(--chart-gpt)',
+    'Claude 3.5 Sonnet': 'var(--chart-claude)', 'Claude 3.5 Haiku': 'var(--chart-claude)', 'Claude 4': 'var(--chart-claude)',
+    'DeepSeek V3': 'var(--chart-deepseek)', 'DeepSeek Coder': 'var(--chart-deepseek)',
+    'Qwen 2.5': 'var(--chart-qwen)',
+  };
+  const total = requests.length;
+  const breakdown: ModelBreakdown[] = [];
+  const otherColor = 'var(--chart-other)';
+  const topModels = sorted.slice(0, 4);
+  const otherCount = sorted.slice(4).reduce((sum, [, count]) => sum + count, 0);
+  for (const [name, count] of topModels) {
+    breakdown.push({ name, percentage: Math.round((count / total) * 100), color: colorMap[name] || otherColor });
+  }
+  if (otherCount > 0) {
+    breakdown.push({ name: '其他', percentage: Math.round((otherCount / total) * 100), color: otherColor });
+  }
+  return breakdown;
+}
+
+export const useStatsStore = create<StatsStore>((set, get) => ({
   stats: EMPTY_STATS,
-  modelBreakdown: [
-    { name: 'GPT-4o', percentage: 0, color: 'var(--chart-gpt)' },
-    { name: 'Claude 3.5', percentage: 0, color: 'var(--chart-claude)' },
-    { name: 'DeepSeek V3', percentage: 0, color: 'var(--chart-deepseek)' },
-    { name: 'Qwen 2.5', percentage: 0, color: 'var(--chart-qwen)' },
-    { name: '其他', percentage: 0, color: 'var(--chart-other)' },
-  ],
+  modelBreakdown: [],
   recentRequests: [],
   heatmapData: [],
+  dailyUsage: [],
   timeRange: '7d',
   loading: false,
+  statsLoading: false,
+  requestsLoading: false,
+  dailyUsageLoading: false,
+  statsError: null,
+  requestsError: null,
+  dailyUsageError: null,
   page: 0,
   pageSize: 10,
 
-  setTimeRange: (timeRange) => set({ timeRange }),
+  setTimeRange: (timeRange) => set({ timeRange, page: 0 }),
   setPage: (page) => set({ page }),
 
   fetchStats: async () => {
+    set({ statsLoading: true, statsError: null });
     try {
-      const s: any = await invoke('get_stats');
+      const timeRange = get().timeRange;
+      const s = await invoke<UsageStats>('get_stats', { timeRange });
       set({
         stats: {
-          totalTokens: s?.total_tokens ?? 0,
-          totalRequests: s?.total_requests ?? 0,
-          activeModels: s?.active_models ?? 0,
-          avgResponseTime: s?.avg_response_time ?? 0,
-          tokenChange: 0, requestChange: 0, responseTimeChange: 0,
-          responseTimeTrend: 'up' as const,
+          totalTokens: s.totalTokens ?? 0,
+          totalRequests: s.totalRequests ?? 0,
+          activeModels: s.activeModels ?? 0,
+          avgResponseTime: s.avgResponseTime ?? 0,
+          tokenChange: s.tokenChange ?? 0,
+          requestChange: s.requestChange ?? 0,
+          responseTimeChange: s.responseTimeChange ?? 0,
+          responseTimeTrend: s.responseTimeTrend ?? 'up',
         },
+        statsLoading: false,
       });
-    } catch {
-      // Proxy not running — data stays empty
+    } catch (e: unknown) {
+      set({ statsLoading: false, statsError: errorMessage(e, '获取统计失败') });
     }
   },
 
   fetchRequests: async () => {
+    set({ requestsLoading: true, requestsError: null });
     try {
-      const reqs: any[] = await invoke('get_recent_requests', { limit: 100 });
+      // Wire format is already camelCase; no manual remapping.
+      const reqs = await invoke<RequestRecord[]>('get_recent_requests', { limit: 100 });
       set({
-        recentRequests: reqs.map((r: any) => ({
-          id: r.id, timestamp: r.timestamp, model: r.model,
-          type: r.type || 'Chat Completion',
-          tokens: r.tokens, status: r.status,
-          latency: `${(r.latency_ms / 1000).toFixed(2)}s`,
-        })),
+        recentRequests: reqs,
+        modelBreakdown: computeModelBreakdown(reqs),
+        requestsLoading: false,
       });
-    } catch {
-      // Keep empty
+    } catch (e: unknown) {
+      set({ requestsLoading: false, requestsError: errorMessage(e, '获取请求记录失败') });
     }
   },
 
   fetchDailyUsage: async () => {
+    set({ dailyUsageLoading: true, dailyUsageError: null });
     try {
-      const data: DailyUsage[] = await invoke('get_daily_usage');
+      const data = await invoke<DailyUsage[]>('get_daily_usage');
       const heatmap = buildHeatmapFromDailyUsage(data);
-      set({ heatmapData: heatmap });
-    } catch {
-      // Keep empty heatmap
+      set({ dailyUsage: data, heatmapData: heatmap, dailyUsageLoading: false });
+    } catch (e: unknown) {
+      set({ dailyUsageLoading: false, dailyUsageError: errorMessage(e, '获取用量数据失败') });
+    }
+  },
+
+  resetStats: async () => {
+    try {
+      await invoke('reset_stats');
+      set({
+        stats: EMPTY_STATS,
+        modelBreakdown: [],
+        recentRequests: [],
+        dailyUsage: [],
+        heatmapData: buildHeatmapFromDailyUsage([]),
+        page: 0,
+      });
+    } catch (e: unknown) {
+      console.warn('[statsStore] reset_stats failed:', e);
     }
   },
 }));

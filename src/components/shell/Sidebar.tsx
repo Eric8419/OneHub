@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, Cpu, Settings, Music } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { LayoutDashboard, Cpu, Settings } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { useT } from '../../i18n';
 
@@ -15,10 +15,19 @@ interface SidebarProps {
   onNavigate: (path: string) => void;
 }
 
+type ProxyStatus = 'running' | 'stopped' | 'error' | 'checking';
+
+interface ProxyStatusPayload {
+  running?: boolean;
+  host?: string;
+  port?: number;
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
   const t = useT();
-  const [proxyRunning, setProxyRunning] = useState(false);
+  const [proxyHost, setProxyHost] = useState('');
   const [proxyPort, setProxyPort] = useState(0);
+  const [proxyStatus, setProxyStatus] = useState<ProxyStatus>('checking');
 
   const navItems: NavItem[] = [
     { key: 'dashboard', label: t('sidebar.dashboard'), icon: <LayoutDashboard size={16} />, path: '/dashboard' },
@@ -28,17 +37,39 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
 
   useEffect(() => {
     const check = () => {
+      setProxyStatus('checking');
       try {
-        invoke('get_proxy_status').then((status: any) => {
-          setProxyRunning(status?.running ?? false);
+        invoke<ProxyStatusPayload>('get_proxy_status').then(status => {
+          const running = status?.running ?? false;
+          setProxyHost(status?.host ?? '');
           setProxyPort(status?.port ?? 0);
-        }).catch(() => {});
-      } catch {}
+          setProxyStatus(running ? 'running' : 'stopped');
+        }).catch(() => {
+          setProxyStatus('stopped');
+        });
+      } catch {
+        setProxyStatus('stopped');
+      }
     };
     check();
     const interval = setInterval(check, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // Memoize status label and dot class
+  const statusInfo = useMemo(() => {
+    switch (proxyStatus) {
+      case 'running':
+        return { label: `${proxyHost || '127.0.0.1'}:${proxyPort}`, dotClass: 'rb-status-dot--running' };
+      case 'stopped':
+        return { label: t('sidebar.stopped'), dotClass: 'rb-status-dot--stopped' };
+      case 'error':
+        return { label: t('sidebar.stopped'), dotClass: 'rb-status-dot--error' };
+      case 'checking':
+        return { label: '检查中...', dotClass: 'rb-status-dot--checking' };
+    }
+  }, [proxyStatus, proxyHost, proxyPort, t]);
+
   return (
     <aside
       className="ds-shell__sidebar"
@@ -69,7 +100,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
           boxSizing: 'border-box',
         }}
       >
-        <Music size={20} style={{ color: 'var(--bg-brand)', flexShrink: 0 }} />
+        <img
+          src="/brand/favicon.png"
+          alt=""
+          aria-hidden="true"
+          width={24}
+          height={24}
+          style={{
+            borderRadius: 'var(--radius-6)',
+            flexShrink: 0,
+            display: 'block',
+          }}
+        />
         <span
           className="ds-shell__brand-name"
           style={{
@@ -100,18 +142,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
         {navItems.map(item => {
           const isActive = item.key === activeKey;
           return (
-            <a
+            <button
               key={item.key}
-              href={item.path}
-              onClick={e => { e.preventDefault(); onNavigate(item.path); }}
+              onClick={() => onNavigate(item.path)}
               className="ds-shell__nav-item"
               data-active={isActive ? 'true' : undefined}
               style={{
+                position: 'relative',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 'var(--spacer-10)',
                 padding: 'var(--spacer-8) var(--spacer-10)',
+                paddingLeft: isActive ? 'var(--spacer-14)' : 'var(--spacer-10)',
                 borderRadius: 'var(--radius-8)',
+                border: 'none',
                 textDecoration: 'none',
                 color: isActive ? 'var(--bg-brand)' : 'var(--text-default)',
                 fontSize: 'var(--body-base-font-size)',
@@ -119,10 +163,58 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
                 lineHeight: 'var(--body-base-line-height)',
                 cursor: 'pointer',
                 background: isActive ? 'var(--brand-100)' : 'transparent',
-                transition: 'opacity 0.15s ease, background-color 0.15s ease',
+                width: '100%',
+                textAlign: 'left',
+                fontFamily: 'inherit',
+                transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease), padding var(--transition-fast, 0.12s ease)',
+              }}
+              onMouseEnter={e => {
+                if (!isActive) {
+                  e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+                  // Icon translate instead of scale
+                  const icon = e.currentTarget.querySelector('.ds-shell__nav-icon') as HTMLElement;
+                  if (icon) icon.style.transform = 'translateX(2px)';
+                }
+              }}
+              onMouseLeave={e => {
+                if (!isActive) {
+                  e.currentTarget.style.background = 'transparent';
+                  const icon = e.currentTarget.querySelector('.ds-shell__nav-icon') as HTMLElement;
+                  if (icon) icon.style.transform = 'translateX(0)';
+                }
+              }}
+              onMouseDown={e => {
+                e.currentTarget.style.background = isActive ? 'var(--brand-200)' : 'var(--bg-overlay-l2)';
+              }}
+              onMouseUp={e => {
+                e.currentTarget.style.background = isActive ? 'var(--brand-100)' : 'var(--bg-overlay-l1)';
               }}
             >
-              <span style={{ color: isActive ? 'var(--icon-brand)' : 'var(--icon-secondary)', display: 'flex' }}>
+              {/* Active indicator bar */}
+              {isActive && (
+                <span
+                  className="ds-shell__nav-indicator"
+                  style={{
+                    position: 'absolute',
+                    left: -8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: 3,
+                    height: 20,
+                    borderRadius: '0 var(--radius-4) var(--radius-4) 0',
+                    background: 'var(--bg-brand)',
+                    transition: 'height var(--transition-normal, 0.2s) ease',
+                  }}
+                />
+              )}
+              <span
+                className="ds-shell__nav-icon"
+                style={{
+                  color: isActive ? 'var(--icon-brand)' : 'var(--icon-secondary)',
+                  display: 'flex',
+                  transition: 'transform var(--transition-fast, 0.12s) ease',
+                }}
+              >
                 {item.icon}
               </span>
               <span
@@ -135,7 +227,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
               >
                 {item.label}
               </span>
-            </a>
+            </button>
           );
         })}
       </nav>
@@ -153,13 +245,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
       >
         <div className="ds-shell__status-indicator" style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-6)' }}>
           <span
-            className="ds-shell__status-dot"
+            className={`ds-shell__status-dot ${statusInfo.dotClass}`}
             style={{
-              width: 6,
-              height: 6,
+              width: 8,
+              height: 8,
               borderRadius: 'var(--radius-full)',
-              background: proxyRunning ? 'var(--status-success-default)' : 'var(--icon-disabled)',
               display: 'inline-block',
+              transition: 'background var(--transition-normal, 0.2s) ease, box-shadow var(--transition-normal, 0.2s) ease',
             }}
           />
           <span
@@ -171,7 +263,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
               whiteSpace: 'nowrap',
             }}
           >
-            {proxyRunning ? `${t('sidebar.running')}:${proxyPort}` : t('sidebar.stopped')}
+            {statusInfo.label}
           </span>
         </div>
         <span
@@ -184,7 +276,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
             whiteSpace: 'nowrap',
           }}
         >
-          v1.0.0
+          v0.1.0
         </span>
       </div>
     </aside>

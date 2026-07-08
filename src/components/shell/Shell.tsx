@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
@@ -15,6 +15,12 @@ export const Shell: React.FC = () => {
   const location = useLocation();
   const activeKey = location.pathname.replace('/', '') || 'dashboard';
   const pageTitle = pageTitles[location.pathname] || 'Melody Hub';
+  const mainRef = useRef<HTMLElement>(null);
+
+  // Scroll to top on route change
+  useEffect(() => {
+    if (mainRef.current) mainRef.current.scrollTop = 0;
+  }, [location.pathname]);
 
   return (
     <div
@@ -28,28 +34,65 @@ export const Shell: React.FC = () => {
         fontFamily: 'var(--body-base-font-family)',
         fontSize: 'var(--body-base-font-size)',
         lineHeight: 'var(--body-base-line-height)',
+        ['--sidebar-width' as string]: '220px',
+        position: 'relative',
       }}
     >
+      {/* Subtle background grain texture */}
+      <div
+        className="ds-shell__grain"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: 'none',
+          opacity: 0.035,
+          backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 512 512\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.65\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")',
+          backgroundRepeat: 'repeat',
+          backgroundSize: '256px 256px',
+        }}
+      />
+      {/* Subtle radial gradient accent */}
+      <div
+        className="ds-shell__accent"
+        style={{
+          position: 'fixed',
+          top: '-50%',
+          right: '-20%',
+          width: '60%',
+          height: '60%',
+          zIndex: 0,
+          pointerEvents: 'none',
+          opacity: 0.04,
+          background: 'radial-gradient(ellipse at center, var(--bg-brand) 0%, transparent 70%)',
+        }}
+      />
+
       <Sidebar activeKey={activeKey} onNavigate={navigate} />
       <div
         className="ds-shell__content"
         style={{
           flex: '1 0 auto',
-          marginLeft: 220,
+          marginLeft: 'var(--sidebar-width, 220px)',
           display: 'flex',
           flexDirection: 'column',
           minHeight: '100vh',
-          background: 'var(--bg-base-default)',
+          background: 'transparent', /* Let grain show through */
+          position: 'relative',
+          zIndex: 1,
         }}
       >
         <Header title={pageTitle} />
         <main
+          ref={mainRef}
           className="ds-shell__main"
           style={{
             flex: '1 0 auto',
             padding: 'var(--spacer-24)',
             overflowY: 'auto',
+            scrollbarGutter: 'stable',
           }}
+          key={location.pathname}
         >
           <Outlet />
         </main>

@@ -35,3 +35,12 @@ src-tauri/gen/
 # Rust artifacts
 **/*.rs.bk
 Cargo.lock
+
+# Playwright MCP runtime artifacts
+.playwright-mcp/
+
+# IDE config
+.trae/
+
+# Development scripts
+scripts/

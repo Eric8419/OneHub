@@ -1,0 +1,9 @@
+packages:
+  - .
+
+shamefullyHoist: true
+strictPeerDependencies: false
+autoInstallPeers: true
+resolutionMode: highest
+onlyBuiltDependencies:
+  - esbuild

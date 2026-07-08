@@ -1,0 +1,22 @@
+{
+  "brand": {
+    "name": "Melody Hub",
+    "tagline": "Model routing console",
+    "aesthetic": "rounded-square soft pixel AI gateway"
+  },
+  "colors": {
+    "ink": "#171C24",
+    "paper": "#F8F4EC",
+    "tileLight": "#F2F0EC",
+    "tileDark": "#1E2632",
+    "signalBlue": "#7EE7FF",
+    "statusGreen": "#6EE7A5"
+  },
+  "assets": {
+    "sourceIcon": "/brand/source-icon.png",
+    "appIcon": "/brand/app-icon-1024.png",
+    "favicon": "/brand/favicon.png",
+    "taskbarIcon": "/brand/taskbar-icon-256.png",
+    "taskbarIconPng": "/brand/taskbar-icon-256.png"
+  }
+}

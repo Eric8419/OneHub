@@ -6,12 +6,12 @@ const rangeOptions: { key: TimeRange; label: string }[] = [
   { key: '7d', label: '近7天' },
   { key: '30d', label: '近30天' },
   { key: '90d', label: '近90天' },
-  { key: 'custom', label: '自定义' },
 ];
 
 export const TimeRangeTabs: React.FC = () => {
   const activeRange = useStatsStore(s => s.timeRange);
   const setTimeRange = useStatsStore(s => s.setTimeRange);
+  const fetchStats = useStatsStore(s => s.fetchStats);
 
   return (
     <div
@@ -29,7 +29,10 @@ export const TimeRangeTabs: React.FC = () => {
           <button
             key={opt.key}
             className={`ds-tab ${isActive ? 'is-active' : ''}`}
-            onClick={() => setTimeRange(opt.key)}
+            onClick={() => {
+              setTimeRange(opt.key);
+              void fetchStats();
+            }}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -44,6 +47,13 @@ export const TimeRangeTabs: React.FC = () => {
               fontWeight: 'var(--font-weight-medium)',
               borderRadius: isActive ? 'var(--radius-8) var(--radius-8) 0 0' : 0,
               position: 'relative',
+              transition: 'background var(--transition-fast, 0.12s) ease, color var(--transition-fast, 0.12s) ease',
+            }}
+            onMouseEnter={e => {
+              if (!isActive) e.currentTarget.style.color = 'var(--text-default)';
+            }}
+            onMouseLeave={e => {
+              if (!isActive) e.currentTarget.style.color = 'var(--text-tertiary)';
             }}
           >
             {opt.label}

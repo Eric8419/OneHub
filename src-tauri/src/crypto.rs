@@ -11,16 +11,15 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
 };
 use rand::RngCore;
-use std::path::PathBuf;
-use tauri::Manager;
 
-const KEY_FILE: &str = ".encryption_key";
+use crate::paths;
+
 const KEY_LEN: usize = 32; // AES-256
 const NONCE_LEN: usize = 12; // GCM standard nonce
 
 /// Get or create the encryption key, stored beside the app config.
 fn get_or_create_key(app_handle: &tauri::AppHandle) -> Result<[u8; KEY_LEN], String> {
-    let key_path = key_path(app_handle);
+    let key_path = paths::key_file(app_handle);
 
     if key_path.exists() {
         // Load existing key
@@ -57,17 +56,6 @@ fn get_or_create_key(app_handle: &tauri::AppHandle) -> Result<[u8; KEY_LEN], Str
         println!("[crypto] Encryption key generated at {:?}", key_path);
         Ok(key)
     }
-}
-
-fn key_path(app_handle: &tauri::AppHandle) -> PathBuf {
-    let mut path = app_handle.path().app_data_dir().unwrap_or_else(|_| {
-        let mut fallback = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        fallback.push("melody-hub_data");
-        fallback
-    });
-    path.push("melody-hub");
-    path.push(KEY_FILE);
-    path
 }
 
 /// Encrypt plaintext using AES-256-GCM.
@@ -137,7 +125,7 @@ mod tests {
         // Use temp directory for key
         let tmp = std::env::temp_dir().join("melody-hub-test-crypto");
         std::fs::create_dir_all(&tmp).ok();
-        let key_path = tmp.join(KEY_FILE);
+        let key_path = tmp.join(".encryption_key");
 
         // Clean up any existing key
         std::fs::remove_file(&key_path).ok();

@@ -2,45 +2,8 @@ import { create } from 'zustand';
 import type { Provider } from '../types/provider';
 import { invoke } from '@tauri-apps/api/core';
 
-const DEFAULT_MOCK_PROVIDERS: Provider[] = [
-  {
-    id: 'openai',
-    name: 'OpenAI',
-    apiBase: 'https://api.openai.com/v1',
-    apiKey: 'sk-...xxxx',
-    status: 'connected',
-    models: [
-      { id: 'gpt-4o', name: 'GPT-4o' },
-      { id: 'gpt-4o-mini', name: 'GPT-4o-mini' },
-      { id: 'gpt-4.1', name: 'GPT-4.1' },
-      { id: 'o3-mini', name: 'o3-mini' },
-      { id: 'o3', name: 'o3' },
-    ],
-  },
-  {
-    id: 'anthropic',
-    name: 'Anthropic',
-    apiBase: 'https://api.anthropic.com',
-    apiKey: 'sk-ant-...xxxx',
-    status: 'connected',
-    models: [
-      { id: 'claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
-      { id: 'claude-3.5-haiku', name: 'Claude 3.5 Haiku' },
-      { id: 'claude-4', name: 'Claude 4' },
-    ],
-  },
-  {
-    id: 'deepseek',
-    name: 'DeepSeek',
-    apiBase: 'https://api.deepseek.com',
-    apiKey: '',
-    status: 'configuring',
-    models: [
-      { id: 'deepseek-v3', name: 'DeepSeek V3' },
-      { id: 'deepseek-coder', name: 'DeepSeek Coder' },
-    ],
-  },
-];
+const errorMessage = (e: unknown, fallback: string) =>
+  e instanceof Error ? e.message : e ? String(e) : fallback;
 
 interface ProviderStore {
   providers: Provider[];
@@ -54,7 +17,10 @@ interface ProviderStore {
 }
 
 export const useProviderStore = create<ProviderStore>((set, get) => ({
-  providers: DEFAULT_MOCK_PROVIDERS,
+  // Empty initial state — the UI renders an empty-state prompt.
+  // Mock defaults were removed so users never see fake providers
+  // (or accidentally route requests through placeholder keys).
+  providers: [],
   loaded: false,
   error: null,
 
@@ -63,27 +29,28 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
   loadProviders: async () => {
     try {
       const data = await invoke<Provider[]>('load_providers');
-      if (data && data.length > 0) {
-        set({ providers: data, loaded: true, error: null });
-      } else {
-        // Use mock data as defaults if nothing persisted
-        set({ loaded: true, error: null });
-      }
-    } catch (e: any) {
-      console.warn('[providerStore] load_providers failed, using defaults:', e);
-      set({ loaded: true, error: e?.toString() || null });
+      // Apply loaded data (may be empty on first run).
+      set({ providers: data ?? [], loaded: true, error: null });
+    } catch (e: unknown) {
+      console.warn('[providerStore] load_providers failed:', e);
+      set({ loaded: true, error: errorMessage(e, '') || null });
     }
   },
 
   addProvider: async (p) => {
     const prev = get().providers;
+    if (prev.some(existing => existing.id === p.id || existing.name === p.name)) {
+      const message = '提供商名称已存在';
+      set({ error: message });
+      throw new Error(message);
+    }
     try {
       const updated = [...prev, p];
       set({ providers: updated, error: null });
       await invoke('save_providers', { providers: updated });
-    } catch (e: any) {
+    } catch (e: unknown) {
       // Rollback on failure
-      set({ providers: prev, error: e?.toString() || '保存失败' });
+      set({ providers: prev, error: errorMessage(e, '保存失败') });
       throw e;
     }
   },
@@ -94,8 +61,8 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
       const updated = prev.map(p => p.id === id ? { ...p, ...partial } : p);
       set({ providers: updated, error: null });
       await invoke('save_providers', { providers: updated });
-    } catch (e: any) {
-      set({ providers: prev, error: e?.toString() || '保存失败' });
+    } catch (e: unknown) {
+      set({ providers: prev, error: errorMessage(e, '保存失败') });
       throw e;
     }
   },
@@ -106,8 +73,8 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
       const updated = prev.filter(p => p.id !== id);
       set({ providers: updated, error: null });
       await invoke('save_providers', { providers: updated });
-    } catch (e: any) {
-      set({ providers: prev, error: e?.toString() || '删除失败' });
+    } catch (e: unknown) {
+      set({ providers: prev, error: errorMessage(e, '删除失败') });
       throw e;
     }
   },

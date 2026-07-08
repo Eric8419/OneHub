@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.melody-hub.app",
   "build": {
-    "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": "pnpm run dev",
+    "devUrl": "http://127.0.0.1:5420",
+    "beforeBuildCommand": "pnpm run build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -21,6 +21,16 @@
     ],
     "security": {
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:* https:; font-src 'self'"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "dialog": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZDMTk2RTNGRDNGODA5MTUKUldRVkNmalRQMjRaL0NObmZ6T2UralhnSktONnBSUzFtckdCcFZJdlFJdzIxYmdTV2JhWmpodVcK",
+      "endpoints": [
+        "https://github.com/Lhy723/MelodyHub/releases/latest/download/{{target}}-{{arch}}-{{current_version}}"
+      ]
     }
   },
   "bundle": {
