@@ -1,13 +1,20 @@
-import React, { useState } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import React, { useMemo, useState } from 'react';
 import { useStatsStore } from '../../store/statsStore';
-import { Card } from '../../components/ui';
+import { Card, EChart, getCssVar, useThemeVersion } from '../../components/ui';
+import type { EChartsOption } from '../../components/ui';
+
+/** Resolve a `var(--token)` string to its computed value; pass through raw colors. */
+function resolveColor(input: string): string {
+  const m = input.match(/^var\((--[^)]+)\)$/);
+  if (m) return getCssVar(m[1]) || input;
+  return input;
+}
 
 export const ModelDonutChart: React.FC = () => {
   const modelBreakdown = useStatsStore(s => s.modelBreakdown);
   const totalRequests = useStatsStore(s => s.stats.totalRequests);
-  const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
   const [hiddenModels, setHiddenModels] = useState<Set<string>>(new Set());
+  const themeVersion = useThemeVersion();
 
   const filteredData = modelBreakdown.filter(item => !hiddenModels.has(item.name));
   const showAll = filteredData.length === modelBreakdown.length;
@@ -20,6 +27,59 @@ export const ModelDonutChart: React.FC = () => {
       return next;
     });
   };
+
+  const option = useMemo<EChartsOption>(() => {
+    const hasData = filteredData.length > 0;
+    const data = hasData
+      ? filteredData.map(d => ({
+          name: d.name,
+          value: d.percentage,
+          itemStyle: { color: resolveColor(d.color) },
+        }))
+      : [{ name: '', value: 100, itemStyle: { color: getCssVar('--border-neutral-l1') || '#E5E5E5' } }];
+    return {
+      tooltip: {
+        trigger: 'item',
+        formatter: hasData ? '{b}: {d}%' : '',
+        backgroundColor: getCssVar('--bg-tooltip') || '#FFFFFF',
+        borderColor: getCssVar('--border-neutral-l1') || '#EEE',
+        borderWidth: 1,
+        textStyle: {
+          color: getCssVar('--text-default') || '#171717',
+          fontSize: 12,
+        },
+      },
+      series: [
+        {
+          type: 'pie',
+          // Reserve room for emphasis scaleSize (10) + shadowBlur (10):
+          // outer 58 + 10 + 10 = 78 < 80 (container radius). No clipping on hover.
+          radius: ['34', '58'],
+          center: ['50%', '50%'],
+          avoidLabelOverlap: false,
+          label: { show: false },
+          labelLine: { show: false },
+          silent: !hasData,
+          emphasis: {
+            scale: true,
+            scaleSize: 10,
+            itemStyle: {
+              shadowBlur: 10,
+              shadowColor: 'rgba(0,0,0,0.12)',
+            },
+          },
+          itemStyle: {
+            borderColor: getCssVar('--bg-base-secondary') || '#F5F5F5',
+            borderWidth: 2,
+          },
+          animationDuration: 600,
+          animationEasing: 'cubicOut',
+          data,
+        },
+      ],
+    };
+    // themeVersion is intentional: re-resolve CSS vars when theme changes.
+  }, [filteredData, themeVersion]);
 
   return (
     <Card>
@@ -43,35 +103,7 @@ export const ModelDonutChart: React.FC = () => {
         ) : (
           <>
             <div style={{ position: 'relative', width: 160, height: 160 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={filteredData.length > 0 ? filteredData : [{ name: '', percentage: 100, color: 'var(--border-neutral-l1)' }]}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={48}
-                    outerRadius={activeIndex !== undefined ? 90 : 80}
-                    dataKey="percentage"
-                    stroke="none"
-                    isAnimationActive={true}
-                    animationDuration={600}
-                    animationEasing="ease-out"
-                    onMouseEnter={(_, index) => setActiveIndex(index)}
-                    onMouseLeave={() => setActiveIndex(undefined)}
-                  >
-                    {(filteredData.length > 0 ? filteredData : [{ name: '', percentage: 100, color: 'var(--border-neutral-l1)' }]).map((entry, index) => (
-                      <Cell
-                        key={index}
-                        fill={entry.color}
-                        style={{
-                          transition: 'opacity var(--transition-fast, 0.12s) ease',
-                          cursor: 'pointer',
-                        }}
-                      />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
+              <EChart option={option} />
               <div
                 style={{
                   position: 'absolute',
@@ -79,6 +111,7 @@ export const ModelDonutChart: React.FC = () => {
                   left: '50%',
                   transform: 'translate(-50%, -50%)',
                   textAlign: 'center',
+                  pointerEvents: 'none',
                 }}
               >
                 <div

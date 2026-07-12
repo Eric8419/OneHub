@@ -39,8 +39,8 @@ export default defineConfig(async () => ({
           if (id.includes("node_modules/react-dom") || id.includes("node_modules/react/") || id.includes("node_modules/react-router")) {
             return "vendor-react";
           }
-          // Charting (recharts + its dependencies)
-          if (id.includes("node_modules/recharts") || id.includes("node_modules/d3-")) {
+          // Charting (echarts)
+          if (id.includes("node_modules/echarts") || id.includes("node_modules/zrender")) {
             return "vendor-charts";
           }
           // Icons

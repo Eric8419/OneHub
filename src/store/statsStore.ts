@@ -8,7 +8,6 @@ interface StatsStore {
   stats: UsageStats;
   modelBreakdown: ModelBreakdown[];
   recentRequests: RequestRecord[];
-  heatmapData: number[][];
   dailyUsage: DailyUsage[];
   timeRange: TimeRange;
   loading: boolean;
@@ -40,29 +39,6 @@ const EMPTY_STATS: UsageStats = {
   responseTimeChange: 0,
   responseTimeTrend: 'up',
 };
-
-/** Build a 52-week × 7-day heatmap grid from daily usage data. */
-function buildHeatmapFromDailyUsage(dailyData: DailyUsage[]): number[][] {
-  const grid: number[][] = Array.from({ length: 7 }, () => Array(52).fill(0));
-  if (dailyData.length === 0) return grid;
-  const maxCount = Math.max(...dailyData.map((d) => d.count), 1);
-  const now = new Date();
-  const dayMs = 24 * 60 * 60 * 1000;
-
-  for (const day of dailyData) {
-    const date = new Date(day.date);
-    const diffDays = Math.floor((now.getTime() - date.getTime()) / dayMs);
-    if (diffDays < 0 || diffDays >= 364) continue;
-    const weekCol = 51 - Math.floor(diffDays / 7);
-    let dayRow = date.getDay() - 1;
-    if (dayRow < 0) dayRow = 6;
-    if (weekCol >= 0 && weekCol < 52 && dayRow >= 0 && dayRow < 7) {
-      const intensity = Math.min(5, Math.round((day.count / maxCount) * 5));
-      grid[dayRow][weekCol] = intensity;
-    }
-  }
-  return grid;
-}
 
 /** Compute model breakdown percentages from request records. */
 function computeModelBreakdown(requests: RequestRecord[]): ModelBreakdown[] {
@@ -101,7 +77,6 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
   stats: EMPTY_STATS,
   modelBreakdown: [],
   recentRequests: [],
-  heatmapData: [],
   dailyUsage: [],
   timeRange: '7d',
   loading: false,
@@ -159,8 +134,7 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     set({ dailyUsageLoading: true, dailyUsageError: null });
     try {
       const data = await desktopApi.getDailyUsage();
-      const heatmap = buildHeatmapFromDailyUsage(data);
-      set({ dailyUsage: data, heatmapData: heatmap, dailyUsageLoading: false });
+      set({ dailyUsage: data, dailyUsageLoading: false });
     } catch (e: unknown) {
       set({ dailyUsageLoading: false, dailyUsageError: errorMessage(e, '获取用量数据失败') });
     }
@@ -174,7 +148,6 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
         modelBreakdown: [],
         recentRequests: [],
         dailyUsage: [],
-        heatmapData: buildHeatmapFromDailyUsage([]),
         page: 0,
       });
     } catch (e: unknown) {

@@ -1,5 +1,6 @@
-import { Card } from '../../components/ui';
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { useMemo } from 'react';
+import { Card, EChart, getCssVar, useThemeVersion } from '../../components/ui';
+import type { EChartsOption } from '../../components/ui';
 import { useStatsStore } from '../../store/statsStore';
 
 interface TrendPoint {
@@ -33,11 +34,102 @@ function rangeToDays(range: string): number {
   return 7;
 }
 
+function formatTokens(v: number): string {
+  if (v >= 1000000) return `${(v / 1000000).toFixed(0)}M`;
+  if (v >= 1000) return `${(v / 1000).toFixed(0)}K`;
+  return v.toString();
+}
+
 export const TokenTrendChart: React.FC = () => {
   const dailyUsage = useStatsStore(s => s.dailyUsage);
   const timeRange = useStatsStore(s => s.timeRange);
   const days = rangeToDays(timeRange);
   const trendData = computeTrend(dailyUsage, days);
+  const themeVersion = useThemeVersion();
+
+  const option = useMemo<EChartsOption>(() => {
+    const brandColor = getCssVar('--viz-series-brand') || '#4B3FE3';
+    const tertiaryText = getCssVar('--text-tertiary') || '#737373';
+    const gridColor = getCssVar('--border-neutral-l1') || 'rgba(115,115,115,0.12)';
+    const tooltipBg = getCssVar('--bg-tooltip') || '#FFFFFF';
+    const tooltipText = getCssVar('--text-default') || '#171717';
+    const metricFont = getCssVar('--font-family-metric') || 'Inter, sans-serif';
+
+    return {
+      grid: { top: 10, right: 8, bottom: 5, left: 0, containLabel: true },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: tooltipBg,
+        borderColor: gridColor,
+        borderWidth: 1,
+        textStyle: { color: tooltipText, fontSize: 12 },
+        axisPointer: {
+          type: 'line',
+          lineStyle: { color: brandColor, type: 'dashed', width: 1 },
+        },
+        formatter: (params: unknown) => {
+          const p = (Array.isArray(params) ? params[0] : params) as { name: string; value: number };
+          return `${p.name}<br/>${formatTokens(p.value)} tokens`;
+        },
+      },
+      xAxis: {
+        type: 'category',
+        boundaryGap: false,
+        data: trendData.map(d => d.day),
+        axisTick: { show: false },
+        axisLine: { lineStyle: { color: gridColor } },
+        axisLabel: {
+          color: tertiaryText,
+          fontSize: 10,
+          fontFamily: metricFont,
+        },
+      },
+      yAxis: {
+        type: 'value',
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: {
+          lineStyle: { color: gridColor, type: 'dashed' },
+        },
+        axisLabel: {
+          color: tertiaryText,
+          fontSize: 10,
+          fontFamily: metricFont,
+          formatter: (v: number) => formatTokens(v),
+        },
+      },
+      series: [
+        {
+          type: 'line',
+          data: trendData.map(d => d.tokens),
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 5,
+          showSymbol: false,
+          lineStyle: { color: brandColor, width: 2.5 },
+          itemStyle: {
+            color: brandColor,
+            borderColor: getCssVar('--bg-base-secondary') || '#F5F5F5',
+            borderWidth: 2,
+          },
+          emphasis: { focus: 'series', scale: 1.4 },
+          areaStyle: {
+            color: {
+              type: 'linear',
+              x: 0, y: 0, x2: 0, y2: 1,
+              colorStops: [
+                { offset: 0, color: brandColor },
+                { offset: 0.05, color: hexWithAlpha(brandColor, 0.2) },
+                { offset: 1, color: hexWithAlpha(brandColor, 0.02) },
+              ],
+            },
+          },
+          animationDuration: 500,
+          animationEasing: 'cubicOut',
+        },
+      ],
+    };
+  }, [trendData, themeVersion]);
 
   return (
     <Card>
@@ -61,50 +153,20 @@ export const TokenTrendChart: React.FC = () => {
             暂无数据 — 启动代理并发送请求后将显示趋势
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={trendData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
-              <defs>
-                <linearGradient id="tokenGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--viz-series-brand)" stopOpacity={0.2} />
-                  <stop offset="100%" stopColor="var(--viz-series-brand)" stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-neutral-l1)" vertical={false} />
-              <XAxis
-                dataKey="day"
-                tick={{ fontSize: 10, fill: 'var(--text-tertiary)', fontFamily: 'var(--font-family-metric)' }}
-                axisLine={{ stroke: 'var(--border-neutral-l1)' }}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 10, fill: 'var(--text-tertiary)', fontFamily: 'var(--font-family-metric)' }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v: number) => v >= 1000000 ? `${(v / 1000000).toFixed(0)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v.toString()}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: 'var(--bg-tooltip)',
-                  border: '1px solid var(--border-neutral-l1)',
-                  borderRadius: 'var(--radius-8)',
-                  fontSize: 'var(--body-sm-font-size)',
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="tokens"
-                stroke="var(--viz-series-brand)"
-                strokeWidth={2.5}
-                fill="url(#tokenGradient)"
-                dot={{ r: 3, fill: 'var(--viz-series-brand)', stroke: 'var(--bg-base-secondary)', strokeWidth: 2 }}
-                isAnimationActive={false}
-                animationDuration={500}
-                animationEasing="ease-out"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          <EChart option={option} />
         )}
       </div>
     </Card>
   );
 };
+
+/** Convert a `#RRGGBB` hex color to an `rgba(…)` string with the given alpha.
+ * Falls back to the original color if it isn't a 6-digit hex. */
+function hexWithAlpha(hex: string, alpha: number): string {
+  const m = hex.match(/^#([0-9a-fA-F]{6})$/);
+  if (!m) return hex;
+  const r = parseInt(m[1].slice(0, 2), 16);
+  const g = parseInt(m[1].slice(2, 4), 16);
+  const b = parseInt(m[1].slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}

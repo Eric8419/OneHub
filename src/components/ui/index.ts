@@ -16,3 +16,6 @@ export { FlexBetween } from './FlexBetween';
 export { ConfirmDialog } from './ConfirmDialog';
 export { AnimatedContent, CountUpValue, SpotlightCard, ShinyText, Skeleton } from './ReactBits';
 export { Stepper } from './Stepper';
+export { EChart } from './EChart';
+export type { EChartProps, EChartsOption } from './EChart';
+export { getCssVar, useThemeVersion } from './EChart';

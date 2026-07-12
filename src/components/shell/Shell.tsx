@@ -72,8 +72,9 @@ export const Shell: React.FC = () => {
       <div
         className="ds-shell__content"
         style={{
-          flex: '1 0 auto',
+          flex: 'none',
           marginLeft: 'var(--sidebar-width, 220px)',
+          width: 'calc(100% - var(--sidebar-width, 220px))',
           display: 'flex',
           flexDirection: 'column',
           minHeight: '100vh',
