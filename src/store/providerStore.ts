@@ -1,9 +1,8 @@
 import { create } from 'zustand';
 import type { Provider } from '../types/provider';
-import { invoke } from '@tauri-apps/api/core';
+import { desktopApi } from '../lib/desktopApi';
 
-const errorMessage = (e: unknown, fallback: string) =>
-  e instanceof Error ? e.message : e ? String(e) : fallback;
+const errorMessage = (e: unknown, fallback: string) => (e instanceof Error ? e.message : e ? String(e) : fallback);
 
 interface ProviderStore {
   providers: Provider[];
@@ -28,7 +27,7 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
 
   loadProviders: async () => {
     try {
-      const data = await invoke<Provider[]>('load_providers');
+      const data = await desktopApi.loadProviders();
       // Apply loaded data (may be empty on first run).
       set({ providers: data ?? [], loaded: true, error: null });
     } catch (e: unknown) {
@@ -39,7 +38,7 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
 
   addProvider: async (p) => {
     const prev = get().providers;
-    if (prev.some(existing => existing.id === p.id || existing.name === p.name)) {
+    if (prev.some((existing) => existing.id === p.id || existing.name === p.name)) {
       const message = '提供商名称已存在';
       set({ error: message });
       throw new Error(message);
@@ -47,7 +46,7 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
     try {
       const updated = [...prev, p];
       set({ providers: updated, error: null });
-      await invoke('save_providers', { providers: updated });
+      await desktopApi.saveProviders(updated);
     } catch (e: unknown) {
       // Rollback on failure
       set({ providers: prev, error: errorMessage(e, '保存失败') });
@@ -58,9 +57,9 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
   updateProvider: async (id, partial) => {
     const prev = get().providers;
     try {
-      const updated = prev.map(p => p.id === id ? { ...p, ...partial } : p);
+      const updated = prev.map((p) => (p.id === id ? { ...p, ...partial } : p));
       set({ providers: updated, error: null });
-      await invoke('save_providers', { providers: updated });
+      await desktopApi.saveProviders(updated);
     } catch (e: unknown) {
       set({ providers: prev, error: errorMessage(e, '保存失败') });
       throw e;
@@ -70,9 +69,9 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
   removeProvider: async (id) => {
     const prev = get().providers;
     try {
-      const updated = prev.filter(p => p.id !== id);
+      const updated = prev.filter((p) => p.id !== id);
       set({ providers: updated, error: null });
-      await invoke('save_providers', { providers: updated });
+      await desktopApi.saveProviders(updated);
     } catch (e: unknown) {
       set({ providers: prev, error: errorMessage(e, '删除失败') });
       throw e;

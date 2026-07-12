@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { desktopApi } from '../../lib/desktopApi';
 import { Avatar, ConfirmDialog } from '../ui';
 import { useT } from '../../i18n';
 import { Info, LogOut } from 'lucide-react';
@@ -19,7 +19,7 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
 
   // Trigger title animation on title change
   useEffect(() => {
-    setTitleKey(k => k + 1);
+    setTitleKey((k) => k + 1);
   }, [title]);
 
   // Click outside to close
@@ -53,7 +53,7 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
   };
 
   const handleConfirmExit = () => {
-    invoke('exit_app');
+    desktopApi.exitApp();
   };
 
   return (
@@ -108,7 +108,7 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
           <button
             ref={avatarRef}
             onClick={() => setMenuOpen(!menuOpen)}
-            onKeyDown={e => {
+            onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 setMenuOpen(!menuOpen);
@@ -126,8 +126,12 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
               borderRadius: 'var(--radius-full)',
               transition: 'box-shadow var(--transition-fast, 0.12s) ease',
             }}
-            onFocus={e => { e.currentTarget.style.boxShadow = '0 0 0 2px var(--bg-brand)'; }}
-            onBlur={e => { e.currentTarget.style.boxShadow = 'none'; }}
+            onFocus={(e) => {
+              e.currentTarget.style.boxShadow = '0 0 0 2px var(--bg-brand)';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.boxShadow = 'none';
+            }}
           >
             <Avatar size="sm">U</Avatar>
           </button>
@@ -151,7 +155,8 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
               padding: 'var(--spacer-8)',
               minWidth: 160,
               color: 'var(--text-default)',
-              boxShadow: '0 12px 32px color-mix(in srgb, var(--text-default) 12%, transparent), 0 2px 8px color-mix(in srgb, var(--text-default) 8%, transparent)',
+              boxShadow:
+                '0 12px 32px color-mix(in srgb, var(--text-default) 12%, transparent), 0 2px 8px color-mix(in srgb, var(--text-default) 8%, transparent)',
               opacity: menuOpen ? 1 : 0,
               transform: menuOpen ? 'translateY(0)' : 'translateY(-4px)',
               pointerEvents: menuOpen ? 'auto' : 'none',
@@ -162,34 +167,63 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
               className="ds-menu__item"
               role="menuitem"
               style={{
-                display: 'flex', alignItems: 'center', gap: 'var(--spacer-8)',
-                minHeight: 32, padding: 'var(--spacer-6) var(--spacer-8)',
-                borderRadius: 'var(--radius-8)', color: 'var(--text-default)',
-                fontSize: 'var(--body-base-font-size)', cursor: 'pointer',
-                border: 'none', background: 'transparent', fontFamily: 'inherit', width: '100%', textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--spacer-8)',
+                minHeight: 32,
+                padding: 'var(--spacer-6) var(--spacer-8)',
+                borderRadius: 'var(--radius-8)',
+                color: 'var(--text-default)',
+                fontSize: 'var(--body-base-font-size)',
+                cursor: 'pointer',
+                border: 'none',
+                background: 'transparent',
+                fontFamily: 'inherit',
+                width: '100%',
+                textAlign: 'left',
                 transition: 'background var(--transition-fast, 0.12s) ease',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
               onClick={() => setMenuOpen(false)}
             >
               <Info size={14} style={{ color: 'var(--icon-tertiary)' }} />
               {t('header.about')}
             </button>
-            <div className="ds-menu__divider" style={{ height: 1, background: 'var(--border-neutral-l1)', margin: 'var(--spacer-4) 0' }} />
+            <div
+              className="ds-menu__divider"
+              style={{ height: 1, background: 'var(--border-neutral-l1)', margin: 'var(--spacer-4) 0' }}
+            />
             <button
               className="ds-menu__item ds-menu__item--danger"
               role="menuitem"
               style={{
-                display: 'flex', alignItems: 'center', gap: 'var(--spacer-8)',
-                minHeight: 32, padding: 'var(--spacer-6) var(--spacer-8)',
-                borderRadius: 'var(--radius-8)', color: 'var(--status-error-default)',
-                fontSize: 'var(--body-base-font-size)', cursor: 'pointer',
-                border: 'none', background: 'transparent', fontFamily: 'inherit', width: '100%', textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--spacer-8)',
+                minHeight: 32,
+                padding: 'var(--spacer-6) var(--spacer-8)',
+                borderRadius: 'var(--radius-8)',
+                color: 'var(--status-error-default)',
+                fontSize: 'var(--body-base-font-size)',
+                cursor: 'pointer',
+                border: 'none',
+                background: 'transparent',
+                fontFamily: 'inherit',
+                width: '100%',
+                textAlign: 'left',
                 transition: 'background var(--transition-fast, 0.12s) ease',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--status-error-surface-l1)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--status-error-surface-l1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
               onClick={handleExit}
             >
               <LogOut size={14} />

@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useProviderStore } from '../../store/providerStore';
 import { Stepper } from '../../components/ui/Stepper';
-import { AnimatedContent, toast, Dropdown, Switch } from '../../components/ui';
+import { AnimatedContent, toast, Dropdown } from '../../components/ui';
 import type { DropdownOption } from '../../components/ui';
+import { ProviderForm } from './ProviderForm';
 import type { Model } from '../../types/provider';
 import { invoke } from '@tauri-apps/api/core';
-import { X, ArrowLeft, ArrowRight, Check, Loader2, RefreshCw, Download, Plus, Trash2, Eye, Brain, SlidersHorizontal } from 'lucide-react';
+import { X, ArrowLeft, ArrowRight, Check, Loader2, RefreshCw, Download, Plus } from 'lucide-react';
 
 interface AddProviderDialogProps {
   open: boolean;
@@ -36,12 +37,6 @@ interface FetchModelsResult {
   message: string;
 }
 
-const REASONING_EFFORT_OPTIONS: Array<{ value: NonNullable<Model['defaultReasoningEffort']>; label: string }> = [
-  { value: 'low', label: '低' },
-  { value: 'medium', label: '中' },
-  { value: 'high', label: '高' },
-];
-
 // Fallback profile list used when the Tauri command is unavailable
 // (e.g. running in a plain browser during development). Mirrors the
 // backend `PROFILES` registry in adapter.rs — kept in sync manually
@@ -56,7 +51,12 @@ const FALLBACK_PROFILES: ProviderProfileEntry[] = [
   { id: 'groq', label: 'Groq', baseUrl: 'https://api.groq.com/openai/v1', flavor: 'openai-compatible' },
   { id: 'xai', label: 'xAI (Grok)', baseUrl: 'https://api.x.ai/v1', flavor: 'openai-compatible' },
   { id: 'togetherai', label: 'Together AI', baseUrl: 'https://api.together.xyz/v1', flavor: 'openai-compatible' },
-  { id: 'fireworks', label: 'Fireworks AI', baseUrl: 'https://api.fireworks.ai/inference/v1', flavor: 'openai-compatible' },
+  {
+    id: 'fireworks',
+    label: 'Fireworks AI',
+    baseUrl: 'https://api.fireworks.ai/inference/v1',
+    flavor: 'openai-compatible',
+  },
   { id: 'cerebras', label: 'Cerebras', baseUrl: 'https://api.cerebras.ai/v1', flavor: 'openai-compatible' },
   { id: 'deepinfra', label: 'Deep Infra', baseUrl: 'https://api.deepinfra.com/v1/openai', flavor: 'openai-compatible' },
   { id: 'baseten', label: 'Baseten', baseUrl: 'https://inference.baseten.co/v1', flavor: 'openai-compatible' },
@@ -64,18 +64,38 @@ const FALLBACK_PROFILES: ProviderProfileEntry[] = [
   { id: 'cohere', label: 'Cohere', baseUrl: 'https://api.cohere.ai/v1', flavor: 'openai-compatible' },
   { id: 'perplexity', label: 'Perplexity', baseUrl: 'https://api.perplexity.ai', flavor: 'openai-compatible' },
   { id: 'nvidia', label: 'NVIDIA NIM', baseUrl: 'https://integrate.api.nvidia.com/v1', flavor: 'openai-compatible' },
-  { id: 'alibaba', label: 'Alibaba (DashScope)', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', flavor: 'openai-compatible' },
+  {
+    id: 'alibaba',
+    label: 'Alibaba (DashScope)',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    flavor: 'openai-compatible',
+  },
   { id: 'venice', label: 'Venice AI', baseUrl: 'https://api.venice.ai/api/v1', flavor: 'openai-compatible' },
   { id: '302ai', label: '302.AI', baseUrl: 'https://api.302.ai/v1', flavor: 'openai-compatible' },
   { id: 'moonshot', label: 'Moonshot AI (Kimi)', baseUrl: 'https://api.moonshot.cn/v1', flavor: 'openai-compatible' },
   { id: 'minimax', label: 'MiniMax', baseUrl: 'https://api.minimax.chat/v1', flavor: 'openai-compatible' },
-  { id: 'huggingface', label: 'Hugging Face', baseUrl: 'https://api-inference.huggingface.co/v1', flavor: 'openai-compatible' },
+  {
+    id: 'huggingface',
+    label: 'Hugging Face',
+    baseUrl: 'https://api-inference.huggingface.co/v1',
+    flavor: 'openai-compatible',
+  },
   { id: 'zai', label: 'Z.AI', baseUrl: 'https://api.z.ai/api/paas/v4', flavor: 'openai-compatible' },
   { id: 'ionet', label: 'IO.NET', baseUrl: 'https://api.intelligence.io.solutions/v1', flavor: 'openai-compatible' },
-  { id: 'nebius', label: 'Nebius Token Factory', baseUrl: 'https://api.studio.nebius.ai/v1', flavor: 'openai-compatible' },
+  {
+    id: 'nebius',
+    label: 'Nebius Token Factory',
+    baseUrl: 'https://api.studio.nebius.ai/v1',
+    flavor: 'openai-compatible',
+  },
   { id: 'cortecs', label: 'Cortecs', baseUrl: 'https://api.cortecs.ai/v1', flavor: 'openai-compatible' },
   { id: 'stackit', label: 'STACKIT', baseUrl: 'https://api.openai.stackit.tech/v1', flavor: 'openai-compatible' },
-  { id: 'ovhcloud', label: 'OVHcloud AI Endpoints', baseUrl: 'https://endpoints.ai.eu.ovhcloud.com/v1', flavor: 'openai-compatible' },
+  {
+    id: 'ovhcloud',
+    label: 'OVHcloud AI Endpoints',
+    baseUrl: 'https://endpoints.ai.eu.ovhcloud.com/v1',
+    flavor: 'openai-compatible',
+  },
   { id: 'scaleway', label: 'Scaleway', baseUrl: 'https://api.scaleway.ai/ai-apis/v1', flavor: 'openai-compatible' },
   { id: 'helicone', label: 'Helicone', baseUrl: 'https://ai-gateway.helicone.ai', flavor: 'openai-compatible' },
   { id: 'frogbot', label: 'FrogBot', baseUrl: 'https://api.frogbot.ai/v1', flavor: 'openai-compatible' },
@@ -85,15 +105,55 @@ const FALLBACK_PROFILES: ProviderProfileEntry[] = [
   { id: 'llamacpp', label: 'llama.cpp (local)', baseUrl: 'http://127.0.0.1:8080/v1', flavor: 'openai-compatible' },
   { id: 'vllm', label: 'vLLM (local)', baseUrl: 'http://127.0.0.1:8000/v1', flavor: 'openai-compatible' },
   { id: 'atomic-chat', label: 'Atomic Chat (local)', baseUrl: 'http://127.0.0.1:1337/v1', flavor: 'openai-compatible' },
-  { id: 'amazon-bedrock', label: 'Amazon Bedrock', baseUrl: 'https://bedrock-runtime.us-east-1.amazonaws.com', flavor: 'openai-compatible' },
-  { id: 'azure-openai', label: 'Azure OpenAI', baseUrl: 'https://RESOURCE_NAME.openai.azure.com', flavor: 'openai-compatible' },
-  { id: 'azure-cognitive-services', label: 'Azure Cognitive Services', baseUrl: 'https://RESOURCE_NAME.cognitiveservices.azure.com', flavor: 'openai-compatible' },
-  { id: 'google-vertex', label: 'Google Vertex AI', baseUrl: 'https://us-central1-aiplatform.googleapis.com/v1', flavor: 'openai-compatible' },
-  { id: 'github-copilot', label: 'GitHub Copilot', baseUrl: 'https://api.githubcopilot.com', flavor: 'openai-compatible' },
+  {
+    id: 'amazon-bedrock',
+    label: 'Amazon Bedrock',
+    baseUrl: 'https://bedrock-runtime.us-east-1.amazonaws.com',
+    flavor: 'openai-compatible',
+  },
+  {
+    id: 'azure-openai',
+    label: 'Azure OpenAI',
+    baseUrl: 'https://RESOURCE_NAME.openai.azure.com',
+    flavor: 'openai-compatible',
+  },
+  {
+    id: 'azure-cognitive-services',
+    label: 'Azure Cognitive Services',
+    baseUrl: 'https://RESOURCE_NAME.cognitiveservices.azure.com',
+    flavor: 'openai-compatible',
+  },
+  {
+    id: 'google-vertex',
+    label: 'Google Vertex AI',
+    baseUrl: 'https://us-central1-aiplatform.googleapis.com/v1',
+    flavor: 'openai-compatible',
+  },
+  {
+    id: 'github-copilot',
+    label: 'GitHub Copilot',
+    baseUrl: 'https://api.githubcopilot.com',
+    flavor: 'openai-compatible',
+  },
   { id: 'gitlab-duo', label: 'GitLab Duo', baseUrl: 'https://cloud.gitlab.com/ai/v1', flavor: 'openai-compatible' },
-  { id: 'sap-ai-core', label: 'SAP AI Core', baseUrl: 'https://api.ai.prod.eu-central-1.aws.ml.hana.ondemand.com/v2', flavor: 'openai-compatible' },
-  { id: 'cloudflare-ai-gateway', label: 'Cloudflare AI Gateway', baseUrl: 'https://gateway.ai.cloudflare.com/v1/ACCOUNT_ID/GATEWAY_ID', flavor: 'openai-compatible' },
-  { id: 'vercel-ai-gateway', label: 'Vercel AI Gateway', baseUrl: 'https://ai-gateway.vercel.sh/v1', flavor: 'openai-compatible' },
+  {
+    id: 'sap-ai-core',
+    label: 'SAP AI Core',
+    baseUrl: 'https://api.ai.prod.eu-central-1.aws.ml.hana.ondemand.com/v2',
+    flavor: 'openai-compatible',
+  },
+  {
+    id: 'cloudflare-ai-gateway',
+    label: 'Cloudflare AI Gateway',
+    baseUrl: 'https://gateway.ai.cloudflare.com/v1/ACCOUNT_ID/GATEWAY_ID',
+    flavor: 'openai-compatible',
+  },
+  {
+    id: 'vercel-ai-gateway',
+    label: 'Vercel AI Gateway',
+    baseUrl: 'https://ai-gateway.vercel.sh/v1',
+    flavor: 'openai-compatible',
+  },
   { id: 'zenmux', label: 'ZenMux', baseUrl: 'https://api.zenmux.ai/v1', flavor: 'openai-compatible' },
   { id: 'opencode-zen', label: 'OpenCode Zen', baseUrl: 'https://zen.opencode.ai/v1', flavor: 'openai-compatible' },
 ];
@@ -106,11 +166,16 @@ const STEPS = [
   { label: '完成', description: '完成配置' },
 ];
 
-const errorMessage = (e: unknown, fallback: string) =>
-  e instanceof Error ? e.message : e ? String(e) : fallback;
+const errorMessage = (e: unknown, fallback: string) => (e instanceof Error ? e.message : e ? String(e) : fallback);
 
 const modelIdFromName = (value: string) =>
-  value.trim().toLowerCase().replace(/[^a-z0-9._:/-]+/g, '-').replace(/^-+|-+$/g, '') || crypto.randomUUID?.() || Date.now().toString(36);
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._:/-]+/g, '-')
+    .replace(/^-+|-+$/g, '') ||
+  crypto.randomUUID?.() ||
+  Date.now().toString(36);
 
 const makeModel = (name: string, id?: string): Model => ({
   id: id?.trim() || modelIdFromName(name),
@@ -121,14 +186,13 @@ const makeModel = (name: string, id?: string): Model => ({
 });
 
 export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onClose }) => {
-  const addProvider = useProviderStore(s => s.addProvider);
+  const addProvider = useProviderStore((s) => s.addProvider);
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [apiBase, setApiBase] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [apiFlavor, setApiFlavor] = useState('openai');
   const [models, setModels] = useState<Model[]>([]);
-  const [manualModelName, setManualModelName] = useState('');
   const [remoteModels, setRemoteModels] = useState<RemoteModelEntry[]>([]);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [modelFetchMessage, setModelFetchMessage] = useState('');
@@ -152,23 +216,33 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
     if (!open) return;
     invoke<ProviderProfileEntry[]>('list_provider_profiles')
       .then(setProfiles)
-      .catch(() => { /* keep FALLBACK_PROFILES already in state */ });
+      .catch(() => {
+        /* keep FALLBACK_PROFILES already in state */
+      });
   }, [open]);
 
   // Focus trap
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
       if (e.key !== 'Tab' || !dialogRef.current) return;
       const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
       );
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener('keydown', handleKey);
     setTimeout(() => nameInputRef.current?.focus(), 50);
@@ -184,7 +258,6 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
       setApiKey('');
       setApiFlavor('openai');
       setModels([]);
-      setManualModelName('');
       setRemoteModels([]);
       setFetchingModels(false);
       setModelFetchMessage('');
@@ -204,9 +277,9 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
   const handleProfileChange = (profileId: string) => {
     setSelectedProfile(profileId);
     if (profileId === 'custom') return;
-    const p = profiles.find(x => x.id === profileId);
+    const p = profiles.find((x) => x.id === profileId);
     if (p) {
-      setName(prev => prev.trim() || p.label);
+      setName((prev) => prev.trim() || p.label);
       setApiBase(p.baseUrl);
       setApiFlavor(p.flavor);
       setApiBaseError(false);
@@ -219,8 +292,7 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
   const profileOptions: DropdownOption[] = useMemo(() => {
     const groupOf = (id: string): string => {
       if (id === 'openai' || id === 'anthropic') return '原生协议';
-      if (['ollama', 'ollama-cloud', 'lmstudio', 'llamacpp', 'vllm', 'atomic-chat'].includes(id))
-        return '本地运行时';
+      if (['ollama', 'ollama-cloud', 'lmstudio', 'llamacpp', 'vllm', 'atomic-chat'].includes(id)) return '本地运行时';
       if (
         [
           'amazon-bedrock',
@@ -239,7 +311,7 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
         return '云平台';
       return 'OpenAI 兼容';
     };
-    const opts: DropdownOption[] = profiles.map(p => ({
+    const opts: DropdownOption[] = profiles.map((p) => ({
       value: p.id,
       label: p.label,
       group: groupOf(p.id),
@@ -259,13 +331,23 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
 
   const handleNext = () => {
     if (step === 0) {
-      if (!name.trim()) { setNameError(true); nameInputRef.current?.focus(); return; }
+      if (!name.trim()) {
+        setNameError(true);
+        nameInputRef.current?.focus();
+        return;
+      }
       setNameError(false);
     }
     if (step === 1) {
       let valid = true;
-      if (!apiBase.trim()) { setApiBaseError(true); valid = false; }
-      if (!apiKey.trim()) { setApiKeyError(true); valid = false; }
+      if (!apiBase.trim()) {
+        setApiBaseError(true);
+        valid = false;
+      }
+      if (!apiKey.trim()) {
+        setApiKeyError(true);
+        valid = false;
+      }
       if (!valid) return;
       setApiBaseError(false);
       setApiKeyError(false);
@@ -274,11 +356,11 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
       toast('请先完成连接测试', 'error');
       return;
     }
-    setStep(s => Math.min(s + 1, STEPS.length - 1));
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };
 
   const handleBack = () => {
-    setStep(s => Math.max(s - 1, 0));
+    setStep((s) => Math.max(s - 1, 0));
   };
 
   // ─── Model Setup ─────────────────────────────────────────
@@ -286,43 +368,14 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
   const addModel = (model: Model) => {
     const cleanName = model.name.trim();
     if (!cleanName) return;
-    setModels(prev => {
-      const exists = prev.some(m => m.name.toLowerCase() === cleanName.toLowerCase() || m.id === model.id);
+    setModels((prev) => {
+      const exists = prev.some((m) => m.name.toLowerCase() === cleanName.toLowerCase() || m.id === model.id);
       if (exists) {
         toast(`模型「${cleanName}」已在列表中`, 'info');
         return prev;
       }
       return [...prev, { ...model, name: cleanName }];
     });
-  };
-
-  const addManualModel = () => {
-    const cleanName = manualModelName.trim();
-    if (!cleanName) return;
-    addModel(makeModel(cleanName));
-    setManualModelName('');
-  };
-
-  const updateModel = (index: number, patch: Partial<Model>) => {
-    setModels(prev => prev.map((model, i) => {
-      if (i !== index) return model;
-      const next = { ...model, ...patch };
-      if (patch.name !== undefined && !model.id) {
-        next.id = modelIdFromName(patch.name);
-      }
-      if (patch.supportsReasoning === false) {
-        next.supportsReasoningEffort = false;
-        next.defaultReasoningEffort = undefined;
-      }
-      if (patch.supportsReasoningEffort === false) {
-        next.defaultReasoningEffort = undefined;
-      }
-      return next;
-    }));
-  };
-
-  const removeModel = (index: number) => {
-    setModels(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleFetchModels = async () => {
@@ -394,8 +447,8 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
   const handleFinish = async () => {
     setSaving(true);
     const configuredModels = models
-      .map(model => ({ ...model, name: model.name.trim(), id: model.id || modelIdFromName(model.name) }))
-      .filter(model => model.name);
+      .map((model) => ({ ...model, name: model.name.trim(), id: model.id || modelIdFromName(model.name) }))
+      .filter((model) => model.name);
 
     const id = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
     try {
@@ -473,7 +526,9 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
         background: 'var(--bg-overlay-l4)',
         animation: 'fadeIn var(--transition-fast, 0.12s) ease',
       }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
         ref={dialogRef}
@@ -486,7 +541,8 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
           maxWidth: 760,
           overflow: 'hidden',
           color: 'var(--text-default)',
-          boxShadow: '0 24px 64px color-mix(in srgb, var(--text-default) 14%, transparent), 0 4px 16px color-mix(in srgb, var(--text-default) 8%, transparent)',
+          boxShadow:
+            '0 24px 64px color-mix(in srgb, var(--text-default) 14%, transparent), 0 4px 16px color-mix(in srgb, var(--text-default) 8%, transparent)',
           animation: 'scaleIn var(--transition-normal, 0.2s) ease',
         }}
       >
@@ -520,15 +576,24 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
           <button
             onClick={onClose}
             style={{
-              width: 32, height: 32,
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              background: 'transparent', border: 'none',
-              color: 'var(--icon-secondary)', cursor: 'pointer',
+              width: 32,
+              height: 32,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--icon-secondary)',
+              cursor: 'pointer',
               borderRadius: 'var(--radius-8)',
               transition: 'background var(--transition-fast, 0.12s) ease',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
           >
             <X size={16} />
           </button>
@@ -569,7 +634,10 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
                     type="text"
                     placeholder="例如: OpenAI, Anthropic, DeepSeek"
                     value={name}
-                    onChange={e => { setName(e.target.value); if (nameError) setNameError(false); }}
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      if (nameError) setNameError(false);
+                    }}
                     style={{
                       ...inputBaseStyle,
                       borderColor: nameError ? 'var(--status-error-default)' : 'var(--border-neutral-l1)',
@@ -600,7 +668,10 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
                     type="text"
                     placeholder="完整地址，含 /v1，如 https://api.openai.com/v1"
                     value={apiBase}
-                    onChange={e => { setApiBase(e.target.value); if (apiBaseError) setApiBaseError(false); }}
+                    onChange={(e) => {
+                      setApiBase(e.target.value);
+                      if (apiBaseError) setApiBaseError(false);
+                    }}
                     style={{
                       ...inputBaseStyle,
                       borderColor: apiBaseError ? 'var(--status-error-default)' : 'var(--border-neutral-l1)',
@@ -624,7 +695,10 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
                     type="password"
                     placeholder="sk-..."
                     value={apiKey}
-                    onChange={e => { setApiKey(e.target.value); if (apiKeyError) setApiKeyError(false); }}
+                    onChange={(e) => {
+                      setApiKey(e.target.value);
+                      if (apiKeyError) setApiKeyError(false);
+                    }}
                     style={{
                       ...inputBaseStyle,
                       borderColor: apiKeyError ? 'var(--status-error-default)' : 'var(--border-neutral-l1)',
@@ -639,12 +713,7 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
 
                 <div style={fieldStyle}>
                   <label style={labelStyle}>API 协议类型</label>
-                  <Dropdown
-                    options={API_FLAVOR_OPTIONS}
-                    value={apiFlavor}
-                    onChange={setApiFlavor}
-                    size="sm"
-                  />
+                  <Dropdown options={API_FLAVOR_OPTIONS} value={apiFlavor} onChange={setApiFlavor} size="sm" />
                   <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
                     选择适配协议，Anthropic API 需选 Anthropic
                   </span>
@@ -657,47 +726,7 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
           {step === 2 && (
             <AnimatedContent key="step-2" duration={250} distance={6}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-12)' }}>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'minmax(0, 1fr) auto',
-                    gap: 'var(--spacer-8)',
-                    alignItems: 'end',
-                  }}
-                >
-                  <div style={fieldStyle}>
-                    <label style={labelStyle}>手动添加模型</label>
-                    <input
-                      type="text"
-                      placeholder="例如: gpt-4o, claude-3-5-sonnet-20241022"
-                      value={manualModelName}
-                      onChange={e => setManualModelName(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addManualModel();
-                        }
-                      }}
-                      style={inputBaseStyle}
-                    />
-                  </div>
-                  <button
-                    onClick={addManualModel}
-                    disabled={!manualModelName.trim()}
-                    style={{
-                      ...stepBtnStyle,
-                      background: manualModelName.trim() ? 'var(--bg-brand)' : 'var(--bg-brand-disabled)',
-                      color: 'var(--text-onbrand)',
-                      cursor: manualModelName.trim() ? 'pointer' : 'not-allowed',
-                      opacity: manualModelName.trim() ? 1 : 0.65,
-                      height: 36,
-                    }}
-                  >
-                    <Plus size={14} />
-                    添加
-                  </button>
-                </div>
-
+                {/* Fetch models */}
                 <div
                   style={{
                     display: 'flex',
@@ -712,7 +741,13 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
                   }}
                 >
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-2)' }}>
-                    <span style={{ fontSize: 'var(--body-sm-font-size)', fontWeight: 'var(--font-weight-medium)', color: 'var(--text-default)' }}>
+                    <span
+                      style={{
+                        fontSize: 'var(--body-sm-font-size)',
+                        fontWeight: 'var(--font-weight-medium)',
+                        color: 'var(--text-default)',
+                      }}
+                    >
                       从接口拉取模型
                     </span>
                     <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
@@ -732,9 +767,13 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
                     }}
                   >
                     {fetchingModels ? (
-                      <><Loader2 size={14} style={{ animation: 'spin 0.6s linear infinite' }} /> 拉取中</>
+                      <>
+                        <Loader2 size={14} style={{ animation: 'spin 0.6s linear infinite' }} /> 拉取中
+                      </>
                     ) : (
-                      <><Download size={14} /> 拉取模型</>
+                      <>
+                        <Download size={14} /> 拉取模型
+                      </>
                     )}
                   </button>
                 </div>
@@ -744,7 +783,8 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
                     style={{
                       padding: 'var(--spacer-8) var(--spacer-12)',
                       borderRadius: 'var(--radius-6)',
-                      background: remoteModels.length > 0 ? 'var(--status-success-surface-l1)' : 'var(--status-alert-surface-l1)',
+                      background:
+                        remoteModels.length > 0 ? 'var(--status-success-surface-l1)' : 'var(--status-alert-surface-l1)',
                       color: remoteModels.length > 0 ? 'var(--status-success-default)' : 'var(--status-alert-default)',
                       fontSize: 'var(--body-sm-font-size)',
                     }}
@@ -761,7 +801,9 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
                       </span>
                       <button
                         type="button"
-                        onClick={() => remoteModels.forEach(remote => addModel(makeModel(remote.name || remote.id, remote.id)))}
+                        onClick={() =>
+                          remoteModels.forEach((remote) => addModel(makeModel(remote.name || remote.id, remote.id)))
+                        }
                         style={{
                           border: 'none',
                           background: 'transparent',
@@ -785,9 +827,9 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
                         paddingRight: 'var(--spacer-4)',
                       }}
                     >
-                      {remoteModels.map(remote => {
+                      {remoteModels.map((remote) => {
                         const displayName = remote.name || remote.id;
-                        const added = models.some(model => model.id === remote.id || model.name === displayName);
+                        const added = models.some((model) => model.id === remote.id || model.name === displayName);
                         return (
                           <button
                             key={remote.id}
@@ -819,149 +861,12 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
                   </div>
                 )}
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-8)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={labelStyle}>已添加模型</span>
-                    <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
-                      {models.length > 0 ? `${models.length} 个模型` : '可稍后在供应商卡片中编辑'}
-                    </span>
-                  </div>
-
-                  {models.length === 0 ? (
-                    <div
-                      style={{
-                        minHeight: 72,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        border: '1px dashed var(--border-neutral-l2)',
-                        borderRadius: 'var(--radius-8)',
-                        color: 'var(--text-tertiary)',
-                        fontSize: 'var(--body-sm-font-size)',
-                      }}
-                    >
-                      还没有模型。可以先拉取接口返回，或手动逐项添加。
-                    </div>
-                  ) : (
-                    <div
-                      className="ds-scroll"
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 'var(--spacer-8)',
-                        maxHeight: 260,
-                        overflowY: 'auto',
-                        paddingRight: 'var(--spacer-4)',
-                      }}
-                    >
-                      {models.map((model, index) => (
-                        <div
-                          key={`${model.id}-${index}`}
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'minmax(160px, 1.2fr) 88px 88px auto',
-                            gap: 'var(--spacer-8)',
-                            alignItems: 'center',
-                            padding: 'var(--spacer-10)',
-                            border: '1px solid var(--border-neutral-l1)',
-                            borderRadius: 'var(--radius-8)',
-                            background: 'var(--bg-base-default)',
-                          }}
-                        >
-                          <input
-                            value={model.name}
-                            onChange={e => updateModel(index, { name: e.target.value })}
-                            placeholder="模型名称"
-                            style={{
-                              ...inputBaseStyle,
-                              height: 32,
-                              fontFamily: 'var(--font-family-mono)',
-                              fontSize: 'var(--body-sm-font-size)',
-                            }}
-                          />
-                          <input
-                            type="number"
-                            min={0}
-                            value={model.contextWindow ?? ''}
-                            onChange={e => updateModel(index, { contextWindow: e.target.value ? Number(e.target.value) : undefined })}
-                            placeholder="上下文"
-                            title="上下文长度"
-                            style={{ ...inputBaseStyle, height: 32, fontSize: 'var(--body-sm-font-size)' }}
-                          />
-                          <input
-                            type="number"
-                            min={0}
-                            value={model.maxOutputTokens ?? ''}
-                            onChange={e => updateModel(index, { maxOutputTokens: e.target.value ? Number(e.target.value) : undefined })}
-                            placeholder="输出"
-                            title="最大输出长度"
-                            style={{ ...inputBaseStyle, height: 32, fontSize: 'var(--body-sm-font-size)' }}
-                          />
-                          <button
-                            type="button"
-                            aria-label="删除模型"
-                            title="删除模型"
-                            onClick={() => removeModel(index)}
-                            style={{
-                              width: 32,
-                              height: 32,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              borderRadius: 'var(--radius-8)',
-                              border: '1px solid var(--border-neutral-l1)',
-                              background: 'transparent',
-                              color: 'var(--icon-tertiary)',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-
-                          <div
-                            style={{
-                              gridColumn: '1 / -1',
-                              display: 'grid',
-                              gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-                              gap: 'var(--spacer-8)',
-                            }}
-                          >
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-6)', fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)' }}>
-                              <Eye size={14} style={{ color: 'var(--icon-tertiary)' }} />
-                              <span>视觉</span>
-                              <Switch checked={Boolean(model.supportsVision)} onChange={checked => updateModel(index, { supportsVision: checked })} />
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-6)', fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)' }}>
-                              <Brain size={14} style={{ color: 'var(--icon-tertiary)' }} />
-                              <span>思考</span>
-                              <Switch checked={Boolean(model.supportsReasoning)} onChange={checked => updateModel(index, { supportsReasoning: checked })} />
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-6)', fontSize: 'var(--body-sm-font-size)', color: model.supportsReasoning ? 'var(--text-secondary)' : 'var(--text-disabled)' }}>
-                              <SlidersHorizontal size={14} style={{ color: model.supportsReasoning ? 'var(--icon-tertiary)' : 'var(--icon-disabled)' }} />
-                              <span>思考强度</span>
-                              <Switch
-                                checked={Boolean(model.supportsReasoningEffort)}
-                                disabled={!model.supportsReasoning}
-                                onChange={checked => updateModel(index, { supportsReasoningEffort: checked, defaultReasoningEffort: checked ? 'medium' : undefined })}
-                              />
-                            </label>
-                            <Dropdown
-                              options={REASONING_EFFORT_OPTIONS}
-                              value={model.defaultReasoningEffort ?? 'medium'}
-                              onChange={v => updateModel(index, { defaultReasoningEffort: v as Model['defaultReasoningEffort'] })}
-                              disabled={!model.supportsReasoningEffort}
-                              size="sm"
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
-                    能力选项用于记录模型差异；后续请求适配可据此决定是否暴露视觉输入、reasoning effort、上下文与输出上限。
-                  </span>
-                </div>
+                <ProviderForm
+                  values={{ name, apiBase, apiKey, apiFlavor, models }}
+                  onChange={(v) => setModels(v.models)}
+                  showCredentials={false}
+                  showActions={false}
+                />
               </div>
             </AnimatedContent>
           )}
@@ -978,18 +883,41 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
                     border: '1px solid var(--border-neutral-l1)',
                   }}
                 >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-4)', marginBottom: 'var(--spacer-12)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--body-sm-font-size)' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 'var(--spacer-4)',
+                      marginBottom: 'var(--spacer-12)',
+                    }}
+                  >
+                    <div
+                      style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--body-sm-font-size)' }}
+                    >
                       <span style={{ color: 'var(--text-tertiary)' }}>提供商</span>
                       <span style={{ color: 'var(--text-default)' }}>{name}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--body-sm-font-size)' }}>
+                    <div
+                      style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--body-sm-font-size)' }}
+                    >
                       <span style={{ color: 'var(--text-tertiary)' }}>API Base</span>
-                      <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-family-mono)', fontSize: 'var(--body-xs-font-size)' }}>{apiBase}</span>
+                      <span
+                        style={{
+                          color: 'var(--text-secondary)',
+                          fontFamily: 'var(--font-family-mono)',
+                          fontSize: 'var(--body-xs-font-size)',
+                        }}
+                      >
+                        {apiBase}
+                      </span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--body-sm-font-size)' }}>
+                    <div
+                      style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--body-sm-font-size)' }}
+                    >
                       <span style={{ color: 'var(--text-tertiary)' }}>协议</span>
-                      <span style={{ color: 'var(--text-secondary)' }}>{API_FLAVOR_OPTIONS.find(o => o.value === apiFlavor)?.label}</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>
+                        {API_FLAVOR_OPTIONS.find((o) => o.value === apiFlavor)?.label}
+                      </span>
                     </div>
                   </div>
 
@@ -998,29 +926,38 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
                     disabled={testing}
                     style={{
                       ...stepBtnStyle,
-                      background: testResult === 'success'
-                        ? 'var(--status-success-default)'
-                        : 'var(--bg-brand)',
+                      background: testResult === 'success' ? 'var(--status-success-default)' : 'var(--bg-brand)',
                       color: 'var(--text-onbrand)',
                       opacity: testing ? 0.7 : 1,
                       width: '100%',
                       justifyContent: 'center',
                     }}
-                    onMouseEnter={e => {
-                      if (!testing && testResult !== 'success') e.currentTarget.style.background = 'var(--bg-brand-hover)';
+                    onMouseEnter={(e) => {
+                      if (!testing && testResult !== 'success')
+                        e.currentTarget.style.background = 'var(--bg-brand-hover)';
                     }}
-                    onMouseLeave={e => {
-                      if (!testing) e.currentTarget.style.background = testResult === 'success' ? 'var(--status-success-default)' : 'var(--bg-brand)';
+                    onMouseLeave={(e) => {
+                      if (!testing)
+                        e.currentTarget.style.background =
+                          testResult === 'success' ? 'var(--status-success-default)' : 'var(--bg-brand)';
                     }}
                   >
                     {testing ? (
-                      <><Loader2 size={16} style={{ animation: 'spin 0.6s linear infinite' }} /> 测试中...</>
+                      <>
+                        <Loader2 size={16} style={{ animation: 'spin 0.6s linear infinite' }} /> 测试中...
+                      </>
                     ) : testResult === 'success' ? (
-                      <><Check size={16} /> 连接成功</>
+                      <>
+                        <Check size={16} /> 连接成功
+                      </>
                     ) : testResult === 'fail' ? (
-                      <><RefreshCw size={16} /> 重新测试</>
+                      <>
+                        <RefreshCw size={16} /> 重新测试
+                      </>
                     ) : (
-                      <><ArrowRight size={16} /> 测试连接</>
+                      <>
+                        <ArrowRight size={16} /> 测试连接
+                      </>
                     )}
                   </button>
 
@@ -1059,7 +996,9 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
                   )}
                 </div>
 
-                <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)', textAlign: 'center' }}>
+                <span
+                  style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)', textAlign: 'center' }}
+                >
                   测试连接将通过选定的 API Base 发送一个轻量请求以验证配置
                 </span>
               </div>
@@ -1069,7 +1008,15 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
           {/* Step 4: Complete */}
           {step === 4 && (
             <AnimatedContent key="step-4" duration={250} distance={6}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-16)', alignItems: 'center', padding: 'var(--spacer-16) 0' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 'var(--spacer-16)',
+                  alignItems: 'center',
+                  padding: 'var(--spacer-16) 0',
+                }}
+              >
                 <div
                   style={{
                     width: 56,
@@ -1084,7 +1031,13 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
                   <Check size={28} strokeWidth={3} style={{ color: 'var(--status-success-default)' }} />
                 </div>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 'var(--heading-sm-font-size)', fontWeight: 'var(--font-weight-strong)', marginBottom: 'var(--spacer-4)' }}>
+                  <div
+                    style={{
+                      fontSize: 'var(--heading-sm-font-size)',
+                      fontWeight: 'var(--font-weight-strong)',
+                      marginBottom: 'var(--spacer-4)',
+                    }}
+                  >
                     连接已验证
                   </div>
                   <div style={{ fontSize: 'var(--body-base-font-size)', color: 'var(--text-tertiary)' }}>
@@ -1111,7 +1064,15 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-tertiary)' }}>API Base</span>
-                    <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-family-mono)', fontSize: 'var(--body-xs-font-size)' }}>{apiBase}</span>
+                    <span
+                      style={{
+                        color: 'var(--text-secondary)',
+                        fontFamily: 'var(--font-family-mono)',
+                        fontSize: 'var(--body-xs-font-size)',
+                      }}
+                    >
+                      {apiBase}
+                    </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-tertiary)' }}>模型数量</span>
@@ -1119,7 +1080,12 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-tertiary)' }}>连接状态</span>
-                    <span style={{ color: testResult === 'success' ? 'var(--status-success-default)' : 'var(--status-alert-default)' }}>
+                    <span
+                      style={{
+                        color:
+                          testResult === 'success' ? 'var(--status-success-default)' : 'var(--status-alert-default)',
+                      }}
+                    >
                       {testResult === 'success' ? '已连接' : '未测试'}
                     </span>
                   </div>
@@ -1149,8 +1115,12 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
                 color: 'var(--text-secondary)',
                 border: '1px solid var(--border-neutral-l1)',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
             >
               <ArrowLeft size={14} />
               返回
@@ -1163,25 +1133,54 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
           {step < STEPS.length - 1 ? (
             <button
               onClick={handleNext}
-              disabled={step === 0 ? !canProceedFromStep0 : step === 1 ? !canProceedFromStep1 : step === 3 ? !canProceedFromStep3 : false}
+              disabled={
+                step === 0
+                  ? !canProceedFromStep0
+                  : step === 1
+                    ? !canProceedFromStep1
+                    : step === 3
+                      ? !canProceedFromStep3
+                      : false
+              }
               style={{
                 ...stepBtnStyle,
-                background: (step === 0 && !canProceedFromStep0) || (step === 1 && !canProceedFromStep1) || (step === 3 && !canProceedFromStep3)
-                  ? 'var(--bg-brand-disabled)'
-                  : 'var(--bg-brand)',
+                background:
+                  (step === 0 && !canProceedFromStep0) ||
+                  (step === 1 && !canProceedFromStep1) ||
+                  (step === 3 && !canProceedFromStep3)
+                    ? 'var(--bg-brand-disabled)'
+                    : 'var(--bg-brand)',
                 color: 'var(--text-onbrand)',
-                opacity: (step === 0 && !canProceedFromStep0) || (step === 1 && !canProceedFromStep1) || (step === 3 && !canProceedFromStep3) ? 0.6 : 1,
-                cursor: (step === 0 && !canProceedFromStep0) || (step === 1 && !canProceedFromStep1) || (step === 3 && !canProceedFromStep3) ? 'not-allowed' : 'pointer',
+                opacity:
+                  (step === 0 && !canProceedFromStep0) ||
+                  (step === 1 && !canProceedFromStep1) ||
+                  (step === 3 && !canProceedFromStep3)
+                    ? 0.6
+                    : 1,
+                cursor:
+                  (step === 0 && !canProceedFromStep0) ||
+                  (step === 1 && !canProceedFromStep1) ||
+                  (step === 3 && !canProceedFromStep3)
+                    ? 'not-allowed'
+                    : 'pointer',
               }}
-              onMouseEnter={e => {
-                if ((step === 0 && canProceedFromStep0) || (step === 1 && canProceedFromStep1) || (step === 3 && canProceedFromStep3) || (step !== 0 && step !== 1 && step !== 3)) {
+              onMouseEnter={(e) => {
+                if (
+                  (step === 0 && canProceedFromStep0) ||
+                  (step === 1 && canProceedFromStep1) ||
+                  (step === 3 && canProceedFromStep3) ||
+                  (step !== 0 && step !== 1 && step !== 3)
+                ) {
                   e.currentTarget.style.background = 'var(--bg-brand-hover)';
                 }
               }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = (step === 0 && !canProceedFromStep0) || (step === 1 && !canProceedFromStep1) || (step === 3 && !canProceedFromStep3)
-                  ? 'var(--bg-brand-disabled)'
-                  : 'var(--bg-brand)';
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background =
+                  (step === 0 && !canProceedFromStep0) ||
+                  (step === 1 && !canProceedFromStep1) ||
+                  (step === 3 && !canProceedFromStep3)
+                    ? 'var(--bg-brand-disabled)'
+                    : 'var(--bg-brand)';
               }}
             >
               下一步
@@ -1198,13 +1197,21 @@ export const AddProviderDialog: React.FC<AddProviderDialogProps> = ({ open, onCl
                 opacity: saving ? 0.6 : 1,
                 cursor: saving ? 'not-allowed' : 'pointer',
               }}
-              onMouseEnter={e => { if (!saving) e.currentTarget.style.background = 'var(--bg-brand-hover)'; }}
-              onMouseLeave={e => { if (!saving) e.currentTarget.style.background = 'var(--bg-brand)'; }}
+              onMouseEnter={(e) => {
+                if (!saving) e.currentTarget.style.background = 'var(--bg-brand-hover)';
+              }}
+              onMouseLeave={(e) => {
+                if (!saving) e.currentTarget.style.background = 'var(--bg-brand)';
+              }}
             >
               {saving ? (
-                <><Loader2 size={16} style={{ animation: 'spin 0.6s linear infinite' }} /> 添加中...</>
+                <>
+                  <Loader2 size={16} style={{ animation: 'spin 0.6s linear infinite' }} /> 添加中...
+                </>
               ) : (
-                <>完成添加 <Check size={14} /></>
+                <>
+                  完成添加 <Check size={14} />
+                </>
               )}
             </button>
           )}

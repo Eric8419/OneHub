@@ -5,21 +5,11 @@ export interface AppSettings {
   autoStart: boolean;
   maxConcurrency: number;
 
-  // ── Token ──
-  tokenLimit: number;
-  tokenWarningThreshold: string;
-  tokenStatPeriod: string;
-
   // ── 界面 ──
   language: string;
   theme: string;
   pageSize: number;
   timeFormat: string;
-
-  // ── 通知 ──
-  apiErrorNotify: boolean;
-  quotaNotify: boolean;
-  modelStatusNotify: boolean;
 
   // ── 网络代理 ──
   proxyEnabled: boolean;
@@ -30,9 +20,7 @@ export interface AppSettings {
   proxyPassword: string;
 
   // ── 日志与监控 ──
-  logLevel: string;
   logRetentionDays: number;
-  logRequestContent: boolean;
   logAutoClean: boolean;
 
   // ── 安全与认证 ──
@@ -41,15 +29,10 @@ export interface AppSettings {
   ipWhitelist: string;
   corsEnabled: boolean;
   rateLimit: string;
-  auditLog: boolean;
 
   // ── 高级选项 ──
-  debugMode: boolean;
   apiTimeout: number;
   maxRetries: string;
-  cacheStrategy: string;
-  dataPath: string;
-  experimentalFeatures: boolean;
 }
 
 export type SettingsCategory = 'general' | 'proxy' | 'logging' | 'security' | 'advanced';

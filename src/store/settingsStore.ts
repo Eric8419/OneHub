@@ -1,27 +1,39 @@
 import { create } from 'zustand';
 import type { AppSettings, SettingsCategory } from '../types/settings';
-import { invoke } from '@tauri-apps/api/core';
+import { desktopApi } from '../lib/desktopApi';
 
-const errorMessage = (e: unknown, fallback: string) =>
-  e instanceof Error ? e.message : e ? String(e) : fallback;
+const errorMessage = (e: unknown, fallback: string) => (e instanceof Error ? e.message : e ? String(e) : fallback);
 
 const DEFAULT_SETTINGS: AppSettings = {
   // 通用
-  port: 8080, host: '127.0.0.1', autoStart: true, maxConcurrency: 20,
-  // Token
-  tokenLimit: 1000000, tokenWarningThreshold: '80%', tokenStatPeriod: 'daily',
+  port: 8080,
+  host: '127.0.0.1',
+  autoStart: true,
+  maxConcurrency: 20,
   // 界面
-  language: 'zh-CN', theme: 'light', pageSize: 10, timeFormat: '24h',
-  // 通知
-  apiErrorNotify: true, quotaNotify: true, modelStatusNotify: false,
+  language: 'zh-CN',
+  theme: 'light',
+  pageSize: 10,
+  timeFormat: '24h',
   // 网络代理
-  proxyEnabled: false, proxyHost: '', proxyPort: 7890, proxyProtocol: 'http', proxyUsername: '', proxyPassword: '',
+  proxyEnabled: false,
+  proxyHost: '',
+  proxyPort: 7890,
+  proxyProtocol: 'http',
+  proxyUsername: '',
+  proxyPassword: '',
   // 日志与监控
-  logLevel: 'info', logRetentionDays: 30, logRequestContent: true, logAutoClean: true,
+  logRetentionDays: 30,
+  logAutoClean: true,
   // 安全与认证
-  encryptApiKeys: true, authToken: '', ipWhitelist: '', corsEnabled: true, rateLimit: '0', auditLog: false,
+  encryptApiKeys: true,
+  authToken: '',
+  ipWhitelist: '',
+  corsEnabled: true,
+  rateLimit: '0',
   // 高级选项
-  debugMode: false, apiTimeout: 60, maxRetries: '0', cacheStrategy: 'none', dataPath: '~/.melody-hub/data', experimentalFeatures: false,
+  apiTimeout: 60,
+  maxRetries: '0',
 };
 
 interface SettingsStore {
@@ -65,32 +77,42 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setActiveCategory: (activeCategory) => set({ activeCategory }),
 
-  updateSettings: (partial) => set(s => {
-    const newSettings = { ...s.settings, ...partial };
-    // Keep localStorage in sync with the active language so the
-    // non-hook `t()` helper (used by toasts) reads the right locale.
-    if (partial.language && partial.language !== s.settings.language) {
-      try { localStorage.setItem('language', partial.language); } catch { /* ignore */ }
-    }
-    return {
-      settings: newSettings,
-      isDirty: !deepEqual(newSettings, s.savedSettings),
-    };
-  }),
+  updateSettings: (partial) =>
+    set((s) => {
+      const newSettings = { ...s.settings, ...partial };
+      // Keep localStorage in sync with the active language so the
+      // non-hook `t()` helper (used by toasts) reads the right locale.
+      if (partial.language && partial.language !== s.settings.language) {
+        try {
+          localStorage.setItem('language', partial.language);
+        } catch {
+          /* ignore */
+        }
+      }
+      return {
+        settings: newSettings,
+        isDirty: !deepEqual(newSettings, s.savedSettings),
+      };
+    }),
 
-  resetSettings: () => set(s => {
-    const newSettings = { ...DEFAULT_SETTINGS };
-    return {
-      settings: newSettings,
-      isDirty: !deepEqual(newSettings, s.savedSettings),
-    };
-  }),
+  resetSettings: () =>
+    set((s) => {
+      const newSettings = { ...DEFAULT_SETTINGS };
+      return {
+        settings: newSettings,
+        isDirty: !deepEqual(newSettings, s.savedSettings),
+      };
+    }),
 
   loadSettings: async () => {
     try {
-      const data = normalizeSettings(await invoke<AppSettings>('load_settings'));
+      const data = normalizeSettings(await desktopApi.loadSettings());
       // Sync localStorage with the persisted language.
-      try { localStorage.setItem('language', data.language); } catch { /* ignore */ }
+      try {
+        localStorage.setItem('language', data.language);
+      } catch {
+        /* ignore */
+      }
       set({ settings: { ...data }, savedSettings: { ...data }, loaded: true, error: null, isDirty: false });
     } catch (e: unknown) {
       console.warn('[settingsStore] load_settings failed, using defaults:', e);
@@ -102,7 +124,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     try {
       const { settings } = get();
       const normalized = normalizeSettings(settings);
-      await invoke('save_settings', { settings: normalized });
+      await desktopApi.saveSettings(normalized);
       set({ settings: { ...normalized }, savedSettings: { ...normalized }, error: null, isDirty: false });
     } catch (e: unknown) {
       set({ error: errorMessage(e, '保存设置失败') });

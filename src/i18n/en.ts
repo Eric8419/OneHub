@@ -10,7 +10,8 @@ const en: Record<string, string> = {
   'header.exit': 'Exit',
 
   'dashboard.empty.title': 'No Data',
-  'dashboard.empty.desc': 'The proxy server has not received any requests yet.\nStart the proxy in Settings first, then send requests from your client.',
+  'dashboard.empty.desc':
+    'The proxy server has not received any requests yet.\nStart the proxy in Settings first, then send requests from your client.',
   'dashboard.kpi.tokens': 'Total Tokens',
   'dashboard.kpi.requests': 'Total Requests',
   'dashboard.kpi.models': 'Active Models',
@@ -108,24 +109,11 @@ const en: Record<string, string> = {
   'settings.basicAutoStart': 'Auto Start',
   'settings.basicMaxConcurrency': 'Max Concurrency',
 
-  'settings.token': 'Token Management',
-  'settings.tokenLimit': 'Token Limit',
-  'settings.tokenThreshold': 'Warning Threshold',
-  'settings.tokenPeriod': 'Statistics Period',
-  'settings.tokenReset': 'Reset Statistics',
-  'settings.tokenResetConfirm': 'Reset all statistics?',
-  'settings.tokenResetted': 'Statistics reset',
-
   'settings.appearance': 'Appearance',
   'settings.appearanceLang': 'Language',
   'settings.appearanceTheme': 'Theme',
   'settings.appearancePageSize': 'Page Size',
   'settings.appearanceTimeFormat': 'Time Format',
-
-  'settings.notification': 'Notifications',
-  'settings.notifyApiError': 'API Error',
-  'settings.notifyQuota': 'Quota Warning',
-  'settings.notifyModelStatus': 'Model Status Change',
 
   'settings.proxyConfig': 'Proxy Configuration',
   'settings.proxyConfigEnable': 'Enable Proxy',
@@ -136,9 +124,7 @@ const en: Record<string, string> = {
   'settings.proxyConfigPassword': 'Password',
 
   'settings.logging.title': 'Logging & Monitoring',
-  'settings.logging.level': 'Log Level',
   'settings.logging.retention': 'Retention (days)',
-  'settings.logging.recordContent': 'Log Request Content',
   'settings.logging.autoClean': 'Auto Cleanup',
   'settings.logging.export': 'Export Logs',
   'settings.logging.exportHint': 'Export feature coming soon',
@@ -153,15 +139,10 @@ const en: Record<string, string> = {
   'settings.security.ipPlaceholder': '127.0.0.1, 192.168.1.*',
   'settings.security.cors': 'Enable CORS',
   'settings.security.rateLimit': 'Rate Limit',
-  'settings.security.audit': 'Audit Log',
 
   'settings.advanced.title': 'Advanced Options',
-  'settings.advanced.debug': 'Debug Mode',
   'settings.advanced.timeout': 'API Timeout (s)',
   'settings.advanced.retries': 'Max Retries',
-  'settings.advanced.cache': 'Cache Strategy',
-  'settings.advanced.dataPath': 'Data Path',
-  'settings.advanced.experimental': 'Experimental Features',
 
   'settings.reset': 'Reset',
   'settings.save': 'Save',

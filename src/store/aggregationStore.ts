@@ -1,10 +1,9 @@
 import { create } from 'zustand';
 import type { Aggregation } from '../types/aggregation';
 import { normalizeStrategyKey } from '../types/aggregation';
-import { invoke } from '@tauri-apps/api/core';
+import { desktopApi } from '../lib/desktopApi';
 
-const errorMessage = (e: unknown, fallback: string) =>
-  e instanceof Error ? e.message : e ? String(e) : fallback;
+const errorMessage = (e: unknown, fallback: string) => (e instanceof Error ? e.message : e ? String(e) : fallback);
 
 interface AggregationStore {
   aggregations: Aggregation[];
@@ -27,10 +26,10 @@ export const useAggregationStore = create<AggregationStore>((set, get) => ({
 
   loadAggregations: async () => {
     try {
-      const data = await invoke<Aggregation[]>('load_aggregations');
+      const data = await desktopApi.loadAggregations();
       // Normalize any legacy localized strategy strings to stable
       // enum keys so the UI dropdowns and backend routing agree.
-      const normalized = (data ?? []).map(a => ({
+      const normalized = (data ?? []).map((a) => ({
         ...a,
         strategy: normalizeStrategyKey(a.strategy),
       }));
@@ -46,7 +45,7 @@ export const useAggregationStore = create<AggregationStore>((set, get) => ({
     try {
       const updated = [...prev, a];
       set({ aggregations: updated, error: null });
-      await invoke('save_aggregations', { aggregations: updated });
+      await desktopApi.saveAggregations(updated);
     } catch (e: unknown) {
       set({ aggregations: prev, error: errorMessage(e, '保存失败') });
       throw e;
@@ -56,9 +55,9 @@ export const useAggregationStore = create<AggregationStore>((set, get) => ({
   updateAggregation: async (id, partial) => {
     const prev = get().aggregations;
     try {
-      const updated = prev.map(a => a.id === id ? { ...a, ...partial } : a);
+      const updated = prev.map((a) => (a.id === id ? { ...a, ...partial } : a));
       set({ aggregations: updated, error: null });
-      await invoke('save_aggregations', { aggregations: updated });
+      await desktopApi.saveAggregations(updated);
     } catch (e: unknown) {
       set({ aggregations: prev, error: errorMessage(e, '保存失败') });
       throw e;
@@ -68,9 +67,9 @@ export const useAggregationStore = create<AggregationStore>((set, get) => ({
   removeAggregation: async (id) => {
     const prev = get().aggregations;
     try {
-      const updated = prev.filter(a => a.id !== id);
+      const updated = prev.filter((a) => a.id !== id);
       set({ aggregations: updated, error: null });
-      await invoke('save_aggregations', { aggregations: updated });
+      await desktopApi.saveAggregations(updated);
     } catch (e: unknown) {
       set({ aggregations: prev, error: errorMessage(e, '删除失败') });
       throw e;

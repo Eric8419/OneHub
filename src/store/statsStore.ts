@@ -1,9 +1,8 @@
 import { create } from 'zustand';
-import { invoke } from '@tauri-apps/api/core';
+import { desktopApi } from '../lib/desktopApi';
 import type { RequestRecord, ModelBreakdown, TimeRange, UsageStats, DailyUsage } from '../types/stats';
 
-const errorMessage = (e: unknown, fallback: string) =>
-  e instanceof Error ? e.message : e ? String(e) : fallback;
+const errorMessage = (e: unknown, fallback: string) => (e instanceof Error ? e.message : e ? String(e) : fallback);
 
 interface StatsStore {
   stats: UsageStats;
@@ -46,7 +45,7 @@ const EMPTY_STATS: UsageStats = {
 function buildHeatmapFromDailyUsage(dailyData: DailyUsage[]): number[][] {
   const grid: number[][] = Array.from({ length: 7 }, () => Array(52).fill(0));
   if (dailyData.length === 0) return grid;
-  const maxCount = Math.max(...dailyData.map(d => d.count), 1);
+  const maxCount = Math.max(...dailyData.map((d) => d.count), 1);
   const now = new Date();
   const dayMs = 24 * 60 * 60 * 1000;
 
@@ -72,10 +71,16 @@ function computeModelBreakdown(requests: RequestRecord[]): ModelBreakdown[] {
   for (const r of requests) counts[r.model] = (counts[r.model] || 0) + 1;
   const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
   const colorMap: Record<string, string> = {
-    'GPT-4o': 'var(--chart-gpt)', 'GPT-4o-mini': 'var(--chart-gpt)', 'GPT-4.1': 'var(--chart-gpt)',
-    'o3-mini': 'var(--chart-gpt)', 'o3': 'var(--chart-gpt)',
-    'Claude 3.5 Sonnet': 'var(--chart-claude)', 'Claude 3.5 Haiku': 'var(--chart-claude)', 'Claude 4': 'var(--chart-claude)',
-    'DeepSeek V3': 'var(--chart-deepseek)', 'DeepSeek Coder': 'var(--chart-deepseek)',
+    'GPT-4o': 'var(--chart-gpt)',
+    'GPT-4o-mini': 'var(--chart-gpt)',
+    'GPT-4.1': 'var(--chart-gpt)',
+    'o3-mini': 'var(--chart-gpt)',
+    o3: 'var(--chart-gpt)',
+    'Claude 3.5 Sonnet': 'var(--chart-claude)',
+    'Claude 3.5 Haiku': 'var(--chart-claude)',
+    'Claude 4': 'var(--chart-claude)',
+    'DeepSeek V3': 'var(--chart-deepseek)',
+    'DeepSeek Coder': 'var(--chart-deepseek)',
     'Qwen 2.5': 'var(--chart-qwen)',
   };
   const total = requests.length;
@@ -116,7 +121,7 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     set({ statsLoading: true, statsError: null });
     try {
       const timeRange = get().timeRange;
-      const s = await invoke<UsageStats>('get_stats', { timeRange });
+      const s = await desktopApi.getStats(timeRange);
       set({
         stats: {
           totalTokens: s.totalTokens ?? 0,
@@ -139,7 +144,7 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     set({ requestsLoading: true, requestsError: null });
     try {
       // Wire format is already camelCase; no manual remapping.
-      const reqs = await invoke<RequestRecord[]>('get_recent_requests', { limit: 100 });
+      const reqs = await desktopApi.getRecentRequests(100);
       set({
         recentRequests: reqs,
         modelBreakdown: computeModelBreakdown(reqs),
@@ -153,7 +158,7 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
   fetchDailyUsage: async () => {
     set({ dailyUsageLoading: true, dailyUsageError: null });
     try {
-      const data = await invoke<DailyUsage[]>('get_daily_usage');
+      const data = await desktopApi.getDailyUsage();
       const heatmap = buildHeatmapFromDailyUsage(data);
       set({ dailyUsage: data, heatmapData: heatmap, dailyUsageLoading: false });
     } catch (e: unknown) {
@@ -163,7 +168,7 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
 
   resetStats: async () => {
     try {
-      await invoke('reset_stats');
+      await desktopApi.resetStats();
       set({
         stats: EMPTY_STATS,
         modelBreakdown: [],

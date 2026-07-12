@@ -64,24 +64,21 @@ fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<Option<T>, S
 /// The in-memory plaintext list is also accepted so callers can
 /// pass runtime state directly.
 pub fn save_providers(app_handle: &tauri::AppHandle, providers: &[Provider]) -> Result<(), String> {
-    let encrypted: Vec<Provider> = providers
+    // Encrypt all keys first — fail before touching the file.
+    let encrypted: Result<Vec<Provider>, String> = providers
         .iter()
         .map(|p| {
             if p.api_key.is_empty() {
-                p.clone().with_encrypted_key(String::new())
+                Ok(p.clone().with_encrypted_key(String::new()))
             } else {
                 match crypto::encrypt(&p.api_key, app_handle) {
-                    Ok(enc) => p.clone().with_encrypted_key(enc),
-                    Err(e) => {
-                        eprintln!("[storage] Failed to encrypt key for '{}': {}", p.name, e);
-                        // Keep plaintext rather than dropping the provider; the
-                        // status will be surfaced as an error on next load.
-                        p.clone()
-                    }
+                    Ok(enc) => Ok(p.clone().with_encrypted_key(enc)),
+                    Err(e) => Err(format!("Unable to encrypt API key for '{}': {}", p.name, e)),
                 }
             }
         })
         .collect();
+    let encrypted = encrypted?;
 
     let path = paths::config_file(app_handle, PROVIDERS_FILE);
     write_json_atomic(&path, &encrypted)?;

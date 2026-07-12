@@ -710,11 +710,6 @@ mod tests {
     }
 
     #[test]
-    fn bind_host_accepts_localhost_alias() {
-        assert_eq!(normalize_bind_host("localhost").unwrap(), "127.0.0.1");
-    }
-
-    #[test]
     fn ip_whitelist_accepts_exact_and_wildcard() {
         let auth = AuthConfig {
             auth_token: String::new(),
@@ -724,5 +719,47 @@ mod tests {
         assert!(require_ip("127.0.0.1".parse().unwrap(), &auth).is_ok());
         assert!(require_ip("192.168.1.42".parse().unwrap(), &auth).is_ok());
         assert!(require_ip("10.0.0.2".parse().unwrap(), &auth).is_err());
+    }
+
+    #[test]
+    fn bind_host_loopback_is_ok() {
+        assert_eq!(normalize_bind_host("127.0.0.1").unwrap(), "127.0.0.1");
+        assert_eq!(normalize_bind_host("localhost").unwrap(), "127.0.0.1");
+    }
+
+    #[test]
+    fn non_loopback_binding_requires_auth_and_whitelist() {
+        // Non-loopback bind must have both a non-empty auth token
+        // and a non-empty IP whitelist to be considered safe.
+        // The server currently does not enforce this at bind time;
+        // these tests verify that if these are empty, the proxy is
+        // effectively exposed with no access control.
+        let empty_auth = AuthConfig {
+            auth_token: String::new(),
+            cors_enabled: true,
+            ip_whitelist: String::new(),
+        };
+        // Without a token, require_auth passes for any client.
+        assert!(require_auth(&HeaderMap::new(), &empty_auth).is_ok());
+        // Without a whitelist, require_ip accepts any IP.
+        assert!(require_ip([10, 0, 0, 1].into(), &empty_auth).is_ok());
+
+        // With both set, non-whitelisted IPs are rejected.
+        let safe_auth = AuthConfig {
+            auth_token: "s3cret".into(),
+            cors_enabled: true,
+            ip_whitelist: "127.0.0.1".into(),
+        };
+        assert!(require_ip([10, 0, 0, 1].into(), &safe_auth).is_err());
+        assert!(require_ip([127, 0, 0, 1].into(), &safe_auth).is_ok());
+    }
+
+    #[tokio::test]
+    async fn health_route_does_not_require_auth() {
+        // /health handler does not call require_auth or require_ip
+        // — it returns ok unconditionally. Verify that the health
+        // payload is correct.
+        let resp = health_handler().await;
+        assert_eq!(resp.0.get("status").and_then(|v| v.as_str()), Some("ok"));
     }
 }

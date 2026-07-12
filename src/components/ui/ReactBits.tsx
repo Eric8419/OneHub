@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { createElement, useEffect, useMemo, useRef, useState } from 'react';
 
 /* ─── AnimatedContent ─────────────────────────────────────── */
 
@@ -15,9 +15,17 @@ interface AnimatedContentProps {
   disabled?: boolean;
 }
 
+const animatedStyle = (style: React.CSSProperties | undefined, delay: number, duration: number, distance: number) =>
+  ({
+    '--rb-delay': `${delay}ms`,
+    '--rb-duration': `${duration}ms`,
+    '--rb-distance': `${distance}px`,
+    ...style,
+  }) as React.CSSProperties;
+
 export const AnimatedContent: React.FC<AnimatedContentProps> = ({
   children,
-  as: Tag = 'div',
+  as = 'div',
   delay = 0,
   duration = 360,
   distance = 8,
@@ -26,23 +34,13 @@ export const AnimatedContent: React.FC<AnimatedContentProps> = ({
   disabled = false,
 }) => {
   const reduced = usePrefersReducedMotion();
-
-  if (disabled || reduced) {
-    return <Tag className={className} style={style}>{children}</Tag>;
-  }
-
-  return (
-    <Tag
-      className={`rb-animated-content ${className}`}
-      style={{
-        ['--rb-delay' as string]: `${delay}ms`,
-        ['--rb-duration' as string]: `${duration}ms`,
-        ['--rb-distance' as string]: `${distance}px`,
-        ...style,
-      }}
-    >
-      {children}
-    </Tag>
+  return createElement(
+    as,
+    {
+      className: disabled || reduced ? className : `rb-animated-content ${className}`,
+      style: disabled || reduced ? style : animatedStyle(style, delay, duration, distance),
+    },
+    children,
   );
 };
 
@@ -56,7 +54,7 @@ interface CountUpValueProps {
 
 export const CountUpValue: React.FC<CountUpValueProps> = ({
   value,
-  formatter = value => Math.round(value).toLocaleString(),
+  formatter = (value) => Math.round(value).toLocaleString(),
   duration = 640,
 }) => {
   const [display, setDisplay] = useState(value);
@@ -113,17 +111,17 @@ interface SpotlightCardProps {
 }
 
 const variantBorder: Record<SpotlightVariant, string> = {
-  kpi:      'var(--border-neutral-l1)',
+  kpi: 'var(--border-neutral-l1)',
   provider: 'var(--border-neutral-l1)',
-  danger:   'var(--status-error-default)',
-  neutral:  'var(--border-neutral-l1)',
+  danger: 'var(--status-error-default)',
+  neutral: 'var(--border-neutral-l1)',
 };
 
 const variantGlow: Record<SpotlightVariant, string> = {
-  kpi:      'var(--bg-brand)',
+  kpi: 'var(--bg-brand)',
   provider: 'var(--bg-brand)',
-  danger:   'var(--status-error-default)',
-  neutral:  'transparent',
+  danger: 'var(--status-error-default)',
+  neutral: 'transparent',
 };
 
 export const SpotlightCard: React.FC<SpotlightCardProps> = ({
@@ -137,23 +135,23 @@ export const SpotlightCard: React.FC<SpotlightCardProps> = ({
   const [enabled, setEnabled] = useState(false);
   const reduced = usePrefersReducedMotion();
 
-  const cardStyle = useMemo<React.CSSProperties>(() => ({
-    background: 'var(--bg-base-secondary)',
-    border: `1px solid ${variantBorder[variant]}`,
-    borderRadius: 'var(--radius-12)',
-    padding: padding || 'var(--spacer-20)',
-    color: 'var(--text-default)',
-    ['--rb-delay' as string]: `${delay}ms`,
-    ['--rb-glow-color' as string]: variantGlow[variant],
-    ...style,
-  }), [delay, padding, style, variant]);
+  const cardStyle = useMemo<React.CSSProperties>(
+    () => ({
+      background: 'var(--bg-base-secondary)',
+      border: `1px solid ${variantBorder[variant]}`,
+      borderRadius: 'var(--radius-12)',
+      padding: padding || 'var(--spacer-20)',
+      color: 'var(--text-default)',
+      ['--rb-delay' as string]: `${delay}ms`,
+      ['--rb-glow-color' as string]: variantGlow[variant],
+      ...style,
+    }),
+    [delay, padding, style, variant],
+  );
 
   if (reduced) {
     return (
-      <div
-        className={`ds-card ${className}`}
-        style={cardStyle}
-      >
+      <div className={`ds-card ${className}`} style={cardStyle}>
         {children}
       </div>
     );
@@ -164,7 +162,7 @@ export const SpotlightCard: React.FC<SpotlightCardProps> = ({
       className={`ds-card rb-spotlight-card ${enabled ? 'is-active' : ''} ${className}`}
       style={cardStyle}
       data-variant={variant}
-      onPointerMove={event => {
+      onPointerMove={(event) => {
         const rect = event.currentTarget.getBoundingClientRect();
         event.currentTarget.style.setProperty('--rb-x', `${event.clientX - rect.left}px`);
         event.currentTarget.style.setProperty('--rb-y', `${event.clientY - rect.top}px`);
@@ -186,16 +184,15 @@ interface ShinyTextProps {
   active?: boolean;
 }
 
-export const ShinyText: React.FC<ShinyTextProps> = ({
-  children,
-  className = '',
-  style,
-  active = true,
-}) => {
+export const ShinyText: React.FC<ShinyTextProps> = ({ children, className = '', style, active = true }) => {
   const reduced = usePrefersReducedMotion();
 
   if (reduced) {
-    return <span className={className} style={style}>{children}</span>;
+    return (
+      <span className={className} style={style}>
+        {children}
+      </span>
+    );
   }
 
   return (

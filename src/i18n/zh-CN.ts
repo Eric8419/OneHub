@@ -116,24 +116,11 @@ const zh: Record<string, string> = {
   'settings.basicAutoStart': '自动启动',
   'settings.basicMaxConcurrency': '最大并发请求数',
 
-  'settings.token': 'Token 管理',
-  'settings.tokenLimit': 'Token 用量上限',
-  'settings.tokenThreshold': '用量提醒阈值',
-  'settings.tokenPeriod': 'Token 统计周期',
-  'settings.tokenReset': '重置统计',
-  'settings.tokenResetConfirm': '确定要重置所有统计记录吗？',
-  'settings.tokenResetted': '统计记录已重置',
-
   'settings.appearance': '界面偏好',
   'settings.appearanceLang': '语言',
   'settings.appearanceTheme': '主题',
   'settings.appearancePageSize': '每页显示条数',
   'settings.appearanceTimeFormat': '时间格式',
-
-  'settings.notification': '通知设置',
-  'settings.notifyApiError': 'API 错误通知',
-  'settings.notifyQuota': '配额提醒通知',
-  'settings.notifyModelStatus': '模型状态变更',
 
   'settings.proxyConfig': '网络代理配置',
   'settings.proxyConfigEnable': '启用代理',
@@ -144,9 +131,7 @@ const zh: Record<string, string> = {
   'settings.proxyConfigPassword': '密码',
 
   'settings.logging.title': '日志与监控',
-  'settings.logging.level': '日志级别',
   'settings.logging.retention': '日志保留天数',
-  'settings.logging.recordContent': '记录请求内容',
   'settings.logging.autoClean': '自动清理日志',
   'settings.logging.export': '导出日志',
   'settings.logging.exportHint': '导出功能开发中',
@@ -161,7 +146,6 @@ const zh: Record<string, string> = {
   'settings.security.ipPlaceholder': '127.0.0.1, 192.168.1.*',
   'settings.security.cors': '启用 CORS',
   'settings.security.rateLimit': '请求速率限制',
-  'settings.security.audit': '日志安全审计',
 
   'settings.advanced.title': '高级选项',
   'settings.advanced.debug': '调试模式',
