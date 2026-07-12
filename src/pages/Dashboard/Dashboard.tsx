@@ -6,6 +6,7 @@ import { TokenTrendChart } from './TokenTrendChart';
 import { ModelDonutChart } from './ModelDonutChart';
 import { UsageHeatmap } from './UsageHeatmap';
 import { RecentRequests } from './RecentRequests';
+import { ProxyControl } from './ProxyControl';
 import { TriangleAlert, RefreshCw } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
@@ -99,6 +100,7 @@ export const Dashboard: React.FC = () => {
           </button>
         </div>
       )}
+      <ProxyControl />
       <KPICards />
       <TimeRangeTabs />
       <div
