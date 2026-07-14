@@ -1,4 +1,3 @@
-/* eslint-disable react/no-unknown-property */
 import { useRef, useEffect, forwardRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { EffectComposer, wrapEffect } from '@react-three/postprocessing';
@@ -203,7 +202,7 @@ const RetroEffect = forwardRef<RetroEffectImpl, RetroEffectProps>((props, ref) =
 });
 RetroEffect.displayName = 'RetroEffect';
 
-interface DitheredWavesProps extends Required<Omit<DitherProps, 'className' | 'style'>> {}
+type DitheredWavesProps = Required<Omit<DitherProps, 'className' | 'style'>>;
 
 function DitheredWaves({
   waveSpeed,

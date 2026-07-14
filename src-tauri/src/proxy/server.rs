@@ -610,10 +610,9 @@ async fn proxy_request(
         // Bridge the mpsc Receiver into a Stream for the response
         // body. We use `futures::stream::unfold` instead of pulling
         // in the `tokio-stream` crate just for `ReceiverStream`.
-        let receiver_stream =
-            futures::stream::unfold(rx, |mut rx| async move {
-                rx.recv().await.map(|item| (item, rx))
-            });
+        let receiver_stream = futures::stream::unfold(rx, |mut rx| async move {
+            rx.recv().await.map(|item| (item, rx))
+        });
         let body = Body::from_stream(receiver_stream);
 
         let response = Response::builder()

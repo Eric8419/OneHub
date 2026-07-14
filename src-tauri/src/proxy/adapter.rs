@@ -372,10 +372,7 @@ impl Protocol for ResponsesApiProtocol {
                     }
                     // The completed response object also nests usage
                     // under `response.usage` for `response.completed` events.
-                    if let Some(usage) = json
-                        .pointer("/response/usage")
-                        .filter(|v| v.is_object())
-                    {
+                    if let Some(usage) = json.pointer("/response/usage").filter(|v| v.is_object()) {
                         if let Some(total) = usage.get("total_tokens").and_then(|v| v.as_i64()) {
                             last_total = Some(total);
                         }
