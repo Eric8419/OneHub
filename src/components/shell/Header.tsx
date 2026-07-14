@@ -3,6 +3,7 @@ import { desktopApi } from '../../lib/desktopApi';
 import { Avatar, ConfirmDialog } from '../ui';
 import { useT } from '../../i18n';
 import { Info, LogOut } from 'lucide-react';
+import { WindowControls } from './WindowControls';
 
 interface HeaderProps {
   title: string;
@@ -78,6 +79,7 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
       <h1
         key={titleKey}
         className="ds-shell__page-title"
+        data-tauri-drag-region
         style={{
           fontFamily: 'var(--heading-md-font-family)',
           fontSize: 'var(--heading-md-font-size)',
@@ -89,6 +91,9 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           animation: 'rbEnter 320ms var(--ease-out-expo) both',
+          flex: 1,
+          minWidth: 0,
+          WebkitUserSelect: 'none',
         }}
       >
         {title}
@@ -232,6 +237,10 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
           </div>
         </div>
       </div>
+
+      {/* Windows/Linux: window controls on the right.
+          On macOS, WindowControls renders null (native traffic lights used). */}
+      <WindowControls />
 
       {/* Exit confirmation dialog */}
       <ConfirmDialog

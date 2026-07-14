@@ -15,7 +15,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:dev:win": "tauri dev --config src-tauri/tauri.windows.conf.json",
+    "tauri:build:win": "tauri build --config src-tauri/tauri.windows.conf.json"
   },
   "dependencies": {
     "@react-three/fiber": "^9.6.1",

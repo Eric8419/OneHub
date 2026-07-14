@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { ToastContainer } from '../ui';
+import { isMac, useWindowFilled } from './WindowControls';
 
 const pageTitles: Record<string, string> = {
   '/dashboard': '仪表盘',
@@ -19,6 +20,7 @@ export const Shell: React.FC = () => {
   const rootPath = pathSegments[0] ? `/${pathSegments[0]}` : '/';
   const pageTitle = pageTitles[location.pathname] || pageTitles[rootPath] || 'Melody Hub';
   const mainRef = useRef<HTMLElement>(null);
+  const windowFilled = useWindowFilled();
 
   // Scroll to top on route change
   useEffect(() => {
@@ -31,7 +33,7 @@ export const Shell: React.FC = () => {
       style={{
         display: 'flex',
         width: '100%',
-        minHeight: '100vh',
+        height: '100vh',
         background: 'var(--bg-base-default)',
         color: 'var(--text-default)',
         fontFamily: 'var(--body-base-font-family)',
@@ -39,13 +41,17 @@ export const Shell: React.FC = () => {
         lineHeight: 'var(--body-base-line-height)',
         ['--sidebar-width' as string]: '220px',
         position: 'relative',
+        // macOS transparent window needs rounded corners; disable when maximized/fullscreen.
+        // Windows keeps sharp corners in all states.
+        borderRadius: isMac && !windowFilled ? 10 : 0,
+        overflow: 'hidden',
       }}
     >
       {/* Subtle background grain texture */}
       <div
         className="ds-shell__grain"
         style={{
-          position: 'fixed',
+          position: 'absolute',
           inset: 0,
           zIndex: 0,
           pointerEvents: 'none',
@@ -59,7 +65,7 @@ export const Shell: React.FC = () => {
       <div
         className="ds-shell__accent"
         style={{
-          position: 'fixed',
+          position: 'absolute',
           top: '-50%',
           right: '-20%',
           width: '60%',

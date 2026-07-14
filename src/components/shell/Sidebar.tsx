@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { LayoutDashboard, Server, Cpu, Settings } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { useT } from '../../i18n';
+import { isMac } from './WindowControls';
 
 interface NavItem {
   key: string;
@@ -75,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
     <aside
       className="ds-shell__sidebar"
       style={{
-        position: 'fixed',
+        position: 'absolute',
         top: 0,
         left: 0,
         bottom: 0,
@@ -88,16 +89,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
         overflow: 'hidden',
       }}
     >
-      {/* Brand */}
+      {/* Brand — on macOS the native traffic lights overlay this area,
+          so we reserve left padding for them and align the text vertically
+          with the traffic lights. Brand height matches traffic-light row
+          to avoid extra whitespace below. */}
       <div
         className="ds-shell__brand"
+        data-tauri-drag-region
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: 'var(--spacer-8)',
           padding: '0 var(--spacer-16)',
-          borderBottom: '1px solid var(--border-neutral-l1)',
-          height: 57,
+          paddingLeft: isMac ? 78 : 'var(--spacer-16)',
+          height: isMac ? 32 : 57,
           boxSizing: 'border-box',
         }}
       >

@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
-use crate::types::{Aggregation, Model, Provider, RoutingStrategy};
+use crate::types::{Aggregation, Provider, RoutingStrategy};
 
 /// Result of routing a request: the target provider, the concrete
 /// model name, and (if matched via aggregation) the aggregation
@@ -258,7 +258,7 @@ mod tests {
                     api_base: "https://example.com".into(),
                     api_key: "key".into(),
                     status: "connected".into(),
-                    models: vec![Model {
+                    models: vec![crate::types::Model {
                         id: format!("{}-m1", id),
                         name: "gpt-4".into(),
                         alias: None,

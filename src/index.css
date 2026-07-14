@@ -333,7 +333,7 @@ html, body {
   font-size: var(--body-base-font-size);
   line-height: var(--body-base-line-height);
   color: var(--text-default);
-  background: var(--bg-base-default);
+  background: transparent;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

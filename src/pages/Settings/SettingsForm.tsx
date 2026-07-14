@@ -152,33 +152,6 @@ export const SettingsForm: React.FC = () => {
         {activeCategory === 'general' && (
           <AnimatedContent>
             <Card style={{ marginBottom: 'var(--spacer-24)' }}>
-              <SectionTitle>{t('settings.basic')}</SectionTitle>
-              <FormGrid>
-                <FormField label="服务地址">
-                  <Input type="text" value={settings.host} onChange={(e) => updateSettings({ host: e.target.value })} />
-                </FormField>
-                <FormField label="代理端口">
-                  <Input
-                    type="number"
-                    value={settings.port.toString()}
-                    onChange={(e) => updateSettings({ port: parseInt(e.target.value) || 8080 })}
-                  />
-                </FormField>
-                <FormField label="自动启动">
-                  <Switch checked={settings.autoStart} onChange={(v) => updateSettings({ autoStart: v })} />
-                </FormField>
-                <FormField label="最大并发">
-                  <Dropdown
-                    options={concurrencyOptions}
-                    value={settings.maxConcurrency.toString()}
-                    onChange={(v) => updateSettings({ maxConcurrency: parseInt(v) })}
-                    size="sm"
-                  />
-                </FormField>
-              </FormGrid>
-            </Card>
-
-            <Card>
               <SectionTitle>{t('settings.appearance')}</SectionTitle>
               <FormGrid>
                 <FormField label="语言">
@@ -214,6 +187,33 @@ export const SettingsForm: React.FC = () => {
                     size="sm"
                   />
                   {planned()}
+                </FormField>
+              </FormGrid>
+            </Card>
+
+            <Card>
+              <SectionTitle>{t('settings.basic')}</SectionTitle>
+              <FormGrid>
+                <FormField label="服务地址">
+                  <Input type="text" value={settings.host} onChange={(e) => updateSettings({ host: e.target.value })} />
+                </FormField>
+                <FormField label="代理端口">
+                  <Input
+                    type="number"
+                    value={settings.port.toString()}
+                    onChange={(e) => updateSettings({ port: parseInt(e.target.value) || 8080 })}
+                  />
+                </FormField>
+                <FormField label="自动启动">
+                  <Switch checked={settings.autoStart} onChange={(v) => updateSettings({ autoStart: v })} />
+                </FormField>
+                <FormField label="最大并发">
+                  <Dropdown
+                    options={concurrencyOptions}
+                    value={settings.maxConcurrency.toString()}
+                    onChange={(v) => updateSettings({ maxConcurrency: parseInt(v) })}
+                    size="sm"
+                  />
                 </FormField>
               </FormGrid>
             </Card>
