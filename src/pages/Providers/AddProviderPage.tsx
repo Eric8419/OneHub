@@ -30,9 +30,9 @@ interface FetchModelsResult {
 // ── Constants ──────────────────────────────────────────────
 
 const API_FLAVOR_OPTIONS: DropdownOption[] = [
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
   { value: 'openai-compatible', label: 'OpenAI 兼容' },
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'responses', label: 'Responses' },
 ];
 
 const REASONING_EFFORT_OPTIONS: Array<{ value: 'low' | 'medium' | 'high'; label: string }> = [
@@ -42,7 +42,7 @@ const REASONING_EFFORT_OPTIONS: Array<{ value: 'low' | 'medium' | 'high'; label:
 ];
 
 const FALLBACK_PROFILES: ProviderProfileEntry[] = [
-  { id: 'openai', label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', flavor: 'openai' },
+  { id: 'openai', label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', flavor: 'responses' },
   { id: 'anthropic', label: 'Anthropic', baseUrl: 'https://api.anthropic.com/v1', flavor: 'anthropic' },
   { id: 'deepseek', label: 'DeepSeek', baseUrl: 'https://api.deepseek.com', flavor: 'openai-compatible' },
   { id: 'openrouter', label: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', flavor: 'openai-compatible' },
@@ -143,7 +143,7 @@ export const AddProviderPage: React.FC = () => {
   const [name, setName] = useState('');
   const [apiBase, setApiBase] = useState('');
   const [apiKey, setApiKey] = useState('');
-  const [apiFlavor, setApiFlavor] = useState('openai');
+  const [apiFlavor, setApiFlavor] = useState('openai-compatible');
   const [models, setModels] = useState<Model[]>([]);
   const [remoteModels, setRemoteModels] = useState<RemoteModelEntry[]>([]);
   const [fetchingModels, setFetchingModels] = useState(false);

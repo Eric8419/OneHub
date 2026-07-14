@@ -23,9 +23,9 @@ interface FetchModelsResult {
 // ── Constants ──────────────────────────────────────────────
 
 const API_FLAVOR_OPTIONS: DropdownOption[] = [
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
   { value: 'openai-compatible', label: 'OpenAI 兼容' },
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'responses', label: 'Responses' },
 ];
 
 const REASONING_EFFORT_OPTIONS: Array<{ value: 'low' | 'medium' | 'high'; label: string }> = [
@@ -90,7 +90,7 @@ export const EditProviderPage: React.FC = () => {
   const [name, setName] = useState(() => provider?.name ?? '');
   const [apiBase, setApiBase] = useState(() => provider?.apiBase ?? '');
   const [apiKey, setApiKey] = useState(() => provider?.apiKey ?? '');
-  const [apiFlavor, setApiFlavor] = useState(() => provider?.apiFlavor || 'openai');
+  const [apiFlavor, setApiFlavor] = useState(() => provider?.apiFlavor || 'openai-compatible');
   const [models, setModels] = useState<Model[]>(() => (provider ? provider.models.map((m) => ({ ...m })) : []));
 
   const [remoteModels, setRemoteModels] = useState<RemoteModelEntry[]>([]);

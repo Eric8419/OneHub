@@ -4,9 +4,9 @@ import type { Model, Provider } from '../../types/provider';
 import { Plus, Trash2, Eye, Brain, SlidersHorizontal, Check, Loader2 } from 'lucide-react';
 
 const API_FLAVOR_OPTIONS = [
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
   { value: 'openai-compatible', label: 'OpenAI 兼容' },
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'responses', label: 'Responses' },
 ];
 
 const REASONING_EFFORT_OPTIONS: Array<{ value: NonNullable<Model['defaultReasoningEffort']>; label: string }> = [
@@ -215,7 +215,7 @@ export const ProviderForm: React.FC<ProviderFormProps> = ({
             <label style={labelStyle}>API 协议类型</label>
             <Dropdown
               options={API_FLAVOR_OPTIONS}
-              value={values.apiFlavor || 'openai'}
+              value={values.apiFlavor || 'openai-compatible'}
               onChange={(v) => onChange({ ...values, apiFlavor: v })}
               size="sm"
             />

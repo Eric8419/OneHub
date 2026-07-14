@@ -25,6 +25,7 @@ use serde_json::Value;
 pub const FLAVOR_OPENAI: &str = "openai";
 pub const FLAVOR_ANTHROPIC: &str = "anthropic";
 pub const FLAVOR_OPENAI_COMPAT: &str = "openai-compatible";
+pub const FLAVOR_RESPONSES: &str = "responses";
 
 // ── Auth ────────────────────────────────────────────────────
 //
@@ -282,6 +283,123 @@ impl Protocol for AnthropicMessagesProtocol {
     }
 }
 
+// ── OpenAI Responses API protocol ───────────────────────────
+//
+// OpenAI's Responses API (https://platform.openai.com/docs/api-reference/responses)
+// is the newer unified endpoint that supersedes Chat Completions.
+// Endpoint: POST {base}/responses
+// Auth: Bearer token (same as Chat Completions)
+// Usage shape: { usage: { input_tokens, output_tokens, total_tokens } }
+
+pub struct ResponsesApiProtocol;
+
+impl Protocol for ResponsesApiProtocol {
+    fn request_type(&self) -> &str {
+        "Responses"
+    }
+
+    fn build_url(&self, api_base: &str) -> String {
+        let base = api_base.trim_end_matches('/');
+        format!("{}/responses", base)
+    }
+
+    fn auth(&self) -> Auth {
+        Auth::Bearer
+    }
+
+    fn count_tokens(&self, resp: &Value) -> i64 {
+        if let Some(usage) = resp.get("usage") {
+            if let Some(total) = usage.get("total_tokens").and_then(|v| v.as_i64()) {
+                return total;
+            }
+            if let (Some(i), Some(o)) = (
+                usage.get("input_tokens").and_then(|v| v.as_i64()),
+                usage.get("output_tokens").and_then(|v| v.as_i64()),
+            ) {
+                return i + o;
+            }
+            if let Some(o) = usage.get("output_tokens").and_then(|v| v.as_i64()) {
+                return o;
+            }
+        }
+        // Fallback: rough char/4 estimate from output text.
+        if let Some(output) = resp.get("output").and_then(|v| v.as_array()) {
+            for item in output {
+                if let Some(content) = item.get("content").and_then(|v| v.as_array()) {
+                    for block in content {
+                        if let Some(text) = block.get("text").and_then(|v| v.as_str()) {
+                            return (text.len() / 4).max(1) as i64;
+                        }
+                    }
+                }
+            }
+        }
+        1
+    }
+
+    fn count_stream_tokens(&self, buffer: &[u8]) -> i64 {
+        let text = match std::str::from_utf8(buffer) {
+            Ok(s) => s,
+            Err(_) => return 0,
+        };
+        // Responses API SSE: `event: <type>\ndata: {json}\n\n`.
+        // `response.completed` event carries the final `response.usage`
+        // with input_tokens / output_tokens / total_tokens.
+        let mut last_total: Option<i64> = None;
+        let mut last_input: i64 = 0;
+        let mut last_output: i64 = 0;
+        for line in text.lines() {
+            let line = line.trim();
+            let data = line
+                .strip_prefix("data: ")
+                .or_else(|| line.strip_prefix("data:"))
+                .map(str::trim);
+            if let Some(data) = data {
+                if data == "[DONE]" || data.is_empty() {
+                    continue;
+                }
+                if let Ok(json) = serde_json::from_str::<Value>(data) {
+                    if let Some(usage) = json.get("usage").filter(|v| v.is_object()) {
+                        if let Some(total) = usage.get("total_tokens").and_then(|v| v.as_i64()) {
+                            last_total = Some(total);
+                        }
+                        if let Some(i) = usage.get("input_tokens").and_then(|v| v.as_i64()) {
+                            last_input = i;
+                        }
+                        if let Some(o) = usage.get("output_tokens").and_then(|v| v.as_i64()) {
+                            last_output = o;
+                        }
+                    }
+                    // The completed response object also nests usage
+                    // under `response.usage` for `response.completed` events.
+                    if let Some(usage) = json
+                        .pointer("/response/usage")
+                        .filter(|v| v.is_object())
+                    {
+                        if let Some(total) = usage.get("total_tokens").and_then(|v| v.as_i64()) {
+                            last_total = Some(total);
+                        }
+                        if let Some(i) = usage.get("input_tokens").and_then(|v| v.as_i64()) {
+                            last_input = i;
+                        }
+                        if let Some(o) = usage.get("output_tokens").and_then(|v| v.as_i64()) {
+                            last_output = o;
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(total) = last_total {
+            return total;
+        }
+        let sum = last_input + last_output;
+        if sum > 0 {
+            return sum;
+        }
+        0
+    }
+}
+
 // ── Compatibility: the old ProviderAdapter trait ────────────
 //
 // Kept as a thin shim so server.rs can keep using `adapter::*`
@@ -324,7 +442,7 @@ impl<P: Protocol> ProviderAdapter for ProtocolAdapter<P> {
     }
 }
 
-/// Resolve an adapter by flavor string. Falls back to OpenAI.
+/// Resolve an adapter by flavor string. Falls back to OpenAI Chat.
 pub fn resolve(flavor: &str) -> Box<dyn ProviderAdapter> {
     match flavor {
         FLAVOR_ANTHROPIC => Box::new(ProtocolAdapter {
@@ -336,10 +454,17 @@ pub fn resolve(flavor: &str) -> Box<dyn ProviderAdapter> {
         FLAVOR_OPENAI_COMPAT => Box::new(ProtocolAdapter {
             protocol: OpenAiChatProtocol,
         }),
+        FLAVOR_RESPONSES => Box::new(ProtocolAdapter {
+            protocol: ResponsesApiProtocol,
+        }),
         _ => {
             if flavor.contains("anthropic") || flavor.contains("claude") {
                 Box::new(ProtocolAdapter {
                     protocol: AnthropicMessagesProtocol,
+                })
+            } else if flavor.contains("responses") {
+                Box::new(ProtocolAdapter {
+                    protocol: ResponsesApiProtocol,
                 })
             } else {
                 Box::new(ProtocolAdapter {
@@ -381,7 +506,7 @@ pub const PROFILES: &[ProviderProfile] = &[
         id: "openai",
         label: "OpenAI",
         base_url: "https://api.openai.com/v1",
-        flavor: FLAVOR_OPENAI,
+        flavor: FLAVOR_RESPONSES,
     },
     ProviderProfile {
         id: "anthropic",
@@ -1308,6 +1433,11 @@ mod tests {
             resolve("openai-compatible").request_type(),
             "Chat Completion"
         );
+    }
+
+    #[test]
+    fn test_resolve_responses() {
+        assert_eq!(resolve("responses").request_type(), "Responses");
     }
 
     #[test]

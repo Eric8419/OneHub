@@ -71,6 +71,7 @@ pub async fn start(state: SharedAppState, host: String, port: u16) -> Result<(),
 
         let app = Router::new()
             .route("/health", get(health_handler))
+            .route("/v1/models", get(models_handler))
             .route("/v1/chat/completions", post(chat_completions_handler))
             .route("/v1/anthropic", post(anthropic_handler))
             .layer(cors)
@@ -731,6 +732,61 @@ async fn health_handler() -> Json<Value> {
     }))
 }
 
+/// `GET /v1/models` — list all callable models exposed by the proxy.
+///
+/// Aggregates:
+///   1. Every model name (and alias) from configured providers.
+///   2. Every enabled aggregation name.
+///
+/// Each entry follows the OpenAI `GET /v1/models` shape so standard
+/// clients can populate their model picker by pointing at the proxy.
+async fn models_handler(
+    State(state): State<SharedAppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    // Same auth gates as chat_completions_handler.
+    {
+        let auth = state.auth.read().await;
+        require_ip(addr.ip(), &auth)?;
+        require_auth(&headers, &auth)?;
+    }
+
+    let cfg = state.routing.read().await;
+    let mut seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let mut data: Vec<Value> = Vec::new();
+
+    // Provider models — emit both real names and aliases.
+    for provider in &cfg.providers {
+        for model in &provider.models {
+            for name in model.alias.iter().chain(std::iter::once(&model.name)) {
+                if !name.is_empty() && seen.insert(name.clone()) {
+                    data.push(json!({
+                        "id": name,
+                        "object": "model",
+                        "created": 0,
+                        "owned_by": provider.name,
+                    }));
+                }
+            }
+        }
+    }
+
+    // Enabled aggregations — callable by their aggregation name.
+    for agg in cfg.aggregations.iter().filter(|a| a.enabled) {
+        if !agg.name.is_empty() && seen.insert(agg.name.clone()) {
+            data.push(json!({
+                "id": agg.name,
+                "object": "model",
+                "created": 0,
+                "owned_by": "melody-hub",
+            }));
+        }
+    }
+
+    Ok(Json(json!({ "object": "list", "data": data })))
+}
+
 async fn chat_completions_handler(
     State(state): State<SharedAppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -898,5 +954,175 @@ mod tests {
         // payload is correct.
         let resp = health_handler().await;
         assert_eq!(resp.0.get("status").and_then(|v| v.as_str()), Some("ok"));
+    }
+
+    async fn build_test_state(
+        providers: Vec<crate::types::Provider>,
+        aggregations: Vec<crate::types::Aggregation>,
+    ) -> SharedAppState {
+        let state = crate::proxy::state::AppState::new();
+        {
+            let mut routing = state.routing.write().await;
+            routing.providers = providers;
+            routing.aggregations = aggregations;
+        }
+        state
+    }
+
+    fn dummy_addr() -> SocketAddr {
+        "127.0.0.1:0".parse().unwrap()
+    }
+
+    #[tokio::test]
+    async fn models_lists_provider_model_names_and_aliases() {
+        let provider = crate::types::Provider {
+            id: "p1".into(),
+            name: "Acme".into(),
+            api_base: "https://example.com/v1".into(),
+            api_key: "sk-test".into(),
+            status: "active".into(),
+            api_key_encrypted: false,
+            api_flavor: "openai-compatible".into(),
+            models: vec![
+                crate::types::Model {
+                    id: "gpt-4".into(),
+                    name: "gpt-4".into(),
+                    alias: Some("fast".into()),
+                    context_window: None,
+                    max_output_tokens: None,
+                    supports_vision: false,
+                    supports_reasoning: false,
+                    supports_reasoning_effort: false,
+                    default_reasoning_effort: None,
+                },
+                crate::types::Model {
+                    id: "gpt-3.5".into(),
+                    name: "gpt-3.5".into(),
+                    alias: None,
+                    context_window: None,
+                    max_output_tokens: None,
+                    supports_vision: false,
+                    supports_reasoning: false,
+                    supports_reasoning_effort: false,
+                    default_reasoning_effort: None,
+                },
+            ],
+        };
+        let state = build_test_state(vec![provider], vec![]).await;
+        let resp = models_handler(State(state), ConnectInfo(dummy_addr()), HeaderMap::new())
+            .await
+            .expect("models handler should succeed");
+        let ids: Vec<String> = resp
+            .0
+            .get("data")
+            .and_then(|d| d.as_array())
+            .unwrap()
+            .iter()
+            .map(|m| m.get("id").and_then(|v| v.as_str()).unwrap().to_string())
+            .collect();
+        // Both real names + alias should be listed, deduplicated.
+        assert!(ids.contains(&"gpt-4".to_string()));
+        assert!(ids.contains(&"fast".to_string()));
+        assert!(ids.contains(&"gpt-3.5".to_string()));
+    }
+
+    #[tokio::test]
+    async fn models_lists_enabled_aggregations() {
+        let agg_enabled = crate::types::Aggregation {
+            id: "a1".into(),
+            name: "smart-pick".into(),
+            models: "gpt-4".into(),
+            strategy: "round-robin".into(),
+            priority: "normal".into(),
+            enabled: true,
+        };
+        let agg_disabled = crate::types::Aggregation {
+            id: "a2".into(),
+            name: "disabled-agg".into(),
+            models: "gpt-4".into(),
+            strategy: "round-robin".into(),
+            priority: "normal".into(),
+            enabled: false,
+        };
+        let state = build_test_state(vec![], vec![agg_enabled, agg_disabled]).await;
+        let resp = models_handler(State(state), ConnectInfo(dummy_addr()), HeaderMap::new())
+            .await
+            .unwrap();
+        let ids: Vec<String> = resp
+            .0
+            .get("data")
+            .and_then(|d| d.as_array())
+            .unwrap()
+            .iter()
+            .map(|m| m.get("id").and_then(|v| v.as_str()).unwrap().to_string())
+            .collect();
+        assert!(ids.contains(&"smart-pick".to_string()));
+        assert!(!ids.contains(&"disabled-agg".to_string()));
+    }
+
+    #[tokio::test]
+    async fn models_deduplicates_when_alias_matches_name() {
+        // If a model's alias equals another model's name, only one
+        // entry should appear.
+        let provider = crate::types::Provider {
+            id: "p1".into(),
+            name: "Acme".into(),
+            api_base: "https://example.com/v1".into(),
+            api_key: "sk-test".into(),
+            status: "active".into(),
+            api_key_encrypted: false,
+            api_flavor: "openai-compatible".into(),
+            models: vec![
+                crate::types::Model {
+                    id: "m1".into(),
+                    name: "m1".into(),
+                    alias: Some("shared".into()),
+                    context_window: None,
+                    max_output_tokens: None,
+                    supports_vision: false,
+                    supports_reasoning: false,
+                    supports_reasoning_effort: false,
+                    default_reasoning_effort: None,
+                },
+                crate::types::Model {
+                    id: "shared".into(),
+                    name: "shared".into(),
+                    alias: None,
+                    context_window: None,
+                    max_output_tokens: None,
+                    supports_vision: false,
+                    supports_reasoning: false,
+                    supports_reasoning_effort: false,
+                    default_reasoning_effort: None,
+                },
+            ],
+        };
+        let state = build_test_state(vec![provider], vec![]).await;
+        let resp = models_handler(State(state), ConnectInfo(dummy_addr()), HeaderMap::new())
+            .await
+            .unwrap();
+        let count = resp
+            .0
+            .get("data")
+            .and_then(|d| d.as_array())
+            .unwrap()
+            .iter()
+            .filter(|m| m.get("id").and_then(|v| v.as_str()) == Some("shared"))
+            .count();
+        assert_eq!(count, 1);
+    }
+
+    #[tokio::test]
+    async fn models_requires_auth_when_token_set() {
+        let state = crate::proxy::state::AppState::new();
+        {
+            let mut auth = state.auth.write().await;
+            auth.auth_token = "secret".into();
+        }
+        let result =
+            models_handler(State(state), ConnectInfo(dummy_addr()), HeaderMap::new()).await;
+        assert!(result.is_err());
+        let (status, _) = result.unwrap_err();
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
     }
 }

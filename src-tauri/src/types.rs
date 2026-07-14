@@ -103,7 +103,7 @@ pub struct Provider {
 }
 
 fn default_flavor() -> String {
-    "openai".into()
+    "openai-compatible".into()
 }
 
 impl Provider {
