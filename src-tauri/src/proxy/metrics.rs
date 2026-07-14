@@ -18,8 +18,10 @@ use crate::types::RequestRecord;
 /// reads. Older records stay on disk and are loaded on startup.
 const IN_MEMORY_CAP: usize = 1000;
 
-/// Flush to disk every this many new records.
-const FLUSH_EVERY: usize = 50;
+/// Flush to disk every this many new records. Set to 1 so every
+/// request is persisted immediately — a crash or force-quit cannot
+/// lose any records.
+const FLUSH_EVERY: usize = 1;
 
 /// How many recent records to load back from disk on startup
 /// (gives the dashboard immediate history after a restart).

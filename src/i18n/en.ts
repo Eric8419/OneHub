@@ -1,5 +1,6 @@
 const en: Record<string, string> = {
   'sidebar.dashboard': 'Dashboard',
+  'sidebar.providers': 'Providers',
   'sidebar.models': 'Models',
   'sidebar.settings': 'Settings',
   'sidebar.running': 'Running',

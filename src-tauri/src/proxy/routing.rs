@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
-use crate::types::{Aggregation, Provider, RoutingStrategy};
+use crate::types::{Aggregation, Model, Provider, RoutingStrategy};
 
 /// Result of routing a request: the target provider, the concrete
 /// model name, and (if matched via aggregation) the aggregation
@@ -62,15 +62,20 @@ pub async fn route_request(
 ) -> Result<RouteResult, String> {
     let cfg = state.read().await;
 
-    // 1. Direct model match (model name → provider).
-    let direct_hit = cfg
+    // 1. Direct match by model name OR alias — round-robin
+    //    across all providers that offer the same model.
+    let direct_hits: Vec<_> = cfg
         .providers
         .iter()
         .flat_map(|p| p.models.iter().map(move |m| (p, m)))
-        .find(|(_, m)| m.name == model_or_agg)
-        .map(|(p, m)| (p.clone(), m.name.clone()));
+        .filter(|(_, m)| m.name == model_or_agg || m.alias.as_deref() == Some(model_or_agg))
+        .map(|(p, m)| (p.clone(), m.name.clone()))
+        .collect();
 
-    if let Some((provider, model)) = direct_hit {
+    if !direct_hits.is_empty() {
+        let rr_key = format!("direct:{}", model_or_agg);
+        let idx = cfg.round_robin_index.get(&rr_key).copied().unwrap_or(0);
+        let (provider, model) = direct_hits[idx % direct_hits.len()].clone();
         return Ok(RouteResult {
             provider,
             model,
@@ -101,7 +106,9 @@ pub async fn route_request(
 
             for provider in &cfg.providers {
                 for model in &provider.models {
-                    if model.name == picked {
+                    // Match by name or alias so aggregation entries
+                    // can reference either the real name or an alias.
+                    if model.name == picked || model.alias.as_deref() == Some(&picked) {
                         return Ok(RouteResult {
                             provider: provider.clone(),
                             model: model.name.clone(),
@@ -167,8 +174,9 @@ pub async fn record_routing_side_effects(
 ) {
     let mut cfg = state.write().await;
 
-    // Advance round-robin only for the matched aggregation.
+    // Advance round-robin cursor.
     if let Some(agg_name) = aggregation_name {
+        // Aggregation: advance its dedicated cursor.
         if let Some(agg) = cfg.aggregations.iter().find(|a| a.name == *agg_name) {
             let model_names = parse_agg_models(&agg.models);
             if !model_names.is_empty() {
@@ -176,6 +184,22 @@ pub async fn record_routing_side_effects(
                 let next = (idx + 1) % model_names.len();
                 cfg.round_robin_index.insert(agg_name.clone(), next);
             }
+        }
+    } else {
+        // Direct mapping: advance the per-model cursor so that
+        // multiple providers offering the same model take turns.
+        let rr_key = format!("direct:{}", model);
+        // Count how many providers offer this model (by name or alias).
+        let count = cfg
+            .providers
+            .iter()
+            .flat_map(|p| p.models.iter())
+            .filter(|m| m.name == model || m.alias.as_deref() == Some(model))
+            .count();
+        if count > 1 {
+            let idx = cfg.round_robin_index.get(&rr_key).copied().unwrap_or(0);
+            let next = (idx + 1) % count;
+            cfg.round_robin_index.insert(rr_key, next);
         }
     }
 
@@ -197,7 +221,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn direct_model_match_does_not_advance_rr() {
+    async fn direct_model_match_advances_direct_rr() {
         let state = make_state();
         {
             let mut cfg = state.write().await;
@@ -212,10 +236,60 @@ mod tests {
             });
         }
 
+        // Direct mapping with a single provider should NOT advance.
         record_routing_side_effects(&state, &None, "gpt-4", 500).await;
 
         let cfg = state.read().await;
         assert_eq!(cfg.round_robin_index.get("agg-1"), Some(&0));
+        // No direct RR key created because only 0 providers match in this empty state.
+        assert_eq!(cfg.round_robin_index.get("direct:gpt-4"), None);
+    }
+
+    #[tokio::test]
+    async fn direct_rr_rotates_across_providers() {
+        let state = make_state();
+        {
+            let mut cfg = state.write().await;
+            // Two providers offering the same model name.
+            for id in ["p1", "p2"] {
+                cfg.providers.push(Provider {
+                    id: id.into(),
+                    name: format!("Provider {}", id),
+                    api_base: "https://example.com".into(),
+                    api_key: "key".into(),
+                    status: "connected".into(),
+                    models: vec![Model {
+                        id: format!("{}-m1", id),
+                        name: "gpt-4".into(),
+                        alias: None,
+                        context_window: None,
+                        max_output_tokens: None,
+                        supports_vision: false,
+                        supports_reasoning: false,
+                        supports_reasoning_effort: false,
+                        default_reasoning_effort: None,
+                    }],
+                    api_flavor: "openai".into(),
+                    api_key_encrypted: false,
+                });
+            }
+        }
+
+        // First request → provider 0.
+        let r1 = route_request(&state, "gpt-4").await.unwrap();
+        // After completion, cursor advances to 1.
+        record_routing_side_effects(&state, &None, "gpt-4", 100).await;
+
+        // Second request → provider 1.
+        let r2 = route_request(&state, "gpt-4").await.unwrap();
+        // After completion, cursor wraps to 0.
+        record_routing_side_effects(&state, &None, "gpt-4", 100).await;
+
+        // Third request → provider 0 again.
+        let r3 = route_request(&state, "gpt-4").await.unwrap();
+
+        assert_ne!(r1.provider.id, r2.provider.id);
+        assert_eq!(r1.provider.id, r3.provider.id);
     }
 
     #[tokio::test]

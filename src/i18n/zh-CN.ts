@@ -1,6 +1,7 @@
 const zh: Record<string, string> = {
   // ── 侧边栏 ──
   'sidebar.dashboard': '仪表盘',
+  'sidebar.providers': 'API 供应商',
   'sidebar.models': '模型配置',
   'sidebar.settings': '应用设置',
   'sidebar.running': '服务运行中',

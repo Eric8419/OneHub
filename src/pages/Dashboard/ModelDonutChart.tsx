@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useStatsStore } from '../../store/statsStore';
-import { Card, EChart, getCssVar, useThemeVersion } from '../../components/ui';
+import { Card, Counter, EChart, getCssVar, useThemeVersion } from '../../components/ui';
 import type { EChartsOption } from '../../components/ui';
 
 /** Resolve a `var(--token)` string to its computed value; pass through raw colors. */
@@ -30,13 +30,15 @@ export const ModelDonutChart: React.FC = () => {
 
   const option = useMemo<EChartsOption>(() => {
     const hasData = filteredData.length > 0;
+    const borderColor = getCssVar('--bg-base-secondary') || '#F5F5F5';
+    const emptyColor = getCssVar('--bg-overlay-l3') || '#D4D4D4';
     const data = hasData
       ? filteredData.map(d => ({
           name: d.name,
           value: d.percentage,
           itemStyle: { color: resolveColor(d.color) },
         }))
-      : [{ name: '', value: 100, itemStyle: { color: getCssVar('--border-neutral-l1') || '#E5E5E5' } }];
+      : [{ name: '', value: 100, itemStyle: { color: emptyColor } }];
     return {
       tooltip: {
         trigger: 'item',
@@ -52,8 +54,6 @@ export const ModelDonutChart: React.FC = () => {
       series: [
         {
           type: 'pie',
-          // Reserve room for emphasis scaleSize (10) + shadowBlur (10):
-          // outer 58 + 10 + 10 = 78 < 80 (container radius). No clipping on hover.
           radius: ['34', '58'],
           center: ['50%', '50%'],
           avoidLabelOverlap: false,
@@ -61,7 +61,7 @@ export const ModelDonutChart: React.FC = () => {
           labelLine: { show: false },
           silent: !hasData,
           emphasis: {
-            scale: true,
+            scale: hasData,
             scaleSize: 10,
             itemStyle: {
               shadowBlur: 10,
@@ -69,7 +69,7 @@ export const ModelDonutChart: React.FC = () => {
             },
           },
           itemStyle: {
-            borderColor: getCssVar('--bg-base-secondary') || '#F5F5F5',
+            borderColor,
             borderWidth: 2,
           },
           animationDuration: 600,
@@ -78,7 +78,6 @@ export const ModelDonutChart: React.FC = () => {
         },
       ],
     };
-    // themeVersion is intentional: re-resolve CSS vars when theme changes.
   }, [filteredData, themeVersion]);
 
   return (
@@ -121,9 +120,22 @@ export const ModelDonutChart: React.FC = () => {
                     fontWeight: 'var(--font-weight-strong)',
                     color: 'var(--text-default)',
                     lineHeight: '28px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
-                  {totalRequests.toLocaleString()}
+                  <Counter
+                    value={totalRequests}
+                    fontSize={22}
+                    gap={1}
+                    horizontalPadding={0}
+                    gradientHeight={0}
+                    gradientFrom="transparent"
+                    gradientTo="transparent"
+                    textColor="var(--text-default)"
+                    fontWeight="var(--font-weight-strong)"
+                  />
                 </div>
                 <div
                   style={{

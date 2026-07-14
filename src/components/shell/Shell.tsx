@@ -6,6 +6,7 @@ import { ToastContainer } from '../ui';
 
 const pageTitles: Record<string, string> = {
   '/dashboard': '仪表盘',
+  '/providers': 'API 供应商',
   '/models': '模型配置',
   '/settings': '应用设置',
 };
@@ -13,8 +14,10 @@ const pageTitles: Record<string, string> = {
 export const Shell: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const activeKey = location.pathname.replace('/', '') || 'dashboard';
-  const pageTitle = pageTitles[location.pathname] || 'Melody Hub';
+  const pathSegments = location.pathname.split('/').filter(Boolean);
+  const activeKey = pathSegments[0] || 'dashboard';
+  const rootPath = pathSegments[0] ? `/${pathSegments[0]}` : '/';
+  const pageTitle = pageTitles[location.pathname] || pageTitles[rootPath] || 'Melody Hub';
   const mainRef = useRef<HTMLElement>(null);
 
   // Scroll to top on route change
@@ -77,7 +80,8 @@ export const Shell: React.FC = () => {
           width: 'calc(100% - var(--sidebar-width, 220px))',
           display: 'flex',
           flexDirection: 'column',
-          minHeight: '100vh',
+          height: '100vh',
+          overflow: 'hidden',
           background: 'transparent', /* Let grain show through */
           position: 'relative',
           zIndex: 1,
@@ -88,7 +92,8 @@ export const Shell: React.FC = () => {
           ref={mainRef}
           className="ds-shell__main"
           style={{
-            flex: '1 0 auto',
+            flex: 1,
+            minHeight: 0,
             padding: 'var(--spacer-24)',
             overflowY: 'auto',
             scrollbarGutter: 'stable',

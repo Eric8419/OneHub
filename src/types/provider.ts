@@ -1,6 +1,9 @@
 export interface Model {
   id: string;
   name: string;
+  /** Optional alias. Clients can call this alias instead of the
+   *  real model name; the proxy resolves it back to `name`. */
+  alias?: string;
   contextWindow?: number;
   maxOutputTokens?: number;
   supportsVision?: boolean;

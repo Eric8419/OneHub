@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStatsStore } from '../../store/statsStore';
 import type { UsageStats } from '../../types/stats';
-import { CountUpValue, FlexBetween, FlexRow, ShinyText, SpotlightCard, Skeleton } from '../../components/ui';
+import { Counter, FlexBetween, FlexRow, ShinyText, SpotlightCard, Skeleton } from '../../components/ui';
 import { Coins, Activity, Box, Clock, RefreshCw } from 'lucide-react';
 
 interface KpiCardConfig {
@@ -195,11 +195,29 @@ export const KPICards: React.FC = () => {
                 color: 'var(--text-default)',
                 lineHeight: '36px',
                 marginBottom: 'var(--spacer-8)',
+                display: 'flex',
+                alignItems: 'center',
               }}
             >
               {value != null ? (
-                <CountUpValue value={value} formatter={v => card.formatter(Math.round(v))} />
-              ) : card.formatter(0)}
+                <>
+                  <Counter
+                    value={value}
+                    fontSize={28}
+                    gap={1}
+                    horizontalPadding={0}
+                    gradientHeight={0}
+                    gradientFrom="transparent"
+                    gradientTo="transparent"
+                    textColor="var(--text-default)"
+                    fontWeight="var(--font-weight-strong)"
+                    containerStyle={{ verticalAlign: 'middle' }}
+                  />
+                  {card.key === 'response' && 's'}
+                </>
+              ) : (
+                card.formatter(0)
+              )}
             </div>
 
             {card.key === 'models' ? (

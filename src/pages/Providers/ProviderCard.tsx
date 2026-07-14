@@ -1,21 +1,9 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useProviderStore } from '../../store/providerStore';
-import type { Model, Provider } from '../../types/provider';
-import { ConfirmDialog, SpotlightCard, Tag, toast, Dropdown } from '../../components/ui';
+import type { Model } from '../../types/provider';
+import { ConfirmDialog, SpotlightCard, Tag, toast } from '../../components/ui';
 import { ChevronRight, Pencil, Trash2, Bot, Copy, Power, PowerOff, Loader2 } from 'lucide-react';
-import { invoke } from '@tauri-apps/api/core';
-
-const API_FLAVOR_OPTIONS = [
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'openai-compatible', label: 'OpenAI 兼容' },
-];
-
-const errorMessage = (e: unknown, fallback: string) =>
-  e instanceof Error ? e.message : e ? String(e) : fallback;
-
-const modelIdFromName = (value: string) =>
-  value.trim().toLowerCase().replace(/[^a-z0-9._:/-]+/g, '-').replace(/^-+|-+$/g, '') || crypto.randomUUID?.() || Date.now().toString(36);
 
 const describeModelCapabilities = (model: Model) => {
   const tags: string[] = [];
@@ -36,73 +24,15 @@ const STATUS_CONFIG: Record<string, { tagVariant: 'green' | 'orange' | 'danger' 
 };
 
 export const ProviderCard: React.FC<{ providerId: string }> = ({ providerId }) => {
+  const navigate = useNavigate();
   const provider = useProviderStore(s => s.providers.find(p => p.id === providerId));
   const updateProvider = useProviderStore(s => s.updateProvider);
   const [expanded, setExpanded] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [editKey, setEditKey] = useState('');
-  const [editApiBase, setEditApiBase] = useState('');
-  const [editApiFlavor, setEditApiFlavor] = useState('openai');
-  const [editModelsText, setEditModelsText] = useState('');
-  const [testing, setTesting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!provider) return null;
 
   const statusCfg = STATUS_CONFIG[provider.status] || STATUS_CONFIG.configuring;
-
-  const handleEdit = () => {
-    setEditKey(provider.apiKey);
-    setEditApiBase(provider.apiBase);
-    setEditApiFlavor(provider.apiFlavor || 'openai');
-    setEditModelsText(provider.models.map(m => m.name).join('\n'));
-    setEditing(true);
-  };
-
-  const handleSaveProvider = async (status?: Provider['status']) => {
-    try {
-      const modelNames = editModelsText
-        .split(/[,，\n]/)
-        .map(s => s.trim())
-        .filter(Boolean);
-      await updateProvider(provider.id, {
-        apiKey: editKey,
-        apiBase: editApiBase.trim(),
-        apiFlavor: editApiFlavor,
-        models: modelNames.map(m => {
-          const existing = provider.models.find(model => model.name === m || model.id === m || model.id === modelIdFromName(m));
-          return { ...existing, id: existing?.id || modelIdFromName(m), name: m };
-        }),
-        status: status || 'configuring',
-      });
-      setEditing(false);
-    } catch (e) {
-      console.error('Failed to save provider:', e);
-    }
-  };
-
-  const handleTestConnection = async () => {
-    setTesting(true);
-    try {
-      const result = await invoke<{ success: boolean; message: string }>('test_provider_connection', {
-        flavor: editApiFlavor,
-        apiBase: editApiBase,
-        apiKey: editKey,
-      });
-      if (result.success) {
-        toast(result.message || '连接成功', 'success');
-        await handleSaveProvider('connected');
-      } else {
-        toast(result.message || '连接失败', 'error');
-        await updateProvider(provider.id, { status: 'error' });
-      }
-    } catch (e: unknown) {
-      toast(errorMessage(e, '连接测试失败'), 'error');
-      await updateProvider(provider.id, { status: 'error' });
-    } finally {
-      setTesting(false);
-    }
-  };
 
   const handleCopyKey = () => {
     if (provider.apiKey) {
@@ -208,7 +138,7 @@ export const ProviderCard: React.FC<{ providerId: string }> = ({ providerId }) =
             className="mc-icon-btn"
             aria-label="编辑提供商"
             title="编辑"
-            onClick={handleEdit}
+            onClick={() => navigate(`/providers/${provider.id}/edit`)}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -308,7 +238,7 @@ export const ProviderCard: React.FC<{ providerId: string }> = ({ providerId }) =
             </div>
           ) : (
             <span
-              onClick={handleEdit}
+              onClick={() => navigate(`/providers/${provider.id}/edit`)}
               style={{
                 fontSize: 'var(--body-sm-font-size)',
                 color: 'var(--text-brand)',
@@ -365,100 +295,6 @@ export const ProviderCard: React.FC<{ providerId: string }> = ({ providerId }) =
           </div>
         )}
       </div>
-
-      {/* API Key Editing */}
-      {editing && (
-        <div style={{ padding: '0 var(--spacer-16) var(--spacer-12)', display: 'flex', flexDirection: 'column', gap: 'var(--spacer-8)' }}>
-          <input
-            type="text"
-            value={editApiBase}
-            onChange={e => setEditApiBase(e.target.value)}
-            placeholder="API Base URL"
-            style={{
-              height: 32, padding: '0 var(--spacer-12)',
-              borderRadius: 'var(--radius-8)', border: '1px solid var(--border-neutral-l1)',
-              background: 'var(--bg-white)', color: 'var(--text-default)',
-              fontSize: 'var(--body-sm-font-size)', outline: 'none',
-            }}
-          />
-          <Dropdown
-            options={API_FLAVOR_OPTIONS}
-            value={editApiFlavor}
-            onChange={setEditApiFlavor}
-            size="sm"
-          />
-          <textarea
-            value={editModelsText}
-            onChange={e => setEditModelsText(e.target.value)}
-            placeholder="模型列表，每行或逗号分隔"
-            style={{
-              minHeight: 72, padding: 'var(--spacer-8) var(--spacer-12)',
-              borderRadius: 'var(--radius-8)', border: '1px solid var(--border-neutral-l1)',
-              background: 'var(--bg-white)', color: 'var(--text-default)',
-              fontSize: 'var(--body-sm-font-size)', outline: 'none',
-              resize: 'vertical', fontFamily: 'var(--font-family-mono)',
-            }}
-          />
-          <div style={{ display: 'flex', gap: 'var(--spacer-8)', alignItems: 'center' }}>
-            <input
-              type="password"
-              value={editKey}
-              onChange={e => setEditKey(e.target.value)}
-              placeholder="输入新的 API Key..."
-              style={{
-                flex: 1, height: 32, padding: '0 var(--spacer-12)',
-                borderRadius: 'var(--radius-8)', border: '1px solid var(--border-neutral-l1)',
-                background: 'var(--bg-white)', color: 'var(--text-default)',
-                fontSize: 'var(--body-sm-font-size)', outline: 'none',
-              }}
-            />
-            <button
-              onClick={() => handleSaveProvider()}
-              style={{
-                height: 32, padding: '0 var(--spacer-12)',
-                borderRadius: 'var(--radius-8)', border: 'none',
-                background: 'var(--bg-brand)', color: 'var(--text-onbrand)',
-                cursor: 'pointer', fontSize: 'var(--body-sm-font-size)',
-                fontFamily: 'inherit',
-                transition: 'background var(--transition-fast, 0.12s) ease',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-brand-hover)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-brand)'; }}
-            >
-              保存
-            </button>
-            <button
-              onClick={handleTestConnection}
-              disabled={testing || !editApiBase.trim() || !editKey.trim()}
-              style={{
-                height: 32, padding: '0 var(--spacer-12)',
-                borderRadius: 'var(--radius-8)', border: 'none',
-                background: 'var(--status-success-default)', color: 'var(--text-onbrand)',
-                cursor: testing ? 'wait' : 'pointer', fontSize: 'var(--body-sm-font-size)',
-                fontFamily: 'inherit',
-                opacity: testing ? 0.7 : 1,
-              }}
-            >
-              {testing ? '测试中...' : '测试并保存'}
-            </button>
-            <button
-              onClick={() => setEditing(false)}
-              style={{
-                height: 32, padding: '0 var(--spacer-12)',
-                borderRadius: 'var(--radius-8)', border: '1px solid var(--border-neutral-l1)',
-                background: 'transparent', color: 'var(--text-secondary)',
-                cursor: 'pointer', fontSize: 'var(--body-sm-font-size)',
-                fontFamily: 'inherit',
-                transition: 'background var(--transition-fast, 0.12s) ease',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-            >
-              取消
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Divider + Toggle model list */}
       <div style={{ height: 1, background: 'var(--border-neutral-l1)', margin: '0 var(--spacer-16)' }} />

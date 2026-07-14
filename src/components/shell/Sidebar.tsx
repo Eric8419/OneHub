@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { LayoutDashboard, Cpu, Settings } from 'lucide-react';
+import { LayoutDashboard, Server, Cpu, Settings } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { useT } from '../../i18n';
 
@@ -31,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
 
   const navItems: NavItem[] = [
     { key: 'dashboard', label: t('sidebar.dashboard'), icon: <LayoutDashboard size={16} />, path: '/dashboard' },
+    { key: 'providers', label: t('sidebar.providers'), icon: <Server size={16} />, path: '/providers' },
     { key: 'models', label: t('sidebar.models'), icon: <Cpu size={16} />, path: '/models' },
     { key: 'settings', label: t('sidebar.settings'), icon: <Settings size={16} />, path: '/settings' },
   ];
@@ -100,18 +101,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
           boxSizing: 'border-box',
         }}
       >
-        <img
-          src="/brand/favicon.png"
-          alt=""
-          aria-hidden="true"
-          width={24}
-          height={24}
-          style={{
-            borderRadius: 'var(--radius-6)',
-            flexShrink: 0,
-            display: 'block',
-          }}
-        />
         <span
           className="ds-shell__brand-name"
           style={{
@@ -136,7 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
           display: 'flex',
           flexDirection: 'column',
           gap: 'var(--spacer-2)',
-          padding: 'var(--spacer-12) var(--spacer-8)',
+          padding: 'var(--spacer-12) var(--spacer-10)',
         }}
       >
         {navItems.map(item => {
@@ -153,34 +142,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
                 alignItems: 'center',
                 gap: 'var(--spacer-10)',
                 padding: 'var(--spacer-8) var(--spacer-10)',
-                paddingLeft: isActive ? 'var(--spacer-14)' : 'var(--spacer-10)',
                 borderRadius: 'var(--radius-8)',
                 border: 'none',
                 textDecoration: 'none',
-                color: isActive ? 'var(--bg-brand)' : 'var(--text-default)',
+                color: isActive ? 'var(--bg-brand)' : 'var(--text-secondary)',
                 fontSize: 'var(--body-base-font-size)',
-                fontWeight: isActive ? 'var(--font-weight-medium)' : 'var(--body-base-font-weight)',
+                fontWeight: isActive ? 'var(--font-weight-strong)' : 'var(--body-base-font-weight)',
                 lineHeight: 'var(--body-base-line-height)',
                 cursor: 'pointer',
                 background: isActive ? 'var(--brand-100)' : 'transparent',
                 width: '100%',
                 textAlign: 'left',
                 fontFamily: 'inherit',
-                transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease), padding var(--transition-fast, 0.12s ease)',
+                transition: 'background 0.18s cubic-bezier(0.22,1,0.36,1), color 0.18s cubic-bezier(0.22,1,0.36,1), box-shadow 0.18s cubic-bezier(0.22,1,0.36,1)',
               }}
               onMouseEnter={e => {
                 if (!isActive) {
                   e.currentTarget.style.background = 'var(--bg-overlay-l1)';
-                  // Icon translate instead of scale
-                  const icon = e.currentTarget.querySelector('.ds-shell__nav-icon') as HTMLElement;
-                  if (icon) icon.style.transform = 'translateX(2px)';
+                  e.currentTarget.style.color = 'var(--text-default)';
                 }
               }}
               onMouseLeave={e => {
                 if (!isActive) {
                   e.currentTarget.style.background = 'transparent';
-                  const icon = e.currentTarget.querySelector('.ds-shell__nav-icon') as HTMLElement;
-                  if (icon) icon.style.transform = 'translateX(0)';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
                 }
               }}
               onMouseDown={e => {
@@ -196,23 +181,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
                   className="ds-shell__nav-indicator"
                   style={{
                     position: 'absolute',
-                    left: -8,
+                    left: 0,
                     top: '50%',
                     transform: 'translateY(-50%)',
                     width: 3,
-                    height: 20,
+                    height: 16,
                     borderRadius: '0 var(--radius-4) var(--radius-4) 0',
                     background: 'var(--bg-brand)',
-                    transition: 'height var(--transition-normal, 0.2s) ease',
                   }}
                 />
               )}
               <span
                 className="ds-shell__nav-icon"
                 style={{
-                  color: isActive ? 'var(--icon-brand)' : 'var(--icon-secondary)',
+                  color: isActive ? 'var(--icon-brand)' : 'var(--icon-tertiary)',
                   display: 'flex',
-                  transition: 'transform var(--transition-fast, 0.12s) ease',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 24,
+                  height: 24,
+                  borderRadius: 'var(--radius-6)',
+                  background: isActive ? 'var(--brand-100)' : 'transparent',
+                  transition: 'color 0.18s cubic-bezier(0.22,1,0.36,1), background 0.18s cubic-bezier(0.22,1,0.36,1)',
+                  flexShrink: 0,
                 }}
               >
                 {item.icon}

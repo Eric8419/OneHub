@@ -40,32 +40,60 @@ const EMPTY_STATS: UsageStats = {
   responseTimeTrend: 'up',
 };
 
+const VENDOR_PATTERNS: Array<{ pattern: RegExp; color: string }> = [
+  { pattern: /gpt|o1|o3|openai/i, color: 'var(--chart-gpt)' },
+  { pattern: /claude|anthropic/i, color: 'var(--chart-claude)' },
+  { pattern: /deepseek/i, color: 'var(--chart-deepseek)' },
+  { pattern: /qwen|tongyi|alibaba/i, color: 'var(--chart-qwen)' },
+  { pattern: /gemini|google/i, color: 'var(--viz-series-teal)' },
+  { pattern: /glm|zhipu|chatglm/i, color: 'var(--viz-series-violet)' },
+  { pattern: /doubao|volcengine|bytedance/i, color: 'var(--viz-series-coral)' },
+  { pattern: /moonshot|kimi/i, color: 'var(--viz-series-sky)' },
+  { pattern: /yi|zero-one|01ai/i, color: 'var(--viz-series-magenta)' },
+  { pattern: /llama|meta/i, color: 'var(--viz-series-indigo)' },
+  { pattern: /mistral/i, color: 'var(--viz-series-amber)' },
+  { pattern: /senseTime|商汤|sensenova/i, color: 'var(--viz-series-mint)' },
+];
+
+const FALLBACK_PALETTE = [
+  'var(--viz-series-lime)',
+  'var(--viz-series-slate)',
+  'var(--viz-series-brand-soft)',
+  'var(--viz-series-violet)',
+  'var(--viz-series-teal)',
+];
+
+function resolveModelColor(modelName: string, usedColors: Set<string>): string {
+  for (const { pattern, color } of VENDOR_PATTERNS) {
+    if (pattern.test(modelName)) return color;
+  }
+  for (const color of FALLBACK_PALETTE) {
+    if (!usedColors.has(color)) {
+      usedColors.add(color);
+      return color;
+    }
+  }
+  return 'var(--chart-other)';
+}
+
 /** Compute model breakdown percentages from request records. */
 function computeModelBreakdown(requests: RequestRecord[]): ModelBreakdown[] {
   if (requests.length === 0) return [];
   const counts: Record<string, number> = {};
   for (const r of requests) counts[r.model] = (counts[r.model] || 0) + 1;
   const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  const colorMap: Record<string, string> = {
-    'GPT-4o': 'var(--chart-gpt)',
-    'GPT-4o-mini': 'var(--chart-gpt)',
-    'GPT-4.1': 'var(--chart-gpt)',
-    'o3-mini': 'var(--chart-gpt)',
-    o3: 'var(--chart-gpt)',
-    'Claude 3.5 Sonnet': 'var(--chart-claude)',
-    'Claude 3.5 Haiku': 'var(--chart-claude)',
-    'Claude 4': 'var(--chart-claude)',
-    'DeepSeek V3': 'var(--chart-deepseek)',
-    'DeepSeek Coder': 'var(--chart-deepseek)',
-    'Qwen 2.5': 'var(--chart-qwen)',
-  };
   const total = requests.length;
   const breakdown: ModelBreakdown[] = [];
+  const usedColors = new Set<string>();
   const otherColor = 'var(--chart-other)';
-  const topModels = sorted.slice(0, 4);
-  const otherCount = sorted.slice(4).reduce((sum, [, count]) => sum + count, 0);
+  const topModels = sorted.slice(0, 5);
+  const otherCount = sorted.slice(5).reduce((sum, [, count]) => sum + count, 0);
   for (const [name, count] of topModels) {
-    breakdown.push({ name, percentage: Math.round((count / total) * 100), color: colorMap[name] || otherColor });
+    breakdown.push({
+      name,
+      percentage: Math.round((count / total) * 100),
+      color: resolveModelColor(name, usedColors),
+    });
   }
   if (otherCount > 0) {
     breakdown.push({ name: '其他', percentage: Math.round((otherCount / total) * 100), color: otherColor });

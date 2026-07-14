@@ -94,6 +94,10 @@ pub struct AppState {
     /// upstream proxy settings change). Reusing one client across
     /// requests enables connection pooling.
     pub http_client: RwLock<Option<reqwest::Client>>,
+    /// Tauri AppHandle for emitting events to the frontend.
+    /// Set once during bootstrap; read by `finalize_record` to
+    /// push `request-completed` events (replaces polling).
+    pub app_handle: RwLock<Option<tauri::AppHandle>>,
 }
 
 impl AppState {
@@ -104,7 +108,15 @@ impl AppState {
             runtime: RwLock::new(RuntimeLimits::new()),
             metrics: Arc::new(MetricsStore::new()),
             http_client: RwLock::new(None),
+            app_handle: RwLock::new(None),
         })
+    }
+
+    /// Inject the Tauri AppHandle so the proxy layer can emit
+    /// events. Called once during bootstrap, before the proxy starts.
+    pub async fn set_app_handle(&self, handle: tauri::AppHandle) {
+        let mut guard = self.app_handle.write().await;
+        *guard = Some(handle);
     }
 
     /// Build (or rebuild) the shared reqwest client. Called once

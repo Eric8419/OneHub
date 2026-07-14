@@ -23,6 +23,7 @@ mod types;
 
 use commands::settings;
 use proxy::SharedAppState;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -74,8 +75,23 @@ pub fn run() {
             commands::logs::open_log_dir,
             commands::logs::init_log_dir,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            // Flush pending metrics records on exit so the dashboard
+            // history survives restarts. Without this, any records
+            // accumulated since the last periodic flush (every 5
+            // records) would be lost when the window is closed.
+            if let tauri::RunEvent::Exit = event {
+                let state = app_handle.state::<SharedAppState>();
+                tauri::async_runtime::block_on(async move {
+                    let flushed = proxy::flush_metrics(state.inner()).await;
+                    if flushed > 0 {
+                        println!("[metrics] Flushed {} records on exit", flushed);
+                    }
+                });
+            }
+        });
 }
 
 /// Synchronous-ish bootstrap: performs async setup on the Tauri
@@ -93,6 +109,10 @@ fn bootstrap(app_handle: &tauri::AppHandle, state: &SharedAppState) {
                 return;
             }
         };
+
+        // 1b. Inject the AppHandle so the proxy can emit
+        // `request-completed` events to the frontend.
+        state.set_app_handle(handle.clone()).await;
 
         // 2. Initialize metrics store (loads JSONL history).
         let log_dir = paths::logs_dir(&handle);

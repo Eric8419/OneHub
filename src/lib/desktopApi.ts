@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { AppSettings } from '../types/settings';
 import type { Provider } from '../types/provider';
 import type { Aggregation } from '../types/aggregation';
@@ -56,3 +57,14 @@ export const desktopApi: DesktopApi = {
   fetchProviderModels: (flavor, apiBase, apiKey) => invoke('fetch_provider_models', { flavor, apiBase, apiKey }),
   testProviderConnection: (flavor, apiBase, apiKey) => invoke('test_provider_connection', { flavor, apiBase, apiKey }),
 };
+
+/**
+ * Subscribe to `request-completed` events emitted by the Rust
+ * backend after each proxy request finishes. Replaces polling.
+ * Returns an `UnlistenFn` for cleanup.
+ */
+export function onRequestCompleted(callback: (record: RequestRecord) => void): Promise<UnlistenFn> {
+  return listen<RequestRecord>('request-completed', (event) => {
+    callback(event.payload);
+  });
+}

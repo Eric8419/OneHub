@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useSettingsStore } from '../../store/settingsStore';
 import { desktopApi } from '../../lib/desktopApi';
-import { toast } from '../../components/ui';
+import { toast, Counter } from '../../components/ui';
+import { Dither } from '../../components/ui/Dither';
 import { Play, Square, Copy, Check, Loader2, Cpu } from 'lucide-react';
 
 interface ProxyStatus {
@@ -11,15 +13,13 @@ interface ProxyStatus {
   uptimeSecs: number;
 }
 
-const formatUptime = (secs: number): string => {
-  if (secs < 60) return `${secs}秒`;
-  if (secs < 3600) return `${Math.floor(secs / 60)}分${secs % 60}秒`;
-  const h = Math.floor(secs / 3600);
-  const m = Math.floor((secs % 3600) / 60);
-  return `${h}时${m}分`;
+const formatUptime = (secs: number): { hours: number; mins: number; secs: number } => {
+  const hours = Math.floor(secs / 3600);
+  const mins = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  return { hours, mins, secs: s };
 };
 
-// ── CSS custom properties override for dark card background ──
 const CARD_THEME = {
   '--text-default': 'rgba(255,255,255,0.92)',
   '--text-secondary': 'rgba(255,255,255,0.7)',
@@ -36,12 +36,18 @@ const CARD_THEME = {
   '--text-onbrand': '#ffffff',
 } as unknown as React.CSSProperties;
 
+const SPRING = { type: 'spring' as const, stiffness: 400, damping: 30 };
+const DURATION_SLOW = { duration: 0.4, ease: [0.22, 1, 0.36, 1] as const };
+const DURATION_FAST = { duration: 0.25, ease: [0.22, 1, 0.36, 1] as const };
+
 export const ProxyControl: React.FC = () => {
   const [status, setStatus] = useState<ProxyStatus | null>(null);
   const [toggling, setToggling] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [now, setNow] = useState(Date.now());
+  const statusAtRef = useRef<number>(0);
 
   const settings = useSettingsStore((s) => s.settings);
   const loadSettings = useSettingsStore((s) => s.loadSettings);
@@ -54,7 +60,10 @@ export const ProxyControl: React.FC = () => {
   const poll = useCallback(() => {
     desktopApi
       .getProxyStatus()
-      .then(setStatus)
+      .then((s) => {
+        statusAtRef.current = Date.now();
+        setStatus(s);
+      })
       .catch(() => setStatus(null));
   }, []);
 
@@ -69,6 +78,13 @@ export const ProxyControl: React.FC = () => {
   const proxyUrl = `http://${settings.host}:${settings.port}`;
   const authToken = settings.authToken;
   const running = status?.running ?? false;
+  const showUptime = running && status !== null;
+
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [running]);
 
   const handleToggle = async () => {
     setToggling(true);
@@ -114,6 +130,24 @@ export const ProxyControl: React.FC = () => {
     }
   };
 
+  const totalUptime = showUptime
+    ? status!.uptimeSecs + Math.max(0, Math.floor((now - statusAtRef.current) / 1000))
+    : 0;
+  const uptimeParts = formatUptime(totalUptime);
+  const counterProps = {
+    fontSize: 11,
+    gap: 0,
+    horizontalPadding: 0,
+    gradientHeight: 0,
+    gradientFrom: 'transparent',
+    gradientTo: 'transparent',
+    textColor: 'var(--text-tertiary)',
+    fontWeight: 'inherit' as const,
+  };
+
+  const ditherWaveSpeed = running ? 0.4 : 0.08;
+  const ditherWaveAmp = running ? 0.3 : 0.12;
+
   return (
     <div
       style={{
@@ -123,32 +157,41 @@ export const ProxyControl: React.FC = () => {
         marginBottom: 'var(--spacer-24)',
       }}
     >
-      {/* Gradient background */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          zIndex: 0,
-          borderRadius: 'var(--radius-12)',
-          overflow: 'hidden',
-          background:
-            'radial-gradient(circle at 18% 15%, color-mix(in srgb, var(--bg-brand) 30%, transparent), transparent 36%), linear-gradient(135deg, #171717, #262626)',
-        }}
-      />
+      <motion.div
+        initial={false}
+        animate={{ opacity: running ? 1 : 0.6 }}
+        transition={DURATION_SLOW}
+        style={{ position: 'absolute', inset: 0 }}
+      >
+        <Dither
+          waveColor={[1, 1, 1]}
+          colorNum={4}
+          pixelSize={2}
+          waveSpeed={ditherWaveSpeed}
+          waveFrequency={3}
+          waveAmplitude={ditherWaveAmp}
+          enableMouseInteraction={running}
+          mouseRadius={0.3}
+        />
+      </motion.div>
 
-      {/* Overlay gradient for readability */}
-      <div
+      <motion.div
+        initial={false}
+        animate={{
+          background: running
+            ? 'linear-gradient(135deg, rgba(0,0,0,0.50) 0%, rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.50) 100%)'
+            : 'linear-gradient(135deg, rgba(0,0,0,0.60) 0%, rgba(0,0,0,0.50) 50%, rgba(0,0,0,0.60) 100%)',
+        }}
+        transition={DURATION_SLOW}
         style={{
           position: 'absolute',
           inset: 0,
           zIndex: 1,
-          background: 'linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.55) 100%)',
           borderRadius: 'var(--radius-12)',
           pointerEvents: 'none',
         }}
       />
 
-      {/* Content card */}
       <div
         style={{
           position: 'relative',
@@ -168,7 +211,6 @@ export const ProxyControl: React.FC = () => {
             ...CARD_THEME,
           }}
         >
-          {/* ── Left: Status + Info ── */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
@@ -178,7 +220,17 @@ export const ProxyControl: React.FC = () => {
                 marginBottom: 'var(--spacer-12)',
               }}
             >
-              <div
+              <motion.div
+                initial={false}
+                animate={{
+                  background: running
+                    ? 'rgba(74,222,128,0.14)'
+                    : 'rgba(255,255,255,0.10)',
+                  borderColor: running
+                    ? 'rgba(74,222,128,0.25)'
+                    : 'rgba(255,255,255,0.14)',
+                }}
+                transition={DURATION_FAST}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -186,18 +238,24 @@ export const ProxyControl: React.FC = () => {
                   width: 40,
                   height: 40,
                   borderRadius: 'var(--radius-10)',
-                  background: running ? 'var(--status-success-surface-l1)' : 'var(--bg-overlay-l1)',
-                  transition: 'background var(--transition-normal, 0.2s) ease',
+                  backdropFilter: 'blur(12px) saturate(140%)',
+                  WebkitBackdropFilter: 'blur(12px) saturate(140%)',
+                  border: '1px solid',
                 }}
               >
-                <Cpu
-                  size={20}
-                  style={{
-                    color: running ? 'var(--status-success-default)' : 'var(--icon-tertiary)',
-                    transition: 'color var(--transition-normal, 0.2s) ease',
-                  }}
-                />
-              </div>
+                <motion.div
+                  animate={running ? { scale: [1, 1.06, 1], opacity: [0.9, 1, 0.9] } : { scale: 1, opacity: 1 }}
+                  transition={running ? { duration: 2, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.3 }}
+                >
+                  <Cpu
+                    size={20}
+                    style={{
+                      color: running ? 'var(--status-success-default)' : 'var(--icon-tertiary)',
+                      transition: 'color 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
+                    }}
+                  />
+                </motion.div>
+              </motion.div>
               <div>
                 <div
                   style={{
@@ -210,7 +268,19 @@ export const ProxyControl: React.FC = () => {
                   }}
                 >
                   本地代理
-                  <span
+                  <motion.span
+                    layout
+                    initial={false}
+                    animate={{
+                      background: running
+                        ? 'rgba(74,222,128,0.16)'
+                        : 'rgba(255,255,255,0.10)',
+                      borderColor: running
+                        ? 'rgba(74,222,128,0.25)'
+                        : 'rgba(255,255,255,0.14)',
+                      color: running ? 'var(--status-success-default)' : 'var(--text-tertiary)',
+                    }}
+                    transition={SPRING}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -220,45 +290,124 @@ export const ProxyControl: React.FC = () => {
                       borderRadius: 'var(--radius-6)',
                       fontSize: 'var(--body-xs-font-size)',
                       fontWeight: 'var(--font-weight-medium)',
-                      background: running ? 'var(--status-success-surface-l1)' : 'var(--bg-overlay-l1)',
-                      color: running ? 'var(--status-success-default)' : 'var(--text-tertiary)',
-                      transition: 'all var(--transition-normal, 0.2s) ease',
+                      backdropFilter: 'blur(12px) saturate(140%)',
+                      WebkitBackdropFilter: 'blur(12px) saturate(140%)',
+                      border: '1px solid',
                     }}
                   >
-                    <span
+                    <motion.span
+                      initial={false}
+                      animate={running
+                        ? {
+                            scale: [1, 1.5, 1],
+                            opacity: [1, 0.5, 1],
+                            background: 'var(--status-success-default)',
+                            boxShadow: '0 0 0 0 rgba(74,222,128,0.5)',
+                          }
+                        : {
+                            scale: 1,
+                            opacity: 1,
+                            background: 'var(--text-disabled)',
+                            boxShadow: '0 0 0 0 rgba(255,255,255,0)',
+                          }}
+                      transition={running
+                        ? {
+                            scale: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
+                            opacity: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
+                            background: { duration: 0.4 },
+                            boxShadow: { duration: 0.4 },
+                          }
+                        : { duration: 0.3 }}
                       style={{
                         width: 6,
                         height: 6,
                         borderRadius: 'var(--radius-full)',
-                        background: running ? 'var(--status-success-default)' : 'var(--text-disabled)',
-                        transition: 'all var(--transition-normal, 0.2s) ease',
+                        display: 'inline-block',
                       }}
                     />
-                    {running ? '运行中' : '已停止'}
-                  </span>
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.span
+                        key={running ? 'running' : 'stopped'}
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 4 }}
+                        transition={DURATION_FAST}
+                      >
+                        {running ? '运行中' : '已停止'}
+                      </motion.span>
+                    </AnimatePresence>
+                  </motion.span>
                 </div>
                 <div
                   style={{
                     fontSize: 'var(--body-sm-font-size)',
                     color: 'var(--text-tertiary)',
                     marginTop: 'var(--spacer-2)',
+                    minHeight: '16px',
                   }}
                 >
-                  {running && status ? `已运行 ${formatUptime(status.uptimeSecs)}` : '其他应用可通过代理地址访问本服务'}
+                  <AnimatePresence mode="wait" initial={false}>
+                    {showUptime ? (
+                      <motion.span
+                        key="uptime"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={DURATION_FAST}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}
+                      >
+                        已运行
+                        {uptimeParts.hours > 0 && (
+                          <>
+                            <Counter value={uptimeParts.hours} {...counterProps} />
+                            <span>时</span>
+                          </>
+                        )}
+                        <Counter value={uptimeParts.mins} {...counterProps} />
+                        <span>分</span>
+                        {uptimeParts.hours === 0 && (
+                          <>
+                            <Counter value={uptimeParts.secs} {...counterProps} />
+                            <span>秒</span>
+                          </>
+                        )}
+                      </motion.span>
+                    ) : (
+                      <motion.span
+                        key="idle"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={DURATION_FAST}
+                      >
+                        其他应用可通过代理地址访问本服务
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
             </div>
 
-            {/* Address row */}
-            <div
+            <motion.div
+              initial={false}
+              animate={{
+                background: running
+                  ? 'rgba(255,255,255,0.10)'
+                  : 'rgba(255,255,255,0.06)',
+                borderColor: running
+                  ? 'rgba(255,255,255,0.16)'
+                  : 'rgba(255,255,255,0.10)',
+              }}
+              transition={DURATION_FAST}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 'var(--spacer-8)',
                 padding: 'var(--spacer-8) var(--spacer-10)',
                 borderRadius: 'var(--radius-8)',
-                background: 'rgba(255,255,255,0.06)',
-                backdropFilter: 'blur(8px)',
+                backdropFilter: 'blur(14px) saturate(150%)',
+                WebkitBackdropFilter: 'blur(14px) saturate(150%)',
+                border: '1px solid',
                 marginBottom: 'var(--spacer-6)',
               }}
             >
@@ -272,19 +421,23 @@ export const ProxyControl: React.FC = () => {
               >
                 地址
               </span>
-              <code
+              <motion.code
+                initial={false}
+                animate={{
+                  color: running ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.25)',
+                }}
+                transition={DURATION_SLOW}
                 style={{
                   flex: 1,
                   fontSize: 'var(--body-sm-font-size)',
                   fontFamily: 'var(--font-family-mono)',
-                  color: running ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.25)',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
                 }}
               >
                 {proxyUrl}
-              </code>
+              </motion.code>
               <button
                 onClick={copyUrl}
                 title="复制地址"
@@ -295,34 +448,69 @@ export const ProxyControl: React.FC = () => {
                   width: 26,
                   height: 26,
                   borderRadius: 'var(--radius-6)',
-                  border: 'none',
-                  background: 'transparent',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'rgba(255,255,255,0.08)',
+                  backdropFilter: 'blur(10px) saturate(140%)',
+                  WebkitBackdropFilter: 'blur(10px) saturate(140%)',
                   color: copiedUrl ? 'var(--status-success-default)' : 'var(--icon-tertiary)',
                   cursor: 'pointer',
                   flexShrink: 0,
-                  transition: 'color var(--transition-fast, 0.12s) ease, background var(--transition-fast, 0.12s) ease',
+                  transition:
+                    'color var(--transition-fast, 0.12s) ease, background var(--transition-fast, 0.12s) ease',
                 }}
                 onMouseEnter={(e) => {
-                  if (!copiedUrl) e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+                  if (!copiedUrl) e.currentTarget.style.background = 'rgba(255,255,255,0.16)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
                 }}
               >
-                {copiedUrl ? <Check size={14} /> : <Copy size={14} />}
+                <AnimatePresence mode="wait" initial={false}>
+                  {copiedUrl ? (
+                    <motion.span
+                      key="check"
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.5, opacity: 0 }}
+                      transition={SPRING}
+                    >
+                      <Check size={14} />
+                    </motion.span>
+                  ) : (
+                    <motion.span
+                      key="copy"
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.5, opacity: 0 }}
+                      transition={SPRING}
+                    >
+                      <Copy size={14} />
+                    </motion.span>
+                  )}
+                </AnimatePresence>
               </button>
-            </div>
+            </motion.div>
 
-            {/* Auth token row */}
-            <div
+            <motion.div
+              initial={false}
+              animate={{
+                background: running
+                  ? 'rgba(255,255,255,0.10)'
+                  : 'rgba(255,255,255,0.06)',
+                borderColor: running
+                  ? 'rgba(255,255,255,0.16)'
+                  : 'rgba(255,255,255,0.10)',
+              }}
+              transition={DURATION_FAST}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 'var(--spacer-8)',
                 padding: 'var(--spacer-8) var(--spacer-10)',
                 borderRadius: 'var(--radius-8)',
-                background: 'rgba(255,255,255,0.06)',
-                backdropFilter: 'blur(8px)',
+                backdropFilter: 'blur(14px) saturate(150%)',
+                WebkitBackdropFilter: 'blur(14px) saturate(150%)',
+                border: '1px solid',
               }}
             >
               <span
@@ -337,19 +525,23 @@ export const ProxyControl: React.FC = () => {
               </span>
               {authToken ? (
                 <>
-                  <code
+                  <motion.code
+                    initial={false}
+                    animate={{
+                      color: running ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.25)',
+                    }}
+                    transition={DURATION_SLOW}
                     style={{
                       flex: 1,
                       fontSize: 'var(--body-sm-font-size)',
                       fontFamily: 'var(--font-family-mono)',
-                      color: 'rgba(255,255,255,0.7)',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                     }}
                   >
                     {authToken.length > 32 ? `${authToken.slice(0, 16)}...${authToken.slice(-8)}` : authToken}
-                  </code>
+                  </motion.code>
                   <button
                     onClick={copyToken}
                     title="复制令牌"
@@ -360,8 +552,10 @@ export const ProxyControl: React.FC = () => {
                       width: 26,
                       height: 26,
                       borderRadius: 'var(--radius-6)',
-                      border: 'none',
-                      background: 'transparent',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      background: 'rgba(255,255,255,0.08)',
+                      backdropFilter: 'blur(10px) saturate(140%)',
+                      WebkitBackdropFilter: 'blur(10px) saturate(140%)',
                       color: copiedToken ? 'var(--status-success-default)' : 'var(--icon-tertiary)',
                       cursor: 'pointer',
                       flexShrink: 0,
@@ -369,13 +563,35 @@ export const ProxyControl: React.FC = () => {
                         'color var(--transition-fast, 0.12s) ease, background var(--transition-fast, 0.12s) ease',
                     }}
                     onMouseEnter={(e) => {
-                      if (!copiedToken) e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+                      if (!copiedToken) e.currentTarget.style.background = 'rgba(255,255,255,0.16)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
                     }}
                   >
-                    {copiedToken ? <Check size={14} /> : <Copy size={14} />}
+                    <AnimatePresence mode="wait" initial={false}>
+                      {copiedToken ? (
+                        <motion.span
+                          key="check"
+                          initial={{ scale: 0.5, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 0.5, opacity: 0 }}
+                          transition={SPRING}
+                        >
+                          <Check size={14} />
+                        </motion.span>
+                      ) : (
+                        <motion.span
+                          key="copy"
+                          initial={{ scale: 0.5, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 0.5, opacity: 0 }}
+                          transition={SPRING}
+                        >
+                          <Copy size={14} />
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
                   </button>
                 </>
               ) : (
@@ -390,16 +606,24 @@ export const ProxyControl: React.FC = () => {
                   未设置（无需认证即可连接）
                 </span>
               )}
-            </div>
+            </motion.div>
           </div>
 
-          {/* Right: Divider + Toggle */}
-          <div
+          <motion.div
+            initial={false}
+            animate={{
+              background: running
+                ? 'linear-gradient(180deg, rgba(74,222,128,0) 0%, rgba(74,222,128,0.3) 50%, rgba(74,222,128,0) 100%)'
+                : 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0) 100%)',
+              opacity: running ? 1 : 0.6,
+              scaleY: running ? 1 : 0.7,
+            }}
+            transition={DURATION_SLOW}
             style={{
-              width: 1,
+              width: 2,
               height: 80,
-              background: 'var(--border-neutral-l1)',
               flexShrink: 0,
+              borderRadius: 1,
             }}
           />
           <div
@@ -412,9 +636,31 @@ export const ProxyControl: React.FC = () => {
               minWidth: 80,
             }}
           >
-            <button
+            <motion.button
               onClick={handleToggle}
               disabled={toggling}
+              initial={false}
+              animate={{
+                background: running
+                  ? toggling
+                    ? 'rgba(248,113,113,0.20)'
+                    : 'rgba(248,113,113,0.30)'
+                  : toggling
+                    ? 'rgba(255,255,255,0.12)'
+                    : 'rgba(74,222,128,0.30)',
+                borderColor: running
+                  ? 'rgba(248,113,113,0.30)'
+                  : 'rgba(74,222,128,0.30)',
+                scale: toggling ? 0.96 : 1,
+              }}
+              whileHover={toggling ? {} : {
+                background: running
+                  ? 'rgba(248,113,113,0.42)'
+                  : 'rgba(74,222,128,0.42)',
+                scale: 1.03,
+              }}
+              whileTap={toggling ? {} : { scale: 0.97 }}
+              transition={SPRING}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -423,41 +669,70 @@ export const ProxyControl: React.FC = () => {
                 height: 36,
                 padding: '0 var(--spacer-20)',
                 borderRadius: 'var(--radius-8)',
-                border: 'none',
+                border: '1px solid',
                 cursor: toggling ? 'not-allowed' : 'pointer',
                 fontSize: 'var(--body-base-font-size)',
                 fontWeight: 'var(--font-weight-strong)',
                 fontFamily: 'inherit',
                 whiteSpace: 'nowrap',
-                transition: 'all var(--transition-normal, 0.2s) ease',
-                background: running ? 'var(--status-error-default)' : 'var(--status-success-default)',
+                backdropFilter: 'blur(14px) saturate(160%)',
+                WebkitBackdropFilter: 'blur(14px) saturate(160%)',
                 color: 'var(--text-onbrand)',
-                opacity: toggling ? 0.7 : 1,
-              }}
-              onMouseEnter={(e) => {
-                if (!toggling) {
-                  e.currentTarget.style.background = running
-                    ? 'var(--status-error-hover)'
-                    : 'var(--status-success-hover)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!toggling) {
-                  e.currentTarget.style.background = running
-                    ? 'var(--status-error-default)'
-                    : 'var(--status-success-default)';
-                }
               }}
             >
-              {toggling ? (
-                <Loader2 size={16} style={{ animation: 'spin 0.6s linear infinite' }} />
-              ) : running ? (
-                <Square size={14} />
-              ) : (
-                <Play size={14} />
-              )}
-              {toggling ? '' : running ? '停止代理' : '启动代理'}
-            </button>
+              <AnimatePresence mode="wait" initial={false}>
+                {toggling ? (
+                  <motion.span
+                    key="loading"
+                    initial={{ rotate: 0, opacity: 0 }}
+                    animate={{ rotate: 360, opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{
+                      rotate: { duration: 0.6, repeat: Infinity, ease: 'linear' },
+                      opacity: { duration: 0.15 },
+                    }}
+                    style={{ display: 'flex' }}
+                  >
+                    <Loader2 size={16} />
+                  </motion.span>
+                ) : running ? (
+                  <motion.span
+                    key="stop"
+                    initial={{ scale: 0.5, opacity: 0, rotate: -45 }}
+                    animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                    exit={{ scale: 0.5, opacity: 0, rotate: 45 }}
+                    transition={SPRING}
+                    style={{ display: 'flex' }}
+                  >
+                    <Square size={14} />
+                  </motion.span>
+                ) : (
+                  <motion.span
+                    key="start"
+                    initial={{ scale: 0.5, opacity: 0, x: -4 }}
+                    animate={{ scale: 1, opacity: 1, x: 0 }}
+                    exit={{ scale: 0.5, opacity: 0, x: 4 }}
+                    transition={SPRING}
+                    style={{ display: 'flex' }}
+                  >
+                    <Play size={14} />
+                  </motion.span>
+                )}
+              </AnimatePresence>
+              <AnimatePresence mode="wait" initial={false}>
+                {!toggling && (
+                  <motion.span
+                    key={running ? 'stop-text' : 'start-text'}
+                    initial={{ opacity: 0, x: running ? -8 : 8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: running ? 8 : -8 }}
+                    transition={DURATION_FAST}
+                  >
+                    {running ? '停止代理' : '启动代理'}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </motion.button>
           </div>
         </div>
       </div>

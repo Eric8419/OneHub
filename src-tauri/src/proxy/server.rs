@@ -20,8 +20,10 @@ use axum::{
 use chrono::Utc;
 use futures::StreamExt;
 use serde_json::{json, Value};
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use uuid::Uuid;
+
+use tauri::Emitter;
 
 use crate::proxy::adapter::ProviderAdapter;
 use crate::proxy::metrics::SharedMetrics;
@@ -167,27 +169,38 @@ fn normalize_bind_host(host: &str) -> Result<String, String> {
 }
 
 fn build_cors_layer(cors_enabled: bool) -> CorsLayer {
-    if cors_enabled {
-        CorsLayer::new()
-            .allow_origin([
-                "http://127.0.0.1:5420".parse().unwrap(),
-                "http://localhost:5420".parse().unwrap(),
-                "tauri://localhost".parse().unwrap(),
-                "https://tauri.localhost".parse().unwrap(),
-            ])
-            .allow_methods(Any)
-            .allow_headers(Any)
-            .allow_credentials(true)
+    use axum::http::{header, Method};
+
+    // CORS spec forbids wildcard (`*`) for allow-headers and
+    // allow-methods when credentials are enabled, so list them
+    // explicitly to avoid a runtime panic in tower-http.
+    let headers = vec![
+        header::CONTENT_TYPE,
+        header::AUTHORIZATION,
+        header::ACCEPT,
+        header::ORIGIN,
+    ];
+    let methods = vec![Method::GET, Method::POST, Method::OPTIONS];
+
+    let origins: Vec<_> = if cors_enabled {
+        vec![
+            "http://127.0.0.1:5420".parse().unwrap(),
+            "http://localhost:5420".parse().unwrap(),
+            "tauri://localhost".parse().unwrap(),
+            "https://tauri.localhost".parse().unwrap(),
+        ]
     } else {
-        CorsLayer::new()
-            .allow_origin([
-                "tauri://localhost".parse().unwrap(),
-                "https://tauri.localhost".parse().unwrap(),
-            ])
-            .allow_methods(Any)
-            .allow_headers(Any)
-            .allow_credentials(true)
-    }
+        vec![
+            "tauri://localhost".parse().unwrap(),
+            "https://tauri.localhost".parse().unwrap(),
+        ]
+    };
+
+    CorsLayer::new()
+        .allow_origin(origins)
+        .allow_methods(methods)
+        .allow_headers(headers)
+        .allow_credentials(true)
 }
 
 // ── Auth & Rate Limit ───────────────────────────────────────
@@ -357,8 +370,55 @@ async fn proxy_request(
         None => None,
     };
 
+    // Clone the AppHandle (if set) so we can emit a
+    // `request-completed` event from `finalize_record`.
+    let app_handle = state.app_handle.read().await.clone();
+
     let provider_name = route.provider.name.clone();
     let selected_model = route.model.clone();
+
+    // Reject requests with an empty API key early. This happens when
+    // the OS keyring encryption key was regenerated (system reinstall,
+    // keychain cleanup, new computer) and the stored ciphertext can't
+    // be decrypted — `storage::load_providers` sets the key to empty
+    // in that case. Returning a clear local error is far more useful
+    // than sending an empty credential upstream and getting an opaque 401.
+    if route.provider.api_key.trim().is_empty() {
+        let err_msg = format!(
+            "Provider '{}' has no API key. The encrypted key could not be decrypted \
+             (common after system reinstall or keychain reset). \
+             Please re-enter the API key in Settings.",
+            provider_name
+        );
+        finalize_record(
+            &state.metrics,
+            &state.routing,
+            app_handle.as_ref(),
+            RequestRecord {
+                id: request_id.to_string(),
+                timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                model: selected_model.clone(),
+                provider: provider_name.clone(),
+                r#type: adapter.request_type().to_string(),
+                tokens: 0,
+                status: "error".into(),
+                latency_ms: 0,
+                error_category: "missing_api_key".into(),
+            },
+            &route.aggregation_name,
+        )
+        .await;
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(standard_error_body(
+                StatusCode::UNAUTHORIZED,
+                &provider_name,
+                request_id,
+                &err_msg,
+            )),
+        ));
+    }
+
     let upstream_url = adapter.build_url(&route.provider.api_base, &selected_model);
 
     let mut upstream_body = body.clone();
@@ -403,6 +463,7 @@ async fn proxy_request(
             finalize_record(
                 &state.metrics,
                 &state.routing,
+                app_handle.as_ref(),
                 RequestRecord {
                     id: request_id.to_string(),
                     timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
@@ -437,6 +498,7 @@ async fn proxy_request(
         finalize_record(
             &state.metrics,
             &state.routing,
+            app_handle.as_ref(),
             RequestRecord {
                 id: request_id.to_string(),
                 timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
@@ -463,28 +525,95 @@ async fn proxy_request(
     }
 
     if is_streaming {
-        let stream = upstream_resp
-            .bytes_stream()
-            .map(|r| r.map_err(std::io::Error::other));
-        let body = Body::from_stream(stream);
+        // Spawn a background task that:
+        //   1. Reads SSE chunks from the upstream and forwards them
+        //      to the client via an mpsc channel.
+        //   2. Accumulates all chunks into a buffer.
+        //   3. When the stream ends (or the client disconnects),
+        //      parses the buffer for `usage` and calls
+        //      `finalize_record` with the real token count.
+        let (tx, rx) = tokio::sync::mpsc::channel(32);
 
-        finalize_record(
-            &state.metrics,
-            &state.routing,
-            RequestRecord {
-                id: request_id.to_string(),
-                timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-                model: selected_model.clone(),
-                provider: provider_name.clone(),
-                r#type: request_type_streaming,
-                tokens: 0,
-                status: "streaming".into(),
-                latency_ms,
-                error_category: String::new(),
-            },
-            &route.aggregation_name,
-        )
-        .await;
+        let metrics = state.metrics.clone();
+        let routing = state.routing.clone();
+        let app_handle_clone = app_handle.clone();
+        let model_clone = selected_model.clone();
+        let provider_clone = provider_name.clone();
+        let req_type_clone = request_type_streaming.clone();
+        let aggregation_name_clone = route.aggregation_name.clone();
+        let request_id_owned = request_id.to_string();
+        // We can't move the borrowed `adapter` across spawn, so we
+        // re-resolve it inside the task from the provider's flavor.
+        let flavor_clone = route.provider.api_flavor.clone();
+        let start_clone = start;
+
+        tokio::spawn(async move {
+            let mut buffer: Vec<u8> = Vec::new();
+            let mut stream = upstream_resp.bytes_stream();
+            let mut had_error = false;
+
+            while let Some(chunk) = stream.next().await {
+                match chunk {
+                    Ok(bytes) => {
+                        buffer.extend_from_slice(&bytes);
+                        if tx.send(Ok(bytes)).await.is_err() {
+                            // Client disconnected — stop reading.
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        let io_err = std::io::Error::other(e);
+                        let _ = tx.send(Err(io_err)).await;
+                        had_error = true;
+                        break;
+                    }
+                }
+            }
+            drop(tx);
+
+            let tokens = if had_error {
+                0
+            } else {
+                let adapter = crate::proxy::adapter::resolve(&flavor_clone);
+                adapter.count_stream_tokens(&buffer)
+            };
+
+            finalize_record(
+                &metrics,
+                &routing,
+                app_handle_clone.as_ref(),
+                RequestRecord {
+                    id: request_id_owned,
+                    timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                    model: model_clone,
+                    provider: provider_clone,
+                    r#type: req_type_clone,
+                    tokens,
+                    status: if had_error {
+                        "stream_error".into()
+                    } else {
+                        "success".into()
+                    },
+                    latency_ms: start_clone.elapsed().as_millis() as i64,
+                    error_category: if had_error {
+                        "stream_io_error".into()
+                    } else {
+                        String::new()
+                    },
+                },
+                &aggregation_name_clone,
+            )
+            .await;
+        });
+
+        // Bridge the mpsc Receiver into a Stream for the response
+        // body. We use `futures::stream::unfold` instead of pulling
+        // in the `tokio-stream` crate just for `ReceiverStream`.
+        let receiver_stream =
+            futures::stream::unfold(rx, |mut rx| async move {
+                rx.recv().await.map(|item| (item, rx))
+            });
+        let body = Body::from_stream(receiver_stream);
 
         let response = Response::builder()
             .header("content-type", "text/event-stream")
@@ -522,6 +651,7 @@ async fn proxy_request(
     finalize_record(
         &state.metrics,
         &state.routing,
+        app_handle.as_ref(),
         RequestRecord {
             id: request_id.to_string(),
             timestamp: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
@@ -568,11 +698,14 @@ async fn send_with_retries(
     }
 }
 
-/// Record a request to metrics and update routing side effects
-/// (round-robin advancement + latency history) in one call.
+/// Record a request to metrics, update routing side effects
+/// (round-robin advancement + latency history), and emit a
+/// `request-completed` event to the frontend so the dashboard
+/// can refresh without polling.
 async fn finalize_record(
     metrics: &SharedMetrics,
     routing: &SharedRouting,
+    app_handle: Option<&tauri::AppHandle>,
     record: RequestRecord,
     aggregation_name: &Option<String>,
 ) {
@@ -581,6 +714,10 @@ async fn finalize_record(
     // Update routing cursors/latency first, then persist the record.
     crate::proxy::routing::record_routing_side_effects(routing, aggregation_name, &model, latency)
         .await;
+    // Notify the frontend before `record` is moved into metrics.
+    if let Some(handle) = app_handle {
+        let _ = handle.emit("request-completed", &record);
+    }
     metrics.record(record).await;
 }
 

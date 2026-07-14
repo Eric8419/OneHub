@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useSettingsStore } from '../../store/settingsStore';
 import {
   Button,
@@ -8,6 +8,7 @@ import {
   Input,
   Dropdown,
   Switch,
+  Card,
   toast,
   AnimatedContent,
 } from '../../components/ui';
@@ -64,21 +65,14 @@ export const SettingsForm: React.FC = () => {
   const t = useT();
   const { settings, activeCategory, loaded, isDirty, loadSettings, saveSettings, updateSettings, resetSettings } =
     useSettingsStore();
-  const [proxyRunning, setProxyRunning] = useState(false);
-  const [proxyHost, setProxyHost] = useState(settings.host);
-  const [proxyPort, setProxyPort] = useState(8080);
-  const [proxyUptime, setProxyUptime] = useState(0);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [openingDir, setOpeningDir] = useState(false);
-  const proxyIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Load persisted settings on mount
   useEffect(() => {
     if (!loaded) loadSettings();
   }, [loaded, loadSettings]);
 
-  // Initialize log directory on mount
   useEffect(() => {
     try {
       desktopApi.initLogDir();
@@ -87,61 +81,6 @@ export const SettingsForm: React.FC = () => {
     }
   }, []);
 
-  // Proxy status polling — only when general category is active
-  useEffect(() => {
-    const check = () => {
-      try {
-        desktopApi
-          .getProxyStatus()
-          .then((s) => {
-            setProxyRunning(s?.running ?? false);
-            setProxyHost(s?.host || settings.host);
-            setProxyPort(s?.port ?? settings.port);
-            setProxyUptime(s?.uptimeSecs ?? 0);
-          })
-          .catch(() => {
-            /* proxy may not be running */
-          });
-      } catch {
-        /* Tauri not available */
-      }
-    };
-
-    if (activeCategory === 'general') {
-      check();
-      proxyIntervalRef.current = setInterval(check, 3000);
-    }
-
-    return () => {
-      if (proxyIntervalRef.current) {
-        clearInterval(proxyIntervalRef.current);
-        proxyIntervalRef.current = null;
-      }
-    };
-  }, [activeCategory, settings.host, settings.port]);
-
-  const handleStartProxy = async () => {
-    try {
-      await desktopApi.startProxy(settings.host, settings.port);
-      setProxyRunning(true);
-      setProxyHost(settings.host);
-      setProxyPort(settings.port);
-      setProxyUptime(0);
-      toast(t('settings.started'), 'success');
-    } catch (e: unknown) {
-      toast(errorMessage(e, '启动失败'), 'error');
-    }
-  };
-  const handleStopProxy = async () => {
-    try {
-      await desktopApi.stopProxy();
-      setProxyRunning(false);
-      setProxyUptime(0);
-      toast(t('settings.stopped'), 'info');
-    } catch (e: unknown) {
-      toast(errorMessage(e, '停止失败'), 'error');
-    }
-  };
   const handleExportLogs = async () => {
     setExporting(true);
     try {
@@ -168,11 +107,6 @@ export const SettingsForm: React.FC = () => {
     e?.preventDefault();
     setSaving(true);
     try {
-      // The store's saveSettings() now persists settings AND asks
-      // the backend to project them into the proxy runtime via a
-      // single `apply_settings` call — so we no longer issue
-      // separate update_proxy_auth / update_proxy_runtime_config
-      // invocations from the form.
       await saveSettings();
       toast(t('settings.saved'), 'success');
     } catch (e: unknown) {
@@ -182,9 +116,6 @@ export const SettingsForm: React.FC = () => {
     }
   };
 
-  const fmt = (secs: number) => `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`;
-
-  // "计划中" badge
   const planned = () => (
     <span
       style={{
@@ -211,71 +142,27 @@ export const SettingsForm: React.FC = () => {
 
   return (
     <div
-      className="settings-form-area"
       style={{
-        flex: '1 1 auto',
-        padding: 'var(--spacer-4) 0 var(--spacer-16) var(--spacer-32)',
-        maxWidth: 640,
-        animation: 'fadeIn var(--transition-normal, 0.2s) ease',
         paddingBottom: isDirty ? 72 : undefined,
         transition: 'padding-bottom var(--transition-normal, 0.2s) ease',
       }}
-      key={activeCategory}
     >
       <form onSubmit={handleSaveSettings}>
         {/* ═══════════════════════════════════════════════════ 通用设置 */}
         {activeCategory === 'general' && (
-          <>
-            <section style={{ marginBottom: 'var(--spacer-32)' }}>
-              <SectionTitle>{t('settings.proxyService')}</SectionTitle>
-              <FormGrid>
-                <FormField label={t('settings.proxyStatus')}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: '50%',
-                        background: proxyRunning ? 'var(--status-success-default)' : 'var(--icon-disabled)',
-                        display: 'inline-block',
-                        transition: 'background var(--transition-normal, 0.2s) ease',
-                      }}
-                    />
-                    <span style={{ color: proxyRunning ? 'var(--status-success-default)' : 'var(--text-tertiary)' }}>
-                      {proxyRunning ? `${proxyHost}:${proxyPort}` : t('settings.proxyStopped')}
-                    </span>
-                  </div>
-                </FormField>
-                <FormField label={t('settings.proxyUptime')}>
-                  <span style={{ color: 'var(--text-secondary)' }}>{proxyRunning ? fmt(proxyUptime) : '-'}</span>
-                </FormField>
-                <FormField label="">
-                  {!proxyRunning ? (
-                    <Button variant="brand" onClick={handleStartProxy}>
-                      {t('settings.proxyStart')}
-                    </Button>
-                  ) : (
-                    <Button variant="danger" onClick={handleStopProxy}>
-                      {t('settings.proxyStop')}
-                    </Button>
-                  )}
-                </FormField>
-                <FormField label={t('settings.proxyPort')}>
-                  <Input
-                    type="number"
-                    value={settings.port.toString()}
-                    onChange={(e) => updateSettings({ port: parseInt(e.target.value) || 8080 })}
-                    disabled={proxyRunning}
-                    wrapperStyle={proxyRunning ? { background: 'var(--bg-base-secondary)' } : {}}
-                  />
-                </FormField>
-              </FormGrid>
-            </section>
-            <section style={{ marginBottom: 'var(--spacer-32)' }}>
+          <AnimatedContent>
+            <Card style={{ marginBottom: 'var(--spacer-24)' }}>
               <SectionTitle>{t('settings.basic')}</SectionTitle>
               <FormGrid>
                 <FormField label="服务地址">
                   <Input type="text" value={settings.host} onChange={(e) => updateSettings({ host: e.target.value })} />
+                </FormField>
+                <FormField label="代理端口">
+                  <Input
+                    type="number"
+                    value={settings.port.toString()}
+                    onChange={(e) => updateSettings({ port: parseInt(e.target.value) || 8080 })}
+                  />
                 </FormField>
                 <FormField label="自动启动">
                   <Switch checked={settings.autoStart} onChange={(v) => updateSettings({ autoStart: v })} />
@@ -289,8 +176,9 @@ export const SettingsForm: React.FC = () => {
                   />
                 </FormField>
               </FormGrid>
-            </section>
-            <section style={{ marginBottom: 'var(--spacer-32)' }}>
+            </Card>
+
+            <Card>
               <SectionTitle>{t('settings.appearance')}</SectionTitle>
               <FormGrid>
                 <FormField label="语言">
@@ -328,176 +216,164 @@ export const SettingsForm: React.FC = () => {
                   {planned()}
                 </FormField>
               </FormGrid>
-            </section>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: 12,
-                paddingTop: 24,
-                borderTop: '1px solid var(--border-neutral-l1)',
-              }}
-            >
-              <Button type="button" onClick={handleResetWithConfirm}>
-                {t('settings.reset')}
-              </Button>
-              <Button type="submit" variant="brand" disabled={saving}>
-                {saving ? '保存中...' : t('settings.save')}
-              </Button>
-            </div>
-          </>
+            </Card>
+          </AnimatedContent>
         )}
 
         {/* ═══════════════════════════════════════════════════ 网络代理 */}
         {activeCategory === 'proxy' && (
-          <section style={{ marginBottom: 'var(--spacer-32)' }}>
-            <SectionTitle>{t('settings.proxyConfig')}</SectionTitle>
-            <FormGrid>
-              <FormField label="启用代理">
-                <Switch checked={settings.proxyEnabled} onChange={(v) => updateSettings({ proxyEnabled: v })} />
-              </FormField>
-              <FormField label="代理主机">
-                <Input
-                  type="text"
-                  value={settings.proxyHost}
-                  onChange={(e) => updateSettings({ proxyHost: e.target.value })}
-                  placeholder="127.0.0.1"
-                />
-              </FormField>
-              <FormField label="代理端口">
-                <Input
-                  type="number"
-                  value={settings.proxyPort.toString()}
-                  onChange={(e) => updateSettings({ proxyPort: parseInt(e.target.value) || 7890 })}
-                />
-              </FormField>
-              <FormField label="代理协议">
-                <Dropdown
-                  options={proxyProtocolOptions}
-                  value={settings.proxyProtocol}
-                  onChange={(v) => updateSettings({ proxyProtocol: v })}
-                  size="sm"
-                />
-              </FormField>
-              <FormField label="用户名">
-                <Input
-                  type="text"
-                  value={settings.proxyUsername}
-                  onChange={(e) => updateSettings({ proxyUsername: e.target.value })}
-                  placeholder="可选"
-                />
-              </FormField>
-              <FormField label="密码">
-                <Input
-                  type="password"
-                  value={settings.proxyPassword}
-                  onChange={(e) => updateSettings({ proxyPassword: e.target.value })}
-                  placeholder="可选"
-                />
-              </FormField>
-            </FormGrid>
-          </section>
+          <AnimatedContent>
+            <Card>
+              <SectionTitle>{t('settings.proxyConfig')}</SectionTitle>
+              <FormGrid>
+                <FormField label="启用代理">
+                  <Switch checked={settings.proxyEnabled} onChange={(v) => updateSettings({ proxyEnabled: v })} />
+                </FormField>
+                <FormField label="代理主机">
+                  <Input
+                    type="text"
+                    value={settings.proxyHost}
+                    onChange={(e) => updateSettings({ proxyHost: e.target.value })}
+                    placeholder="127.0.0.1"
+                  />
+                </FormField>
+                <FormField label="代理端口">
+                  <Input
+                    type="number"
+                    value={settings.proxyPort.toString()}
+                    onChange={(e) => updateSettings({ proxyPort: parseInt(e.target.value) || 7890 })}
+                  />
+                </FormField>
+                <FormField label="代理协议">
+                  <Dropdown
+                    options={proxyProtocolOptions}
+                    value={settings.proxyProtocol}
+                    onChange={(v) => updateSettings({ proxyProtocol: v })}
+                    size="sm"
+                  />
+                </FormField>
+                <FormField label="用户名">
+                  <Input
+                    type="text"
+                    value={settings.proxyUsername}
+                    onChange={(e) => updateSettings({ proxyUsername: e.target.value })}
+                    placeholder="可选"
+                  />
+                </FormField>
+                <FormField label="密码">
+                  <Input
+                    type="password"
+                    value={settings.proxyPassword}
+                    onChange={(e) => updateSettings({ proxyPassword: e.target.value })}
+                    placeholder="可选"
+                  />
+                </FormField>
+              </FormGrid>
+            </Card>
+          </AnimatedContent>
         )}
 
         {/* ═══════════════════════════════════════════════════ 日志与监控 */}
         {activeCategory === 'logging' && (
-          <section style={{ marginBottom: 'var(--spacer-32)' }}>
-            <SectionTitle>{t('settings.logging.title')}</SectionTitle>
-            <FormGrid>
-              <FormField label="日志保留天数">
-                <Input
-                  type="number"
-                  value={settings.logRetentionDays.toString()}
-                  onChange={(e) => updateSettings({ logRetentionDays: parseInt(e.target.value) || 30 })}
-                />
-              </FormField>
-              <FormField label="自动清理日志">
-                <Switch checked={settings.logAutoClean} onChange={(v) => updateSettings({ logAutoClean: v })} />
-              </FormField>
-              <FormField label="">
-                <Button disabled={exporting} onClick={handleExportLogs}>
-                  {exporting ? '导出中...' : '导出日志'}
-                </Button>
-              </FormField>
-              <FormField label="">
-                <Button disabled={openingDir} onClick={handleOpenLogDir}>
-                  {openingDir ? '打开中...' : '打开日志目录'}
-                </Button>
-              </FormField>
-            </FormGrid>
-          </section>
+          <AnimatedContent>
+            <Card>
+              <SectionTitle>{t('settings.logging.title')}</SectionTitle>
+              <FormGrid>
+                <FormField label="日志保留天数">
+                  <Input
+                    type="number"
+                    value={settings.logRetentionDays.toString()}
+                    onChange={(e) => updateSettings({ logRetentionDays: parseInt(e.target.value) || 30 })}
+                  />
+                </FormField>
+                <FormField label="自动清理日志">
+                  <Switch checked={settings.logAutoClean} onChange={(v) => updateSettings({ logAutoClean: v })} />
+                </FormField>
+                <FormField label="">
+                  <Button disabled={exporting} onClick={handleExportLogs}>
+                    {exporting ? '导出中...' : '导出日志'}
+                  </Button>
+                </FormField>
+                <FormField label="">
+                  <Button disabled={openingDir} onClick={handleOpenLogDir}>
+                    {openingDir ? '打开中...' : '打开日志目录'}
+                  </Button>
+                </FormField>
+              </FormGrid>
+            </Card>
+          </AnimatedContent>
         )}
 
         {/* ═══════════════════════════════════════════════════ 安全与认证 */}
         {activeCategory === 'security' && (
-          <section style={{ marginBottom: 'var(--spacer-32)' }}>
-            <SectionTitle>{t('settings.security.title')}</SectionTitle>
-            <FormGrid>
-              <FormField label="API 密钥加密存储">
-                <Switch checked disabled />
-                <span
-                  style={{
-                    fontSize: 'var(--body-xs-font-size)',
-                    color: 'var(--status-success-default)',
-                    marginLeft: 'var(--spacer-6)',
-                  }}
-                >
-                  始终启用
-                </span>
-              </FormField>
-              <FormField label="本地认证令牌">
-                <Input
-                  type="text"
-                  value={settings.authToken}
-                  onChange={(e) => updateSettings({ authToken: e.target.value })}
-                  placeholder="输入令牌..."
-                />
-              </FormField>
-              <FormField label="IP 白名单">
-                <Input
-                  type="text"
-                  value={settings.ipWhitelist}
-                  onChange={(e) => updateSettings({ ipWhitelist: e.target.value })}
-                  placeholder="127.0.0.1, 192.168.1.*"
-                />
-              </FormField>
-              <FormField label="启用 CORS">
-                <Switch checked={settings.corsEnabled} onChange={(v) => updateSettings({ corsEnabled: v })} />
-              </FormField>
-              <FormField label="请求速率限制">
-                <Dropdown
-                  options={rateLimitOptions}
-                  value={settings.rateLimit}
-                  onChange={(v) => updateSettings({ rateLimit: v })}
-                  size="sm"
-                />
-              </FormField>
-            </FormGrid>
-          </section>
+          <AnimatedContent>
+            <Card>
+              <SectionTitle>{t('settings.security.title')}</SectionTitle>
+              <FormGrid>
+                <FormField label="API 密钥加密存储">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-6)' }}>
+                    <Switch checked disabled />
+                    <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--status-success-default)' }}>
+                      始终启用
+                    </span>
+                  </div>
+                </FormField>
+                <FormField label="本地认证令牌">
+                  <Input
+                    type="text"
+                    value={settings.authToken}
+                    onChange={(e) => updateSettings({ authToken: e.target.value })}
+                    placeholder="输入令牌..."
+                  />
+                </FormField>
+                <FormField label="IP 白名单">
+                  <Input
+                    type="text"
+                    value={settings.ipWhitelist}
+                    onChange={(e) => updateSettings({ ipWhitelist: e.target.value })}
+                    placeholder="127.0.0.1, 192.168.1.*"
+                  />
+                </FormField>
+                <FormField label="启用 CORS">
+                  <Switch checked={settings.corsEnabled} onChange={(v) => updateSettings({ corsEnabled: v })} />
+                </FormField>
+                <FormField label="请求速率限制">
+                  <Dropdown
+                    options={rateLimitOptions}
+                    value={settings.rateLimit}
+                    onChange={(v) => updateSettings({ rateLimit: v })}
+                    size="sm"
+                  />
+                </FormField>
+              </FormGrid>
+            </Card>
+          </AnimatedContent>
         )}
 
         {/* ═══════════════════════════════════════════════════ 高级选项 */}
         {activeCategory === 'advanced' && (
-          <section style={{ marginBottom: 'var(--spacer-32)' }}>
-            <SectionTitle>{t('settings.advanced.title')}</SectionTitle>
-            <FormGrid>
-              <FormField label="API 超时(秒)">
-                <Input
-                  type="number"
-                  value={settings.apiTimeout.toString()}
-                  onChange={(e) => updateSettings({ apiTimeout: parseInt(e.target.value) || 60 })}
-                />
-              </FormField>
-              <FormField label="最大重试次数">
-                <Dropdown
-                  options={retryOptions}
-                  value={settings.maxRetries}
-                  onChange={(v) => updateSettings({ maxRetries: v })}
-                  size="sm"
-                />
-              </FormField>
-            </FormGrid>
-          </section>
+          <AnimatedContent>
+            <Card>
+              <SectionTitle>{t('settings.advanced.title')}</SectionTitle>
+              <FormGrid>
+                <FormField label="API 超时(秒)">
+                  <Input
+                    type="number"
+                    value={settings.apiTimeout.toString()}
+                    onChange={(e) => updateSettings({ apiTimeout: parseInt(e.target.value) || 60 })}
+                  />
+                </FormField>
+                <FormField label="最大重试次数">
+                  <Dropdown
+                    options={retryOptions}
+                    value={settings.maxRetries}
+                    onChange={(v) => updateSettings({ maxRetries: v })}
+                    size="sm"
+                  />
+                </FormField>
+              </FormGrid>
+            </Card>
+          </AnimatedContent>
         )}
       </form>
 
@@ -509,7 +385,7 @@ export const SettingsForm: React.FC = () => {
             style={{
               position: 'fixed',
               bottom: 0,
-              left: 220, // sidebar width
+              left: 220,
               right: 0,
               zIndex: 30,
               padding: 'var(--spacer-10) var(--spacer-24)',

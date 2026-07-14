@@ -62,6 +62,11 @@ impl RoutingStrategy {
 pub struct Model {
     pub id: String,
     pub name: String,
+    /// Optional alias. When set, clients can call this alias
+    /// instead of the real model name; the proxy resolves the
+    /// alias back to `name` before forwarding upstream.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context_window: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

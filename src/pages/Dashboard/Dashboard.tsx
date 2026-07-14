@@ -1,5 +1,7 @@
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useStatsStore } from '../../store/statsStore';
+import { onRequestCompleted } from '../../lib/desktopApi';
+import type { UnlistenFn } from '@tauri-apps/api/event';
 import { KPICards } from './KPICards';
 import { TimeRangeTabs } from './TimeRangeTabs';
 import { TokenTrendChart } from './TokenTrendChart';
@@ -16,7 +18,6 @@ export const Dashboard: React.FC = () => {
   const statsError = useStatsStore((s) => s.statsError);
   const requestsError = useStatsStore((s) => s.requestsError);
   const dailyUsageError = useStatsStore((s) => s.dailyUsageError);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Unified load error: combine all widget errors into one.
   const loadError = useMemo(() => {
@@ -30,31 +31,53 @@ export const Dashboard: React.FC = () => {
   };
 
   useEffect(() => {
+    // Initial load.
     fetchStats();
     fetchRequests();
     fetchDailyUsage();
 
-    intervalRef.current = setInterval(() => {
-      fetchStats();
-      fetchRequests();
-    }, 10000);
+    // Event-driven refresh: listen for `request-completed` events
+    // from the Rust backend and debounce-refresh all three data
+    // sources. Replaces the former 10-second polling interval.
+    let unlisten: UnlistenFn | null = null;
+    let cancelled = false;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    // Pause polling when tab is hidden
+    const scheduleRefresh = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fetchStats();
+        fetchRequests();
+        fetchDailyUsage();
+      }, 300);
+    };
+
+    onRequestCompleted(scheduleRefresh)
+      .then((fn) => {
+        if (cancelled) {
+          fn();
+        } else {
+          unlisten = fn;
+        }
+      })
+      .catch((e) => {
+        console.warn('[Dashboard] Failed to listen for request-completed events:', e);
+      });
+
+    // Re-fetch when the tab becomes visible again (no polling).
     const onVisibility = () => {
-      if (document.hidden && intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      } else if (!document.hidden && !intervalRef.current) {
-        intervalRef.current = setInterval(() => {
-          fetchStats();
-          fetchRequests();
-        }, 10000);
+      if (!document.hidden) {
+        fetchStats();
+        fetchRequests();
+        fetchDailyUsage();
       }
     };
     document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      cancelled = true;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      if (unlisten) unlisten();
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [fetchStats, fetchRequests, fetchDailyUsage]);

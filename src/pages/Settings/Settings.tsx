@@ -19,19 +19,11 @@ export const Settings: React.FC = () => {
   }, [isDirty]);
 
   return (
-    <div
-      className="settings-layout"
-      style={{
-        display: 'flex',
-        gap: 0,
-        minHeight: 'calc(100vh - 104px)',
-        position: 'relative',
-      }}
-    >
-      <AnimatedContent distance={6} style={{ flex: '0 0 auto' }}>
+    <div>
+      <AnimatedContent distance={6}>
         <SettingsNav />
       </AnimatedContent>
-      <AnimatedContent delay={90} distance={6} style={{ flex: '1 1 auto' }}>
+      <AnimatedContent delay={60} distance={6}>
         <SettingsForm />
       </AnimatedContent>
     </div>

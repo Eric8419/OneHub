@@ -5,11 +5,11 @@ import { Settings, FileText, Shield, Sliders, Globe } from 'lucide-react';
 import { useT } from '../../i18n';
 
 const categoryKeys: { key: SettingsCategory; icon: React.ReactNode }[] = [
-  { key: 'general', icon: <Settings size={16} /> },
-  { key: 'proxy', icon: <Globe size={16} /> },
-  { key: 'logging', icon: <FileText size={16} /> },
-  { key: 'security', icon: <Shield size={16} /> },
-  { key: 'advanced', icon: <Sliders size={16} /> },
+  { key: 'general', icon: <Settings size={14} /> },
+  { key: 'proxy', icon: <Globe size={14} /> },
+  { key: 'logging', icon: <FileText size={14} /> },
+  { key: 'security', icon: <Shield size={14} /> },
+  { key: 'advanced', icon: <Sliders size={14} /> },
 ];
 
 export const SettingsNav: React.FC = () => {
@@ -31,70 +31,62 @@ export const SettingsNav: React.FC = () => {
   );
 
   return (
-    <nav
-      className="settings-categories"
+    <div
       style={{
-        flex: '0 0 220px',
         display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--spacer-2)',
-        padding: 'var(--spacer-4) var(--spacer-16) var(--spacer-16) 0',
-        borderRight: '1px solid var(--border-neutral-l1)',
+        gap: 'var(--spacer-8)',
+        marginBottom: 'var(--spacer-24)',
+        borderBottom: '1px solid var(--border-neutral-l1)',
+        paddingBottom: 0,
       }}
     >
       {categories.map(cat => {
         const isActive = cat.key === activeCategory;
         return (
-          <a
+          <button
             key={cat.key}
-            href="#"
-            onClick={e => { e.preventDefault(); setActiveCategory(cat.key); }}
-            className={`settings-cat-item ${isActive ? 'settings-cat-item--active' : ''}`}
+            onClick={() => setActiveCategory(cat.key)}
             style={{
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
-              gap: 'var(--spacer-10)',
-              padding: 'var(--spacer-10) var(--spacer-12)',
-              borderRadius: 'var(--radius-8)',
-              borderLeft: isActive ? '3px solid var(--bg-brand)' : '3px solid transparent',
+              gap: 'var(--spacer-8)',
+              padding: 'var(--spacer-10) var(--spacer-20)',
+              borderRadius: 'var(--radius-8) var(--radius-8) 0 0',
+              border: 'none',
+              borderBottom: isActive ? '2px solid var(--bg-brand)' : '2px solid transparent',
               textDecoration: 'none',
-              color: isActive ? 'var(--text-default)' : 'var(--text-secondary)',
+              color: isActive ? 'var(--bg-brand)' : 'var(--text-secondary)',
               fontSize: 'var(--body-base-font-size)',
-              fontWeight: isActive ? 'var(--body-base-strong-font-weight)' : 'var(--body-base-font-weight)',
+              fontWeight: isActive ? 'var(--font-weight-strong)' : 'var(--body-base-font-weight)',
               lineHeight: 'var(--body-base-line-height)',
               cursor: 'pointer',
-              background: isActive ? 'var(--bg-overlay-l2)' : 'transparent',
-              transition: 'background-color var(--transition-fast, 0.12s) ease, color var(--transition-fast, 0.12s) ease, border-color var(--transition-fast, 0.12s) ease',
+              background: 'transparent',
+              fontFamily: 'inherit',
+              transition: 'color 0.18s cubic-bezier(0.22,1,0.36,1), border-color 0.18s cubic-bezier(0.22,1,0.36,1)',
+              marginBottom: '-1px',
             }}
             onMouseEnter={e => {
-              if (!isActive) e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+              if (!isActive) e.currentTarget.style.color = 'var(--text-default)';
             }}
             onMouseLeave={e => {
-              if (!isActive) e.currentTarget.style.background = 'transparent';
+              if (!isActive) e.currentTarget.style.color = 'var(--text-secondary)';
             }}
           >
             <span
               style={{
-                color: isActive ? 'var(--icon-brand)' : 'var(--icon-secondary)',
+                color: isActive ? 'var(--icon-brand)' : 'var(--icon-tertiary)',
                 display: 'flex',
                 flexShrink: 0,
               }}
             >
               {cat.icon}
             </span>
-            <span
-              className="settings-cat-label"
-              style={{
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
+            <span style={{ whiteSpace: 'nowrap' }}>
               {cat.label}
             </span>
-          </a>
+          </button>
         );
       })}
-    </nav>
+    </div>
   );
 };

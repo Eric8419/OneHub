@@ -78,6 +78,14 @@ pub trait Protocol: Send + Sync {
 
     /// Count tokens from a successful non-streaming response.
     fn count_tokens(&self, resp: &Value) -> i64;
+
+    /// Count tokens from an accumulated SSE streaming buffer. The
+    /// buffer contains all raw bytes received from the upstream
+    /// (including `data:` prefixes and `\n\n` separators). Default
+    /// returns 0; protocols override to parse their SSE format.
+    fn count_stream_tokens(&self, _buffer: &[u8]) -> i64 {
+        0
+    }
 }
 
 // ── OpenAI Chat Completions protocol ────────────────────────
@@ -127,6 +135,53 @@ impl Protocol for OpenAiChatProtocol {
         }
         1
     }
+
+    fn count_stream_tokens(&self, buffer: &[u8]) -> i64 {
+        let text = match std::str::from_utf8(buffer) {
+            Ok(s) => s,
+            Err(_) => return 0,
+        };
+        // OpenAI SSE: each event is `data: {json}\n\n`. When
+        // `stream_options.include_usage` is set (or the server
+        // emits usage by default), the final chunk before [DONE]
+        // carries a top-level `usage` object.
+        let mut last_total: Option<i64> = None;
+        let mut last_prompt: i64 = 0;
+        let mut last_completion: i64 = 0;
+        for line in text.lines() {
+            let line = line.trim();
+            let data = line
+                .strip_prefix("data: ")
+                .or_else(|| line.strip_prefix("data:"))
+                .map(str::trim);
+            if let Some(data) = data {
+                if data == "[DONE]" || data.is_empty() {
+                    continue;
+                }
+                if let Ok(json) = serde_json::from_str::<Value>(data) {
+                    if let Some(usage) = json.get("usage").filter(|v| v.is_object()) {
+                        if let Some(total) = usage.get("total_tokens").and_then(|v| v.as_i64()) {
+                            last_total = Some(total);
+                        }
+                        if let Some(p) = usage.get("prompt_tokens").and_then(|v| v.as_i64()) {
+                            last_prompt = p;
+                        }
+                        if let Some(c) = usage.get("completion_tokens").and_then(|v| v.as_i64()) {
+                            last_completion = c;
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(total) = last_total {
+            return total;
+        }
+        let sum = last_prompt + last_completion;
+        if sum > 0 {
+            return sum;
+        }
+        0
+    }
 }
 
 // ── Anthropic Messages protocol ─────────────────────────────
@@ -172,6 +227,59 @@ impl Protocol for AnthropicMessagesProtocol {
         }
         1
     }
+
+    fn count_stream_tokens(&self, buffer: &[u8]) -> i64 {
+        let text = match std::str::from_utf8(buffer) {
+            Ok(s) => s,
+            Err(_) => return 0,
+        };
+        // Anthropic SSE: `event: <type>\ndata: {json}\n\n`.
+        // input_tokens arrives in `message_start` (under
+        // `message.usage.input_tokens`); output_tokens arrives in
+        // `message_delta` (under `usage.output_tokens`).
+        let mut input_tokens: i64 = 0;
+        let mut output_tokens: i64 = 0;
+        let mut current_event = String::new();
+        for line in text.lines() {
+            let line = line.trim();
+            if let Some(ev) = line.strip_prefix("event: ") {
+                current_event = ev.trim().to_string();
+                continue;
+            }
+            let data = line
+                .strip_prefix("data: ")
+                .or_else(|| line.strip_prefix("data:"))
+                .map(str::trim);
+            if let Some(data) = data {
+                if data == "[DONE]" || data.is_empty() {
+                    continue;
+                }
+                if let Ok(json) = serde_json::from_str::<Value>(data) {
+                    if current_event == "message_start" {
+                        if let Some(i) = json
+                            .pointer("/message/usage/input_tokens")
+                            .and_then(|v| v.as_i64())
+                        {
+                            input_tokens = i;
+                        }
+                    }
+                    if current_event == "message_delta" {
+                        if let Some(o) = json
+                            .pointer("/usage/output_tokens")
+                            .and_then(|v| v.as_i64())
+                        {
+                            output_tokens = o;
+                        }
+                    }
+                }
+            }
+        }
+        let sum = input_tokens + output_tokens;
+        if sum > 0 {
+            return sum;
+        }
+        0
+    }
 }
 
 // ── Compatibility: the old ProviderAdapter trait ────────────
@@ -187,6 +295,7 @@ pub trait ProviderAdapter: Send + Sync {
         vec![]
     }
     fn count_tokens(&self, resp: &Value) -> i64;
+    fn count_stream_tokens(&self, buffer: &[u8]) -> i64;
 }
 
 /// Adapter wrapping a Protocol + its Auth strategy.
@@ -209,6 +318,9 @@ impl<P: Protocol> ProviderAdapter for ProtocolAdapter<P> {
     }
     fn count_tokens(&self, resp: &Value) -> i64 {
         self.protocol.count_tokens(resp)
+    }
+    fn count_stream_tokens(&self, buffer: &[u8]) -> i64 {
+        self.protocol.count_stream_tokens(buffer)
     }
 }
 

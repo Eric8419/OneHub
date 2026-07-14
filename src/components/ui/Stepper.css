@@ -1,0 +1,150 @@
+.rb-stepper-outer {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+}
+
+.rb-stepper-circle-container {
+  width: 100%;
+}
+
+.rb-stepper-indicator-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0;
+  padding: var(--spacer-20) 0;
+}
+
+.rb-stepper-content {
+  position: relative;
+  overflow: hidden;
+}
+
+.rb-stepper-step-default {
+  padding: 0;
+}
+
+.rb-stepper-footer {
+  padding: var(--spacer-12) 0 0;
+}
+
+.rb-stepper-footer-nav {
+  margin-top: var(--spacer-20);
+  display: flex;
+  align-items: center;
+}
+
+.rb-stepper-footer-nav.spread {
+  justify-content: space-between;
+}
+
+.rb-stepper-footer-nav.end {
+  justify-content: flex-end;
+}
+
+.rb-stepper-btn-back {
+  transition:
+    background var(--transition-fast, 0.12s) ease,
+    color var(--transition-fast, 0.12s) ease;
+  border-radius: var(--radius-8);
+  padding: var(--spacer-6) var(--spacer-12);
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border-neutral-l1);
+  cursor: pointer;
+  font-size: var(--body-sm-font-size);
+  font-weight: var(--font-weight-medium);
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacer-4);
+  height: 34px;
+}
+
+.rb-stepper-btn-back:hover {
+  background: var(--bg-overlay-l1);
+}
+
+.rb-stepper-btn-next {
+  transition:
+    background var(--transition-fast, 0.12s) ease,
+    opacity var(--transition-fast, 0.12s) ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacer-4);
+  border-radius: var(--radius-8);
+  background: var(--bg-brand);
+  color: var(--text-onbrand);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--body-sm-font-size);
+  font-family: inherit;
+  padding: var(--spacer-6) var(--spacer-16);
+  border: none;
+  height: 34px;
+  cursor: pointer;
+}
+
+.rb-stepper-btn-next:hover {
+  background: var(--bg-brand-hover);
+}
+
+.rb-stepper-btn-next:active {
+  opacity: 0.85;
+}
+
+.rb-stepper-btn-next:disabled {
+  background: var(--bg-brand-disabled);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.rb-stepper-indicator {
+  position: relative;
+  outline: none;
+}
+
+.rb-stepper-indicator-inner {
+  display: flex;
+  height: 32px;
+  width: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  font-weight: var(--font-weight-strong);
+  border: 2px solid var(--border-neutral-l2);
+}
+
+.rb-stepper-active-dot {
+  height: 10px;
+  width: 10px;
+  border-radius: var(--radius-full);
+  background-color: var(--text-onbrand);
+}
+
+.rb-stepper-step-number {
+  font-size: var(--body-sm-font-size);
+}
+
+.rb-stepper-connector {
+  position: relative;
+  margin-left: var(--spacer-6);
+  margin-right: var(--spacer-6);
+  height: 2px;
+  flex: 1;
+  overflow: hidden;
+  border-radius: var(--radius-2);
+  background: var(--border-neutral-l1);
+}
+
+.rb-stepper-connector-inner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+}
+
+.rb-stepper-check-icon {
+  color: var(--text-onbrand);
+}
