@@ -31,8 +31,11 @@ const KEYRING_ACCOUNT: &str = "api-key-encryption-key";
 
 /// Decode a base64-encoded key into a fixed-size array.
 fn decode_key(encoded: &str) -> Option<[u8; KEY_LEN]> {
-    let decoded =
-        base64::Engine::decode(&base64::engine::general_purpose::STANDARD, encoded.trim()).ok()?;
+    let decoded = base64::Engine::decode(
+        &base64::engine::general_purpose::STANDARD,
+        encoded.trim(),
+    )
+    .ok()?;
     if decoded.len() != KEY_LEN {
         return None;
     }
@@ -118,7 +121,10 @@ fn get_or_create_key(app_handle: &tauri::AppHandle) -> Result<[u8; KEY_LEN], Str
 
 /// Encrypt plaintext using AES-256-GCM.
 /// Returns base64-encoded string containing nonce || ciphertext.
-pub fn encrypt(plaintext: &str, app_handle: &tauri::AppHandle) -> Result<String, String> {
+pub fn encrypt(
+    plaintext: &str,
+    app_handle: &tauri::AppHandle,
+) -> Result<String, String> {
     if plaintext.is_empty() {
         return Ok(String::new());
     }
@@ -155,8 +161,9 @@ pub fn decrypt(encoded: &str, app_handle: &tauri::AppHandle) -> Result<String, S
     let key = get_or_create_key(app_handle)?;
     let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| e.to_string())?;
 
-    let combined = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, encoded)
-        .map_err(|e| format!("Failed to decode encrypted data: {}", e))?;
+    let combined =
+        base64::Engine::decode(&base64::engine::general_purpose::STANDARD, encoded)
+            .map_err(|e| format!("Failed to decode encrypted data: {}", e))?;
 
     if combined.len() < NONCE_LEN {
         return Err("Invalid encrypted data: too short".into());
@@ -169,7 +176,8 @@ pub fn decrypt(encoded: &str, app_handle: &tauri::AppHandle) -> Result<String, S
         .decrypt(nonce, ciphertext)
         .map_err(|e| format!("Decryption failed: {}", e))?;
 
-    String::from_utf8(plaintext).map_err(|e| format!("Invalid UTF-8 in decrypted data: {}", e))
+    String::from_utf8(plaintext)
+        .map_err(|e| format!("Invalid UTF-8 in decrypted data: {}", e))
 }
 
 #[cfg(test)]
@@ -198,9 +206,11 @@ mod tests {
             base64::Engine::encode(&base64::engine::general_purpose::STANDARD, combined);
 
         // Decode and decrypt
-        let decoded =
-            base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &encoded_str)
-                .unwrap();
+        let decoded = base64::Engine::decode(
+            &base64::engine::general_purpose::STANDARD,
+            &encoded_str,
+        )
+        .unwrap();
         let decrypted_nonce = Nonce::from_slice(&decoded[..NONCE_LEN]);
         let decrypted_ct = &decoded[NONCE_LEN..];
         let decrypted = cipher.decrypt(decrypted_nonce, decrypted_ct).unwrap();
