@@ -161,13 +161,19 @@ impl Protocol for OpenAiChatProtocol {
                 }
                 if let Ok(json) = serde_json::from_str::<Value>(data) {
                     if let Some(usage) = json.get("usage").filter(|v| v.is_object()) {
-                        if let Some(total) = usage.get("total_tokens").and_then(|v| v.as_i64()) {
+                        if let Some(total) =
+                            usage.get("total_tokens").and_then(|v| v.as_i64())
+                        {
                             last_total = Some(total);
                         }
-                        if let Some(p) = usage.get("prompt_tokens").and_then(|v| v.as_i64()) {
+                        if let Some(p) =
+                            usage.get("prompt_tokens").and_then(|v| v.as_i64())
+                        {
                             last_prompt = p;
                         }
-                        if let Some(c) = usage.get("completion_tokens").and_then(|v| v.as_i64()) {
+                        if let Some(c) =
+                            usage.get("completion_tokens").and_then(|v| v.as_i64())
+                        {
                             last_completion = c;
                         }
                     }
@@ -360,26 +366,40 @@ impl Protocol for ResponsesApiProtocol {
                 }
                 if let Ok(json) = serde_json::from_str::<Value>(data) {
                     if let Some(usage) = json.get("usage").filter(|v| v.is_object()) {
-                        if let Some(total) = usage.get("total_tokens").and_then(|v| v.as_i64()) {
+                        if let Some(total) =
+                            usage.get("total_tokens").and_then(|v| v.as_i64())
+                        {
                             last_total = Some(total);
                         }
-                        if let Some(i) = usage.get("input_tokens").and_then(|v| v.as_i64()) {
+                        if let Some(i) =
+                            usage.get("input_tokens").and_then(|v| v.as_i64())
+                        {
                             last_input = i;
                         }
-                        if let Some(o) = usage.get("output_tokens").and_then(|v| v.as_i64()) {
+                        if let Some(o) =
+                            usage.get("output_tokens").and_then(|v| v.as_i64())
+                        {
                             last_output = o;
                         }
                     }
                     // The completed response object also nests usage
                     // under `response.usage` for `response.completed` events.
-                    if let Some(usage) = json.pointer("/response/usage").filter(|v| v.is_object()) {
-                        if let Some(total) = usage.get("total_tokens").and_then(|v| v.as_i64()) {
+                    if let Some(usage) =
+                        json.pointer("/response/usage").filter(|v| v.is_object())
+                    {
+                        if let Some(total) =
+                            usage.get("total_tokens").and_then(|v| v.as_i64())
+                        {
                             last_total = Some(total);
                         }
-                        if let Some(i) = usage.get("input_tokens").and_then(|v| v.as_i64()) {
+                        if let Some(i) =
+                            usage.get("input_tokens").and_then(|v| v.as_i64())
+                        {
                             last_input = i;
                         }
-                        if let Some(o) = usage.get("output_tokens").and_then(|v| v.as_i64()) {
+                        if let Some(o) =
+                            usage.get("output_tokens").and_then(|v| v.as_i64())
+                        {
                             last_output = o;
                         }
                     }
@@ -847,7 +867,8 @@ impl ProxyError {
 
     /// Classify an upstream HTTP status + body into a ProxyError.
     pub fn from_upstream(status: u16, body: &str, model: &str) -> Self {
-        let msg = extract_error_message(body).unwrap_or_else(|| status_label(status).to_string());
+        let msg = extract_error_message(body)
+            .unwrap_or_else(|| status_label(status).to_string());
         match status {
             401 | 403 => ProxyError::Auth {
                 message: msg,
@@ -1581,7 +1602,8 @@ mod tests {
 
     #[test]
     fn test_error_extracts_context_length_code() {
-        let body = r#"{"error":{"code":"context_length_exceeded","message":"too long"}}"#;
+        let body =
+            r#"{"error":{"code":"context_length_exceeded","message":"too long"}}"#;
         let err = ProxyError::from_upstream(400, body, "");
         // 400 falls into the generic Api branch, but message extraction
         // should still surface the friendly code message.

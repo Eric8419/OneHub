@@ -1,7 +1,8 @@
 fn main() {
     println!("cargo:rerun-if-changed=icons/taskbar-icon.ico");
 
-    let windows = tauri_build::WindowsAttributes::new().window_icon_path("icons/taskbar-icon.ico");
+    let windows =
+        tauri_build::WindowsAttributes::new().window_icon_path("icons/taskbar-icon.ico");
     let attributes = tauri_build::Attributes::new().windows_attributes(windows);
 
     tauri_build::try_build(attributes).expect("failed to run tauri-build");

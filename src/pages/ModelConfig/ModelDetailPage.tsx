@@ -17,6 +17,8 @@ import {
   Server,
   Cpu,
   FileText,
+  Wrench,
+  Braces,
 } from 'lucide-react';
 
 // ── Types (mirrors ModelInventory) ─────────────────────────
@@ -118,6 +120,8 @@ export const ModelDetailPage: React.FC = () => {
   const allVision = paramSources.length > 0 && paramSources.every(s => s.model.supportsVision);
   const allReasoning = paramSources.length > 0 && paramSources.every(s => s.model.supportsReasoning);
   const anyEffort = paramSources.some(s => s.model.supportsReasoningEffort);
+  const allToolCalls = paramSources.length > 0 && paramSources.every(s => s.model.supportsToolCalls);
+  const allJsonMode = paramSources.length > 0 && paramSources.every(s => s.model.supportsJsonMode);
   const maxCtx = Math.max(0, ...paramSources.map(s => s.model.contextWindow || 0));
   const maxOutput = Math.max(0, ...paramSources.map(s => s.model.maxOutputTokens || 0));
   const hasDirect = sources.some(s => s.kind === 'direct');
@@ -255,6 +259,16 @@ export const ModelDetailPage: React.FC = () => {
               label="思考强度"
               enabled={anyEffort}
             />
+            <CapabilityItem
+              icon={<Wrench size={18} />}
+              label="工具调用"
+              enabled={allToolCalls}
+            />
+            <CapabilityItem
+              icon={<Braces size={18} />}
+              label="JSON 模式"
+              enabled={allJsonMode}
+            />
             {maxCtx > 0 && (
               <SpecItem icon={<FileText size={18} />} label="上下文窗口" value={maxCtx.toLocaleString()} />
             )}
@@ -364,6 +378,8 @@ const DirectDetailRow: React.FC<{ source: DirectMapping }> = ({ source }) => {
   if (source.model.supportsVision) tags.push('视觉');
   if (source.model.supportsReasoning) tags.push('思考');
   if (source.model.supportsReasoningEffort) tags.push('强度');
+  if (source.model.supportsToolCalls) tags.push('工具');
+  if (source.model.supportsJsonMode) tags.push('JSON');
 
   return (
     <div

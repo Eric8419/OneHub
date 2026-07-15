@@ -99,9 +99,9 @@ const zh: Record<string, string> = {
   // ── 设置 ──
   'settings.general': '通用设置',
   'settings.proxy': '网络代理',
-  'settings.logging': '日志与监控',
   'settings.security': '安全与认证',
   'settings.advanced': '高级选项',
+  'settings.about': '关于',
 
   'settings.proxyService': '代理服务',
   'settings.proxyStatus': '代理状态',
@@ -121,7 +121,10 @@ const zh: Record<string, string> = {
   'settings.appearanceLang': '语言',
   'settings.appearanceTheme': '主题',
   'settings.appearancePageSize': '每页显示条数',
-  'settings.appearanceTimeFormat': '时间格式',
+
+  'settings.notifications.title': '通知设置',
+  'settings.notifications.enabled': '启用通知',
+  'settings.notifications.desktop': '桌面通知',
 
   'settings.proxyConfig': '网络代理配置',
   'settings.proxyConfigEnable': '启用代理',
@@ -135,12 +138,9 @@ const zh: Record<string, string> = {
   'settings.logging.retention': '日志保留天数',
   'settings.logging.autoClean': '自动清理日志',
   'settings.logging.export': '导出日志',
-  'settings.logging.exportHint': '导出功能开发中',
   'settings.logging.openDir': '打开日志目录',
-  'settings.logging.dirHint': '日志目录功能开发中',
 
   'settings.security.title': '安全与认证',
-  'settings.security.encrypt': 'API 密钥加密存储',
   'settings.security.token': '本地认证令牌',
   'settings.security.tokenPlaceholder': '输入令牌...',
   'settings.security.ipWhitelist': 'IP 白名单',
@@ -149,12 +149,11 @@ const zh: Record<string, string> = {
   'settings.security.rateLimit': '请求速率限制',
 
   'settings.advanced.title': '高级选项',
-  'settings.advanced.debug': '调试模式',
   'settings.advanced.timeout': 'API 超时(秒)',
   'settings.advanced.retries': '最大重试次数',
-  'settings.advanced.cache': '缓存策略',
-  'settings.advanced.dataPath': '数据存储路径',
-  'settings.advanced.experimental': '实验性功能',
+
+  'settings.aboutUpdate': '更新检查',
+  'settings.dataManagement.title': '数据管理',
 
   'settings.reset': '重置默认',
   'settings.save': '保存设置',

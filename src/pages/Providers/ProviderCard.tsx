@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProviderStore } from '../../store/providerStore';
 import type { Model } from '../../types/provider';
-import { ConfirmDialog, SpotlightCard, Tag, toast } from '../../components/ui';
+import { ConfirmDialog, SpotlightCard, Tag, toast, ProviderLogo } from '../../components/ui';
 import { ChevronRight, Pencil, Trash2, Bot, Copy, Power, PowerOff, Loader2 } from 'lucide-react';
 
 const describeModelCapabilities = (model: Model) => {
@@ -12,6 +12,8 @@ const describeModelCapabilities = (model: Model) => {
   if (model.supportsVision) tags.push('视觉');
   if (model.supportsReasoning) tags.push('思考');
   if (model.supportsReasoningEffort) tags.push('强度');
+  if (model.supportsToolCalls) tags.push('工具');
+  if (model.supportsJsonMode) tags.push('JSON');
   return tags;
 };
 
@@ -89,6 +91,15 @@ export const ProviderCard: React.FC<{ providerId: string }> = ({ providerId }) =
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-8)' }}>
+          <ProviderLogo
+            providerId={provider.id}
+            name={provider.name}
+            size={20}
+            style={{
+              color: isDisabled ? 'var(--text-disabled)' : 'var(--text-secondary)',
+              transition: 'color var(--transition-normal, 0.2s) ease',
+            }}
+          />
           <span
             style={{
               fontFamily: 'var(--heading-xs-font-family)',

@@ -79,6 +79,13 @@ pub struct Model {
     pub supports_reasoning_effort: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_reasoning_effort: Option<String>,
+    /// Whether the model supports OpenAI-style function/tool calls.
+    #[serde(default)]
+    pub supports_tool_calls: bool,
+    /// Whether the model supports `response_format: { type:
+    /// "json_object" }` (JSON mode).
+    #[serde(default)]
+    pub supports_json_mode: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

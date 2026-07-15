@@ -9,7 +9,10 @@ export interface AppSettings {
   language: string;
   theme: string;
   pageSize: number;
-  timeFormat: string;
+
+  // ── 通知 ──
+  notificationsEnabled: boolean;
+  desktopNotifications: boolean;
 
   // ── 网络代理 ──
   proxyEnabled: boolean;
@@ -19,20 +22,21 @@ export interface AppSettings {
   proxyUsername: string;
   proxyPassword: string;
 
-  // ── 日志与监控 ──
-  logRetentionDays: number;
-  logAutoClean: boolean;
-
   // ── 安全与认证 ──
-  encryptApiKeys: boolean;
   authToken: string;
   ipWhitelist: string;
   corsEnabled: boolean;
   rateLimit: string;
 
-  // ── 高级选项 ──
+  // ── 高级选项（含日志） ──
   apiTimeout: number;
   maxRetries: string;
+  logRetentionDays: number;
+  logAutoClean: boolean;
+
+  // ── 关于 ──
+  checkUpdatesOnStart: boolean;
+  updateChannel: string;
 }
 
-export type SettingsCategory = 'general' | 'proxy' | 'logging' | 'security' | 'advanced';
+export type SettingsCategory = 'general' | 'security' | 'proxy' | 'advanced' | 'about';

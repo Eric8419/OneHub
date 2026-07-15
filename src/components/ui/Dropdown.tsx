@@ -35,6 +35,10 @@ interface DropdownProps {
   size?: 'sm' | 'md';
   /** Custom render for the selected value's display label. */
   renderValue?: (opt: DropdownOption | undefined) => string;
+  /** Custom render for each option's content (e.g. logo + label). */
+  renderOption?: (opt: DropdownOption) => React.ReactNode;
+  /** Custom render for the trigger's leading content (e.g. logo). */
+  renderTriggerLeading?: (opt: DropdownOption | undefined) => React.ReactNode;
   /** Max visible items before scrolling (controls max-height). */
   maxItems?: number;
 }
@@ -50,6 +54,8 @@ export const Dropdown: React.FC<DropdownProps> = ({
   className,
   size = 'md',
   renderValue,
+  renderOption,
+  renderTriggerLeading,
   maxItems = 8,
 }) => {
   const [open, setOpen] = useState(false);
@@ -235,8 +241,11 @@ export const Dropdown: React.FC<DropdownProps> = ({
             userSelect: 'none',
           }}
         >
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {opt.label}
+          <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-8)', overflow: 'hidden', flex: 1, minWidth: 0 }}>
+            {renderOption ? renderOption(opt) : null}
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {opt.label}
+            </span>
           </span>
           {isSelected && <Check size={14} style={{ color: 'var(--text-brand)', flexShrink: 0 }} />}
         </div>,
@@ -285,8 +294,11 @@ export const Dropdown: React.FC<DropdownProps> = ({
           transition: 'border-color var(--transition-fast), outline var(--transition-fast)',
         }}
       >
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left', flex: 1 }}>
-          {displayLabel}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-8)', overflow: 'hidden', flex: 1, minWidth: 0 }}>
+          {renderTriggerLeading ? renderTriggerLeading(selected) : null}
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
+            {displayLabel}
+          </span>
         </span>
         <ChevronDown
           size={16}

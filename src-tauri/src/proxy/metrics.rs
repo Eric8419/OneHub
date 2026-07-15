@@ -79,8 +79,8 @@ impl MetricsStore {
             Some(d) => d,
             None => return Ok(0),
         };
-        let cutoff =
-            chrono::Utc::now().date_naive() - chrono::Duration::days(retention_days as i64);
+        let cutoff = chrono::Utc::now().date_naive()
+            - chrono::Duration::days(retention_days as i64);
         let mut removed = 0usize;
 
         let entries = match std::fs::read_dir(&dir) {
@@ -99,7 +99,8 @@ impl MetricsStore {
             let Some(date_part) = name.strip_prefix("requests-") else {
                 continue;
             };
-            let Ok(date) = chrono::NaiveDate::parse_from_str(date_part, "%Y-%m-%d") else {
+            let Ok(date) = chrono::NaiveDate::parse_from_str(date_part, "%Y-%m-%d")
+            else {
                 continue;
             };
             if date < cutoff {
@@ -261,7 +262,8 @@ mod tests {
 
     #[test]
     fn load_recent_handles_missing_dir() {
-        let recs = load_recent_from_disk(&PathBuf::from("/nonexistent/melody-hub-test"), 100);
+        let recs =
+            load_recent_from_disk(&PathBuf::from("/nonexistent/melody-hub-test"), 100);
         assert!(recs.is_empty());
     }
 }

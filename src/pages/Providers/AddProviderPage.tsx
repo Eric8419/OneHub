@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProviderStore } from '../../store/providerStore';
-import { Stepper, Step, Dropdown, toast } from '../../components/ui';
+import { Stepper, Step, Dropdown, toast, ProviderLogo } from '../../components/ui';
 import type { DropdownOption } from '../../components/ui';
 import type { Model } from '../../types/provider';
+import { buildModelFromName } from '../../lib/modelPresets';
 import { invoke } from '@tauri-apps/api/core';
-import { ArrowLeft, Check, Loader2, RefreshCw, Download, Plus, Trash2, Eye, Brain, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Check, Loader2, RefreshCw, Download, Plus, Trash2, Eye, Brain, SlidersHorizontal, Wrench, Braces } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -97,13 +98,9 @@ const modelIdFromName = (value: string) =>
   value.trim().toLowerCase().replace(/[^a-z0-9._:/-]+/g, '-').replace(/^-+|-+$/g, '') ||
   crypto.randomUUID?.() || Date.now().toString(36);
 
-const makeModel = (name: string, id?: string): Model => ({
-  id: id?.trim() || modelIdFromName(name),
-  name: name.trim(),
-  supportsVision: false,
-  supportsReasoning: false,
-  supportsReasoningEffort: false,
-});
+// `makeModel` wraps buildModelFromName to apply preset auto-fill
+// based on the model name (regex match in modelPresets.ts).
+const makeModel = (name: string, id?: string): Model => buildModelFromName(name, id);
 
 // ── Shared input styles ────────────────────────────────────
 
@@ -436,6 +433,16 @@ export const AddProviderPage: React.FC = () => {
                   placeholder="— 选择预设提供商 —"
                   searchable
                   maxItems={8}
+                  renderOption={(opt) =>
+                    opt.value !== 'custom' ? (
+                      <ProviderLogo providerId={opt.value} name={opt.label} size={16} />
+                    ) : null
+                  }
+                  renderTriggerLeading={(opt) =>
+                    opt && opt.value !== 'custom' ? (
+                      <ProviderLogo providerId={opt.value} name={opt.label} size={16} />
+                    ) : null
+                  }
                 />
                 <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
                   选择预设可自动填充地址和协议；选「自定义」手动填写
@@ -800,7 +807,7 @@ export const AddProviderPage: React.FC = () => {
                           style={{
                             gridColumn: '1 / -1',
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                            gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
                             gap: 'var(--spacer-8)',
                           }}
                         >
@@ -842,6 +849,73 @@ export const AddProviderPage: React.FC = () => {
                             disabled={!model.supportsReasoningEffort}
                             size="sm"
                           />
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-6)', fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)' }}>
+                            <Wrench size={14} style={{ color: 'var(--icon-tertiary)' }} />
+                            <span>工具调用</span>
+                            <input
+                              type="checkbox"
+                              checked={Boolean(model.supportsToolCalls)}
+                              onChange={(e) => updateModel(index, { supportsToolCalls: e.target.checked })}
+                              style={{ accentColor: 'var(--bg-brand)', width: 16, height: 16, cursor: 'pointer' }}
+                            />
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-6)', fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)' }}>
+                            <Braces size={14} style={{ color: 'var(--icon-tertiary)' }} />
+                            <span>JSON 模式</span>
+                            <input
+                              type="checkbox"
+                              checked={Boolean(model.supportsJsonMode)}
+                              onChange={(e) => updateModel(index, { supportsJsonMode: e.target.checked })}
+                              style={{ accentColor: 'var(--bg-brand)', width: 16, height: 16, cursor: 'pointer' }}
+                            />
+                          </label>
+                        </div>
+
+                        {/* Context window & max output tokens */}
+                        <div
+                          style={{
+                            gridColumn: '1 / -1',
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                            gap: 'var(--spacer-8)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-2)' }}>
+                            <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
+                              上下文长度（tokens）
+                            </span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={model.contextWindow ?? ''}
+                              onChange={(e) => updateModel(index, { contextWindow: e.target.value ? Number(e.target.value) : undefined })}
+                              placeholder="如 128000"
+                              style={{
+                                ...inputBaseStyle,
+                                height: 32,
+                                fontFamily: 'var(--font-family-mono)',
+                                fontSize: 'var(--body-sm-font-size)',
+                              }}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-2)' }}>
+                            <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
+                              最大输出长度（tokens）
+                            </span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={model.maxOutputTokens ?? ''}
+                              onChange={(e) => updateModel(index, { maxOutputTokens: e.target.value ? Number(e.target.value) : undefined })}
+                              placeholder="如 8192"
+                              style={{
+                                ...inputBaseStyle,
+                                height: 32,
+                                fontFamily: 'var(--font-family-mono)',
+                                fontSize: 'var(--body-sm-font-size)',
+                              }}
+                            />
+                          </div>
                         </div>
                       </div>
                     ))}

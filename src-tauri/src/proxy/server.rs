@@ -45,7 +45,11 @@ struct ProxyHandle {
 static PROXY: std::sync::Mutex<Option<ProxyHandle>> = std::sync::Mutex::new(None);
 
 /// Start the proxy server in a background task.
-pub async fn start(state: SharedAppState, host: String, port: u16) -> Result<(), String> {
+pub async fn start(
+    state: SharedAppState,
+    host: String,
+    port: u16,
+) -> Result<(), String> {
     {
         let guard = PROXY.lock().map_err(|e| e.to_string())?;
         if guard.is_some() {
@@ -115,7 +119,9 @@ pub async fn stop() -> Result<(), String> {
     match handle {
         Some(handle) => {
             let _ = handle.shutdown_tx.send(());
-            match tokio::time::timeout(std::time::Duration::from_secs(2), handle.task).await {
+            match tokio::time::timeout(std::time::Duration::from_secs(2), handle.task)
+                .await
+            {
                 Ok(Ok(())) => Ok(()),
                 Ok(Err(e)) => Err(format!("Proxy task failed while stopping: {}", e)),
                 Err(_) => Err("Timed out while stopping proxy server".into()),
@@ -206,7 +212,10 @@ fn build_cors_layer(cors_enabled: bool) -> CorsLayer {
 
 // ── Auth & Rate Limit ───────────────────────────────────────
 
-fn require_auth(headers: &HeaderMap, auth: &AuthConfig) -> Result<(), (StatusCode, Json<Value>)> {
+fn require_auth(
+    headers: &HeaderMap,
+    auth: &AuthConfig,
+) -> Result<(), (StatusCode, Json<Value>)> {
     let token = auth.auth_token.as_str();
     if token.is_empty() {
         return Ok(());
@@ -265,7 +274,9 @@ fn require_ip(ip: IpAddr, auth: &AuthConfig) -> Result<(), (StatusCode, Json<Val
 
 /// Enforce a per-minute request cap. Mutates `limits` to record
 /// the timestamp. A `rate_limit_per_minute` of 0 means unlimited.
-fn check_rate_limit(limits: &mut RuntimeLimits) -> Result<(), (StatusCode, Json<Value>)> {
+fn check_rate_limit(
+    limits: &mut RuntimeLimits,
+) -> Result<(), (StatusCode, Json<Value>)> {
     if limits.rate_limit_per_minute == 0 {
         return Ok(());
     }
@@ -291,7 +302,10 @@ fn check_rate_limit(limits: &mut RuntimeLimits) -> Result<(), (StatusCode, Json<
     Ok(())
 }
 
-fn check_body_size(body: &Value, max_body_size: u64) -> Result<(), (StatusCode, Json<Value>)> {
+fn check_body_size(
+    body: &Value,
+    max_body_size: u64,
+) -> Result<(), (StatusCode, Json<Value>)> {
     if max_body_size == 0 {
         return Ok(());
     }
@@ -689,9 +703,14 @@ async fn send_with_retries(
             .expect("request builder was already verified cloneable");
         match builder.send().await {
             Ok(resp) => return Ok(resp),
-            Err(err) if attempts < max_retries && (err.is_connect() || err.is_timeout()) => {
+            Err(err)
+                if attempts < max_retries && (err.is_connect() || err.is_timeout()) =>
+            {
                 attempts += 1;
-                tokio::time::sleep(std::time::Duration::from_millis(150 * attempts as u64)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(
+                    150 * attempts as u64,
+                ))
+                .await;
             }
             Err(err) => return Err(err),
         }
@@ -712,8 +731,13 @@ async fn finalize_record(
     let model = record.model.clone();
     let latency = record.latency_ms;
     // Update routing cursors/latency first, then persist the record.
-    crate::proxy::routing::record_routing_side_effects(routing, aggregation_name, &model, latency)
-        .await;
+    crate::proxy::routing::record_routing_side_effects(
+        routing,
+        aggregation_name,
+        &model,
+        latency,
+    )
+    .await;
     // Notify the frontend before `record` is moved into metrics.
     if let Some(handle) = app_handle {
         let _ = handle.emit("request-completed", &record);
@@ -852,7 +876,8 @@ async fn anthropic_handler(
         .await
         .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": e}))))?;
 
-    let adapter = crate::proxy::adapter::resolve(crate::proxy::adapter::FLAVOR_ANTHROPIC);
+    let adapter =
+        crate::proxy::adapter::resolve(crate::proxy::adapter::FLAVOR_ANTHROPIC);
 
     proxy_request(
         &state,
@@ -993,6 +1018,8 @@ mod tests {
                     supports_reasoning: false,
                     supports_reasoning_effort: false,
                     default_reasoning_effort: None,
+                    supports_tool_calls: false,
+                    supports_json_mode: false,
                 },
                 crate::types::Model {
                     id: "gpt-3.5".into(),
@@ -1004,13 +1031,16 @@ mod tests {
                     supports_reasoning: false,
                     supports_reasoning_effort: false,
                     default_reasoning_effort: None,
+                    supports_tool_calls: false,
+                    supports_json_mode: false,
                 },
             ],
         };
         let state = build_test_state(vec![provider], vec![]).await;
-        let resp = models_handler(State(state), ConnectInfo(dummy_addr()), HeaderMap::new())
-            .await
-            .expect("models handler should succeed");
+        let resp =
+            models_handler(State(state), ConnectInfo(dummy_addr()), HeaderMap::new())
+                .await
+                .expect("models handler should succeed");
         let ids: Vec<String> = resp
             .0
             .get("data")
@@ -1044,9 +1074,10 @@ mod tests {
             enabled: false,
         };
         let state = build_test_state(vec![], vec![agg_enabled, agg_disabled]).await;
-        let resp = models_handler(State(state), ConnectInfo(dummy_addr()), HeaderMap::new())
-            .await
-            .unwrap();
+        let resp =
+            models_handler(State(state), ConnectInfo(dummy_addr()), HeaderMap::new())
+                .await
+                .unwrap();
         let ids: Vec<String> = resp
             .0
             .get("data")
@@ -1082,6 +1113,8 @@ mod tests {
                     supports_reasoning: false,
                     supports_reasoning_effort: false,
                     default_reasoning_effort: None,
+                    supports_tool_calls: false,
+                    supports_json_mode: false,
                 },
                 crate::types::Model {
                     id: "shared".into(),
@@ -1093,13 +1126,16 @@ mod tests {
                     supports_reasoning: false,
                     supports_reasoning_effort: false,
                     default_reasoning_effort: None,
+                    supports_tool_calls: false,
+                    supports_json_mode: false,
                 },
             ],
         };
         let state = build_test_state(vec![provider], vec![]).await;
-        let resp = models_handler(State(state), ConnectInfo(dummy_addr()), HeaderMap::new())
-            .await
-            .unwrap();
+        let resp =
+            models_handler(State(state), ConnectInfo(dummy_addr()), HeaderMap::new())
+                .await
+                .unwrap();
         let count = resp
             .0
             .get("data")
@@ -1119,7 +1155,8 @@ mod tests {
             auth.auth_token = "secret".into();
         }
         let result =
-            models_handler(State(state), ConnectInfo(dummy_addr()), HeaderMap::new()).await;
+            models_handler(State(state), ConnectInfo(dummy_addr()), HeaderMap::new())
+                .await;
         assert!(result.is_err());
         let (status, _) = result.unwrap_err();
         assert_eq!(status, StatusCode::UNAUTHORIZED);

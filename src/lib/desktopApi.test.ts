@@ -15,7 +15,8 @@ const settingsFixture: AppSettings = {
   language: 'zh-CN',
   theme: 'light',
   pageSize: 10,
-  timeFormat: '24h',
+  notificationsEnabled: true,
+  desktopNotifications: false,
   proxyEnabled: false,
   proxyHost: '',
   proxyPort: 7890,
@@ -24,13 +25,14 @@ const settingsFixture: AppSettings = {
   proxyPassword: '',
   logRetentionDays: 30,
   logAutoClean: true,
-  encryptApiKeys: true,
   authToken: '',
   ipWhitelist: '',
   corsEnabled: true,
   rateLimit: '0',
   apiTimeout: 60,
   maxRetries: '0',
+  checkUpdatesOnStart: true,
+  updateChannel: 'stable',
 };
 
 const providerFixture: Provider = {

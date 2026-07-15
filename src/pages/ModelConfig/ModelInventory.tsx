@@ -5,7 +5,7 @@ import { useAggregationStore } from '../../store/aggregationStore';
 import type { Aggregation } from '../../types/aggregation';
 import type { Model } from '../../types/provider';
 import { SpotlightCard } from '../../components/ui';
-import { Bot, ChevronRight, Eye, Brain, SlidersHorizontal } from 'lucide-react';
+import { Bot, ChevronRight, Eye, Brain, SlidersHorizontal, Wrench, Braces } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -187,12 +187,19 @@ export const ModelInventory: React.FC = () => {
           const allVision = paramSources.length > 0 && paramSources.every((s) => s.model.supportsVision);
           const allReasoning = paramSources.length > 0 && paramSources.every((s) => s.model.supportsReasoning);
           const anyEffort = paramSources.some((s) => s.model.supportsReasoningEffort);
+          const allToolCalls = paramSources.length > 0 && paramSources.every((s) => s.model.supportsToolCalls);
+          const allJsonMode = paramSources.length > 0 && paramSources.every((s) => s.model.supportsJsonMode);
           const maxCtx = Math.max(0, ...paramSources.map((s) => s.model.contextWindow || 0));
+          const maxOut = Math.max(0, ...paramSources.map((s) => s.model.maxOutputTokens || 0));
 
           const chips: { icon: React.ReactNode; label: string }[] = [];
           if (allVision) chips.push({ icon: <Eye size={12} />, label: '视觉' });
           if (allReasoning) chips.push({ icon: <Brain size={12} />, label: '思考' });
           if (anyEffort) chips.push({ icon: <SlidersHorizontal size={12} />, label: '强度' });
+          if (allToolCalls) chips.push({ icon: <Wrench size={12} />, label: '工具' });
+          if (allJsonMode) chips.push({ icon: <Braces size={12} />, label: 'JSON' });
+          if (maxCtx > 0) chips.push({ icon: null, label: `${maxCtx.toLocaleString()} ctx` });
+          if (maxOut > 0) chips.push({ icon: null, label: `${maxOut.toLocaleString()} out` });
 
           return (
             <SpotlightCard key={entry.name} padding="0" variant="neutral" style={{ overflow: 'hidden' }}>

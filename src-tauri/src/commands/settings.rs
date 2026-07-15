@@ -33,7 +33,9 @@ pub struct AppSettings {
     pub language: String,
     pub theme: String,
     pub page_size: u32,
-    pub time_format: String,
+    // ── 通知 ──
+    pub notifications_enabled: bool,
+    pub desktop_notifications: bool,
     // ── 网络代理 ──
     pub proxy_enabled: bool,
     pub proxy_host: String,
@@ -41,18 +43,19 @@ pub struct AppSettings {
     pub proxy_protocol: String,
     pub proxy_username: String,
     pub proxy_password: String,
-    // ── 日志与监控 ──
-    pub log_retention_days: u32,
-    pub log_auto_clean: bool,
     // ── 安全与认证 ──
-    pub encrypt_api_keys: bool,
     pub auth_token: String,
     pub ip_whitelist: String,
     pub cors_enabled: bool,
     pub rate_limit: String,
-    // ── 高级选项 ──
+    // ── 高级选项（含日志） ──
     pub api_timeout: u32,
     pub max_retries: String,
+    pub log_retention_days: u32,
+    pub log_auto_clean: bool,
+    // ── 关于 ──
+    pub check_updates_on_start: bool,
+    pub update_channel: String,
 }
 
 impl Default for AppSettings {
@@ -65,22 +68,24 @@ impl Default for AppSettings {
             language: "zh-CN".into(),
             theme: "light".into(),
             page_size: 10,
-            time_format: "24h".into(),
+            notifications_enabled: true,
+            desktop_notifications: false,
             proxy_enabled: false,
             proxy_host: String::new(),
             proxy_port: 7890,
             proxy_protocol: "http".into(),
             proxy_username: String::new(),
             proxy_password: String::new(),
-            log_retention_days: 30,
-            log_auto_clean: true,
-            encrypt_api_keys: true,
             auth_token: String::new(),
             ip_whitelist: String::new(),
             cors_enabled: true,
             rate_limit: "0".into(),
             api_timeout: 60,
             max_retries: "0".into(),
+            log_retention_days: 30,
+            log_auto_clean: true,
+            check_updates_on_start: true,
+            update_channel: "stable".into(),
         }
     }
 }
@@ -97,7 +102,10 @@ fn read_settings(app_handle: &tauri::AppHandle) -> Result<Option<AppSettings>, S
     Ok(Some(data))
 }
 
-fn write_settings(app_handle: &tauri::AppHandle, settings: &AppSettings) -> Result<(), String> {
+fn write_settings(
+    app_handle: &tauri::AppHandle,
+    settings: &AppSettings,
+) -> Result<(), String> {
     let path = paths::config_file(app_handle, SETTINGS_FILE);
     storage::write_json_atomic(&path, settings)?;
     println!("[settings] Saved to {:?}", path);
@@ -227,7 +235,13 @@ pub async fn update_proxy_auth(
     cors_enabled: bool,
     state: tauri::State<'_, SharedAppState>,
 ) -> Result<(), String> {
-    proxy::update_security_config(state.inner(), auth_token, cors_enabled, String::new()).await;
+    proxy::update_security_config(
+        state.inner(),
+        auth_token,
+        cors_enabled,
+        String::new(),
+    )
+    .await;
     Ok(())
 }
 

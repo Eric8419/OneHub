@@ -92,9 +92,9 @@ const en: Record<string, string> = {
 
   'settings.general': 'General',
   'settings.proxy': 'Network Proxy',
-  'settings.logging': 'Logging',
   'settings.security': 'Security',
   'settings.advanced': 'Advanced',
+  'settings.about': 'About',
 
   'settings.proxyService': 'Proxy Service',
   'settings.proxyStatus': 'Status',
@@ -114,7 +114,10 @@ const en: Record<string, string> = {
   'settings.appearanceLang': 'Language',
   'settings.appearanceTheme': 'Theme',
   'settings.appearancePageSize': 'Page Size',
-  'settings.appearanceTimeFormat': 'Time Format',
+
+  'settings.notifications.title': 'Notifications',
+  'settings.notifications.enabled': 'Enable Notifications',
+  'settings.notifications.desktop': 'Desktop Notifications',
 
   'settings.proxyConfig': 'Proxy Configuration',
   'settings.proxyConfigEnable': 'Enable Proxy',
@@ -124,16 +127,13 @@ const en: Record<string, string> = {
   'settings.proxyConfigUsername': 'Username',
   'settings.proxyConfigPassword': 'Password',
 
-  'settings.logging.title': 'Logging & Monitoring',
+  'settings.logging.title': 'Logging',
   'settings.logging.retention': 'Retention (days)',
   'settings.logging.autoClean': 'Auto Cleanup',
   'settings.logging.export': 'Export Logs',
-  'settings.logging.exportHint': 'Export feature coming soon',
   'settings.logging.openDir': 'Open Log Directory',
-  'settings.logging.dirHint': 'Log directory feature coming soon',
 
   'settings.security.title': 'Security & Authentication',
-  'settings.security.encrypt': 'Encrypt API Keys',
   'settings.security.token': 'Auth Token',
   'settings.security.tokenPlaceholder': 'Enter token...',
   'settings.security.ipWhitelist': 'IP Whitelist',
@@ -144,6 +144,9 @@ const en: Record<string, string> = {
   'settings.advanced.title': 'Advanced Options',
   'settings.advanced.timeout': 'API Timeout (s)',
   'settings.advanced.retries': 'Max Retries',
+
+  'settings.aboutUpdate': 'Updates',
+  'settings.dataManagement.title': 'Data Management',
 
   'settings.reset': 'Reset',
   'settings.save': 'Save',

@@ -21,3 +21,5 @@ export type { CounterProps } from './Counter';
 export { EChart } from './EChart';
 export type { EChartProps, EChartsOption } from './EChart';
 export { getCssVar, useThemeVersion } from './EChart';
+export { ProviderLogo } from './ProviderLogo';
+export type { ProviderLogoProps } from './ProviderLogo';

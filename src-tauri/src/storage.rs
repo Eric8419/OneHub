@@ -63,7 +63,10 @@ fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<Option<T>, S
 /// Save providers to disk, encrypting each non-empty API key.
 /// The in-memory plaintext list is also accepted so callers can
 /// pass runtime state directly.
-pub fn save_providers(app_handle: &tauri::AppHandle, providers: &[Provider]) -> Result<(), String> {
+pub fn save_providers(
+    app_handle: &tauri::AppHandle,
+    providers: &[Provider],
+) -> Result<(), String> {
     // Encrypt all keys first — fail before touching the file.
     let encrypted: Result<Vec<Provider>, String> = providers
         .iter()
@@ -73,7 +76,9 @@ pub fn save_providers(app_handle: &tauri::AppHandle, providers: &[Provider]) -> 
             } else {
                 match crypto::encrypt(&p.api_key, app_handle) {
                     Ok(enc) => Ok(p.clone().with_encrypted_key(enc)),
-                    Err(e) => Err(format!("Unable to encrypt API key for '{}': {}", p.name, e)),
+                    Err(e) => {
+                        Err(format!("Unable to encrypt API key for '{}': {}", p.name, e))
+                    }
                 }
             }
         })
@@ -152,7 +157,9 @@ pub fn save_aggregations(
     Ok(())
 }
 
-pub fn load_aggregations(app_handle: &tauri::AppHandle) -> Result<Vec<Aggregation>, String> {
+pub fn load_aggregations(
+    app_handle: &tauri::AppHandle,
+) -> Result<Vec<Aggregation>, String> {
     let path = paths::config_file(app_handle, AGGREGATIONS_FILE);
     let stored: Option<Vec<Aggregation>> = read_json(&path)?;
     Ok(stored.unwrap_or_default())

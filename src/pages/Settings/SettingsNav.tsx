@@ -1,15 +1,16 @@
 import { useMemo } from 'react';
 import { useSettingsStore } from '../../store/settingsStore';
 import type { SettingsCategory } from '../../types/settings';
-import { Settings, FileText, Shield, Sliders, Globe } from 'lucide-react';
+import { Settings, Shield, Globe, Sliders, Info } from 'lucide-react';
 import { useT } from '../../i18n';
 
+// 按使用频率排序：通用 → 安全 → 代理 → 高级 → 关于
 const categoryKeys: { key: SettingsCategory; icon: React.ReactNode }[] = [
   { key: 'general', icon: <Settings size={14} /> },
-  { key: 'proxy', icon: <Globe size={14} /> },
-  { key: 'logging', icon: <FileText size={14} /> },
   { key: 'security', icon: <Shield size={14} /> },
+  { key: 'proxy', icon: <Globe size={14} /> },
   { key: 'advanced', icon: <Sliders size={14} /> },
+  { key: 'about', icon: <Info size={14} /> },
 ];
 
 export const SettingsNav: React.FC = () => {
@@ -19,10 +20,10 @@ export const SettingsNav: React.FC = () => {
 
   const labelMap: Record<SettingsCategory, string> = useMemo(() => ({
     general: t('settings.general'),
-    proxy: t('settings.proxy'),
-    logging: t('settings.logging'),
     security: t('settings.security'),
+    proxy: t('settings.proxy'),
     advanced: t('settings.advanced'),
+    about: t('settings.about'),
   }), [t]);
 
   const categories = useMemo(() =>

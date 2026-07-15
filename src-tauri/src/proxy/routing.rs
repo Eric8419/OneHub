@@ -68,7 +68,9 @@ pub async fn route_request(
         .providers
         .iter()
         .flat_map(|p| p.models.iter().map(move |m| (p, m)))
-        .filter(|(_, m)| m.name == model_or_agg || m.alias.as_deref() == Some(model_or_agg))
+        .filter(|(_, m)| {
+            m.name == model_or_agg || m.alias.as_deref() == Some(model_or_agg)
+        })
         .map(|(p, m)| (p.clone(), m.name.clone()))
         .collect();
 
@@ -268,6 +270,8 @@ mod tests {
                         supports_reasoning: false,
                         supports_reasoning_effort: false,
                         default_reasoning_effort: None,
+                        supports_tool_calls: false,
+                        supports_json_mode: false,
                     }],
                     api_flavor: "openai".into(),
                     api_key_encrypted: false,

@@ -18,7 +18,6 @@ export const RecentRequests: React.FC = () => {
   const fetchRequests = useStatsStore(s => s.fetchRequests);
   const page = useStatsStore(s => s.page);
   const pageSize = useSettingsStore(s => s.settings.pageSize);
-  const timeFormat = useSettingsStore(s => s.settings.timeFormat);
   const setPage = useStatsStore(s => s.setPage);
   const prevLength = useRef(recentRequests.length);
 
@@ -40,20 +39,7 @@ export const RecentRequests: React.FC = () => {
   const safePage = Math.min(page, totalPages - 1);
   const paged = recentRequests.slice(safePage * pageSize, (safePage + 1) * pageSize);
 
-  const formatTimestamp = (timestamp: string) => {
-    if (timeFormat === '24h') return timestamp;
-    const parsed = new Date(timestamp.replace(' ', 'T'));
-    if (Number.isNaN(parsed.getTime())) return timestamp;
-    return parsed.toLocaleString(undefined, {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-    });
-  };
+  const formatTimestamp = (timestamp: string) => timestamp;
 
   // Loading skeleton
   if (loading && recentRequests.length === 0) {

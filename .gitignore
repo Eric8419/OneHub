@@ -41,6 +41,11 @@ Cargo.lock
 
 # IDE config
 .trae/
+.claude/
+.zcode/
+
+# Test results
+test-results/
 
 # Development scripts
 scripts/

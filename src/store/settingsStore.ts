@@ -14,7 +14,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   language: 'zh-CN',
   theme: 'light',
   pageSize: 10,
-  timeFormat: '24h',
+  // 通知
+  notificationsEnabled: true,
+  desktopNotifications: false,
   // 网络代理
   proxyEnabled: false,
   proxyHost: '',
@@ -22,18 +24,19 @@ const DEFAULT_SETTINGS: AppSettings = {
   proxyProtocol: 'http',
   proxyUsername: '',
   proxyPassword: '',
-  // 日志与监控
-  logRetentionDays: 30,
-  logAutoClean: true,
   // 安全与认证
-  encryptApiKeys: true,
   authToken: '',
   ipWhitelist: '',
   corsEnabled: true,
   rateLimit: '0',
-  // 高级选项
+  // 高级选项（含日志）
   apiTimeout: 60,
   maxRetries: '0',
+  logRetentionDays: 30,
+  logAutoClean: true,
+  // 关于
+  checkUpdatesOnStart: true,
+  updateChannel: 'stable',
 };
 
 interface SettingsStore {
@@ -61,7 +64,6 @@ function normalizeSettings(settings: AppSettings): AppSettings {
   return {
     ...DEFAULT_SETTINGS,
     ...settings,
-    encryptApiKeys: true,
   };
 }
 

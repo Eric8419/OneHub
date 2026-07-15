@@ -79,7 +79,8 @@ impl RuntimeLimits {
         } else {
             self.max_concurrency as usize
         };
-        self.concurrency_semaphore = Some(Arc::new(tokio::sync::Semaphore::new(permits)));
+        self.concurrency_semaphore =
+            Some(Arc::new(tokio::sync::Semaphore::new(permits)));
     }
 }
 
@@ -122,7 +123,10 @@ impl AppState {
     /// Build (or rebuild) the shared reqwest client. Called once
     /// during bootstrap and again whenever upstream-proxy settings
     /// change. A plain client (no system proxy) is used by default.
-    pub async fn rebuild_http_client(&self, proxy: &UpstreamProxySettings) -> Result<(), String> {
+    pub async fn rebuild_http_client(
+        &self,
+        proxy: &UpstreamProxySettings,
+    ) -> Result<(), String> {
         let client = build_http_client(proxy)?;
         let mut guard = self.http_client.write().await;
         *guard = Some(client);
@@ -146,7 +150,9 @@ fn build_http_client(proxy: &UpstreamProxySettings) -> Result<reqwest::Client, S
         }
         let protocol = match proxy.protocol.as_str() {
             "http" | "https" | "socks5" | "socks5h" => proxy.protocol.as_str(),
-            other => return Err(format!("Unsupported upstream proxy protocol: {}", other)),
+            other => {
+                return Err(format!("Unsupported upstream proxy protocol: {}", other))
+            }
         };
         let proxy_url = format!("{}://{}:{}", protocol, host, proxy.port);
         let mut upstream_proxy = reqwest::Proxy::all(&proxy_url)

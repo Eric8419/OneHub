@@ -85,7 +85,9 @@ fn compute_stats_for_range(
         .collect();
     let previous: Vec<_> = records
         .iter()
-        .filter(|r| record_date(r).is_some_and(|d| d >= previous_start && d < current_start))
+        .filter(|r| {
+            record_date(r).is_some_and(|d| d >= previous_start && d < current_start)
+        })
         .cloned()
         .collect();
 
@@ -99,7 +101,10 @@ fn compute_stats_for_range(
         active_models: cur.active_models,
         avg_response_time: cur.avg_response_time,
         token_change: percent_change(cur.total_tokens as f64, prev.total_tokens as f64),
-        request_change: percent_change(cur.total_requests as f64, prev.total_requests as f64),
+        request_change: percent_change(
+            cur.total_requests as f64,
+            prev.total_requests as f64,
+        ),
         response_time_change: response_delta,
         response_time_trend: if response_delta <= 0.0 { "up" } else { "down" }.into(),
     })
@@ -162,7 +167,8 @@ fn round1(value: f64) -> f64 {
 }
 
 fn record_date(record: &RequestRecord) -> Option<NaiveDate> {
-    if let Ok(dt) = NaiveDateTime::parse_from_str(&record.timestamp, "%Y-%m-%d %H:%M:%S") {
+    if let Ok(dt) = NaiveDateTime::parse_from_str(&record.timestamp, "%Y-%m-%d %H:%M:%S")
+    {
         return Some(dt.date());
     }
     if record.timestamp.len() >= 10 {

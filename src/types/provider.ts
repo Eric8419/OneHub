@@ -10,6 +10,10 @@ export interface Model {
   supportsReasoning?: boolean;
   supportsReasoningEffort?: boolean;
   defaultReasoningEffort?: 'low' | 'medium' | 'high';
+  /** Whether the model supports OpenAI-style function/tool calls. */
+  supportsToolCalls?: boolean;
+  /** Whether the model supports `response_format: { type: "json_object" }`. */
+  supportsJsonMode?: boolean;
 }
 
 export interface Provider {

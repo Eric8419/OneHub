@@ -106,6 +106,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
           boxSizing: 'border-box',
         }}
       >
+        <img
+          src="/brand/app-icon-1024.png"
+          alt="Melody Hub"
+          width={isMac ? 20 : 28}
+          height={isMac ? 20 : 28}
+          style={{ borderRadius: isMac ? 5 : 7, flexShrink: 0, userSelect: 'none' }}
+          draggable={false}
+        />
         <span
           className="ds-shell__brand-name"
           style={{

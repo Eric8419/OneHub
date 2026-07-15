@@ -27,7 +27,11 @@ pub use state::{AppState, SharedAppState};
 
 // ── Server lifecycle (thin re-exports) ──────────────────────
 
-pub async fn start(state: SharedAppState, host: String, port: u16) -> Result<(), String> {
+pub async fn start(
+    state: SharedAppState,
+    host: String,
+    port: u16,
+) -> Result<(), String> {
     server::start(state, host, port).await
 }
 
@@ -88,7 +92,10 @@ pub async fn update_runtime_config(
 }
 
 /// Initialize the metrics log directory and load recent history.
-pub async fn init_metrics(state: &SharedAppState, log_dir: PathBuf) -> Result<(), String> {
+pub async fn init_metrics(
+    state: &SharedAppState,
+    log_dir: PathBuf,
+) -> Result<(), String> {
     state.metrics.initialize(log_dir).await
 }
 

@@ -38,10 +38,6 @@ const pageSizeOptions = sel([
   { value: '50', label: '50' },
   { value: '100', label: '100' },
 ]);
-const timeFormatOptions = sel([
-  { value: '24h', label: '24小时' },
-  { value: '12h', label: '12小时' },
-]);
 const proxyProtocolOptions = sel([
   { value: 'http', label: 'HTTP' },
   { value: 'socks5', label: 'SOCKS5' },
@@ -57,6 +53,10 @@ const retryOptions = sel([
   { value: '1', label: '1次' },
   { value: '3', label: '3次' },
   { value: '5', label: '5次' },
+]);
+const updateChannelOptions = sel([
+  { value: 'stable', label: '稳定版' },
+  { value: 'beta', label: '测试版' },
 ]);
 
 const errorMessage = (e: unknown, fallback: string) => (e instanceof Error ? e.message : e ? String(e) : fallback);
@@ -116,23 +116,6 @@ export const SettingsForm: React.FC = () => {
     }
   };
 
-  const planned = () => (
-    <span
-      style={{
-        display: 'inline-block',
-        fontSize: 'var(--body-xs-font-size)',
-        color: 'var(--text-tertiary)',
-        background: 'var(--bg-overlay-l1)',
-        padding: '0 var(--spacer-6)',
-        borderRadius: 'var(--radius-4)',
-        lineHeight: '18px',
-        marginLeft: 'var(--spacer-6)',
-      }}
-    >
-      v0.2.0
-    </span>
-  );
-
   const handleResetWithConfirm = () => {
     if (window.confirm('确定恢复所有默认值？未保存的修改将丢失。')) {
       resetSettings();
@@ -177,21 +160,11 @@ export const SettingsForm: React.FC = () => {
                     onChange={(v) => updateSettings({ pageSize: parseInt(v) })}
                     size="sm"
                   />
-                  {planned()}
-                </FormField>
-                <FormField label="时间格式">
-                  <Dropdown
-                    options={timeFormatOptions}
-                    value={settings.timeFormat}
-                    onChange={(v) => updateSettings({ timeFormat: v })}
-                    size="sm"
-                  />
-                  {planned()}
                 </FormField>
               </FormGrid>
             </Card>
 
-            <Card>
+            <Card style={{ marginBottom: 'var(--spacer-24)' }}>
               <SectionTitle>{t('settings.basic')}</SectionTitle>
               <FormGrid>
                 <FormField label="服务地址">
@@ -212,6 +185,62 @@ export const SettingsForm: React.FC = () => {
                     options={concurrencyOptions}
                     value={settings.maxConcurrency.toString()}
                     onChange={(v) => updateSettings({ maxConcurrency: parseInt(v) })}
+                    size="sm"
+                  />
+                </FormField>
+              </FormGrid>
+            </Card>
+
+            <Card>
+              <SectionTitle>{t('settings.notifications.title')}</SectionTitle>
+              <FormGrid>
+                <FormField label="启用通知">
+                  <Switch
+                    checked={settings.notificationsEnabled}
+                    onChange={(v) => updateSettings({ notificationsEnabled: v })}
+                  />
+                </FormField>
+                <FormField label="桌面通知">
+                  <Switch
+                    checked={settings.desktopNotifications}
+                    onChange={(v) => updateSettings({ desktopNotifications: v })}
+                  />
+                </FormField>
+              </FormGrid>
+            </Card>
+          </AnimatedContent>
+        )}
+
+        {/* ═══════════════════════════════════════════════════ 安全与认证 */}
+        {activeCategory === 'security' && (
+          <AnimatedContent>
+            <Card>
+              <SectionTitle>{t('settings.security.title')}</SectionTitle>
+              <FormGrid>
+                <FormField label="本地认证令牌">
+                  <Input
+                    type="text"
+                    value={settings.authToken}
+                    onChange={(e) => updateSettings({ authToken: e.target.value })}
+                    placeholder="输入令牌..."
+                  />
+                </FormField>
+                <FormField label="IP 白名单">
+                  <Input
+                    type="text"
+                    value={settings.ipWhitelist}
+                    onChange={(e) => updateSettings({ ipWhitelist: e.target.value })}
+                    placeholder="127.0.0.1, 192.168.1.*"
+                  />
+                </FormField>
+                <FormField label="启用 CORS">
+                  <Switch checked={settings.corsEnabled} onChange={(v) => updateSettings({ corsEnabled: v })} />
+                </FormField>
+                <FormField label="请求速率限制">
+                  <Dropdown
+                    options={rateLimitOptions}
+                    value={settings.rateLimit}
+                    onChange={(v) => updateSettings({ rateLimit: v })}
                     size="sm"
                   />
                 </FormField>
@@ -273,9 +302,30 @@ export const SettingsForm: React.FC = () => {
           </AnimatedContent>
         )}
 
-        {/* ═══════════════════════════════════════════════════ 日志与监控 */}
-        {activeCategory === 'logging' && (
+        {/* ═══════════════════════════════════════════════════ 高级选项 */}
+        {activeCategory === 'advanced' && (
           <AnimatedContent>
+            <Card style={{ marginBottom: 'var(--spacer-24)' }}>
+              <SectionTitle>{t('settings.advanced.title')}</SectionTitle>
+              <FormGrid>
+                <FormField label="API 超时(秒)">
+                  <Input
+                    type="number"
+                    value={settings.apiTimeout.toString()}
+                    onChange={(e) => updateSettings({ apiTimeout: parseInt(e.target.value) || 60 })}
+                  />
+                </FormField>
+                <FormField label="最大重试次数">
+                  <Dropdown
+                    options={retryOptions}
+                    value={settings.maxRetries}
+                    onChange={(v) => updateSettings({ maxRetries: v })}
+                    size="sm"
+                  />
+                </FormField>
+              </FormGrid>
+            </Card>
+
             <Card>
               <SectionTitle>{t('settings.logging.title')}</SectionTitle>
               <FormGrid>
@@ -304,72 +354,58 @@ export const SettingsForm: React.FC = () => {
           </AnimatedContent>
         )}
 
-        {/* ═══════════════════════════════════════════════════ 安全与认证 */}
-        {activeCategory === 'security' && (
+        {/* ═══════════════════════════════════════════════════ 关于 */}
+        {activeCategory === 'about' && (
           <AnimatedContent>
-            <Card>
-              <SectionTitle>{t('settings.security.title')}</SectionTitle>
+            <Card style={{ marginBottom: 'var(--spacer-24)' }}>
+              <SectionTitle>{t('settings.aboutUpdate')}</SectionTitle>
               <FormGrid>
-                <FormField label="API 密钥加密存储">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-6)' }}>
-                    <Switch checked disabled />
-                    <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--status-success-default)' }}>
-                      始终启用
-                    </span>
-                  </div>
-                </FormField>
-                <FormField label="本地认证令牌">
-                  <Input
-                    type="text"
-                    value={settings.authToken}
-                    onChange={(e) => updateSettings({ authToken: e.target.value })}
-                    placeholder="输入令牌..."
+                <FormField label="启动时检查更新">
+                  <Switch
+                    checked={settings.checkUpdatesOnStart}
+                    onChange={(v) => updateSettings({ checkUpdatesOnStart: v })}
                   />
                 </FormField>
-                <FormField label="IP 白名单">
-                  <Input
-                    type="text"
-                    value={settings.ipWhitelist}
-                    onChange={(e) => updateSettings({ ipWhitelist: e.target.value })}
-                    placeholder="127.0.0.1, 192.168.1.*"
-                  />
-                </FormField>
-                <FormField label="启用 CORS">
-                  <Switch checked={settings.corsEnabled} onChange={(v) => updateSettings({ corsEnabled: v })} />
-                </FormField>
-                <FormField label="请求速率限制">
+                <FormField label="更新通道">
                   <Dropdown
-                    options={rateLimitOptions}
-                    value={settings.rateLimit}
-                    onChange={(v) => updateSettings({ rateLimit: v })}
+                    options={updateChannelOptions}
+                    value={settings.updateChannel}
+                    onChange={(v) => updateSettings({ updateChannel: v })}
                     size="sm"
                   />
                 </FormField>
               </FormGrid>
             </Card>
-          </AnimatedContent>
-        )}
 
-        {/* ═══════════════════════════════════════════════════ 高级选项 */}
-        {activeCategory === 'advanced' && (
-          <AnimatedContent>
             <Card>
-              <SectionTitle>{t('settings.advanced.title')}</SectionTitle>
+              <SectionTitle>{t('settings.dataManagement.title')}</SectionTitle>
               <FormGrid>
-                <FormField label="API 超时(秒)">
-                  <Input
-                    type="number"
-                    value={settings.apiTimeout.toString()}
-                    onChange={(e) => updateSettings({ apiTimeout: parseInt(e.target.value) || 60 })}
-                  />
+                <FormField label="">
+                  <Button
+                    onClick={() => toast('配置导出功能开发中', 'info')}
+                  >
+                    导出配置
+                  </Button>
                 </FormField>
-                <FormField label="最大重试次数">
-                  <Dropdown
-                    options={retryOptions}
-                    value={settings.maxRetries}
-                    onChange={(v) => updateSettings({ maxRetries: v })}
-                    size="sm"
-                  />
+                <FormField label="">
+                  <Button
+                    variant="secondary"
+                    onClick={() => toast('配置导入功能开发中', 'info')}
+                  >
+                    导入配置
+                  </Button>
+                </FormField>
+                <FormField label="">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      if (window.confirm('确定重置所有数据？此操作不可撤销。')) {
+                        toast('重置功能开发中', 'info');
+                      }
+                    }}
+                  >
+                    重置所有数据
+                  </Button>
                 </FormField>
               </FormGrid>
             </Card>

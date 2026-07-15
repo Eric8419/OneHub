@@ -21,7 +21,8 @@ const KEY_FILE: &str = ".encryption_key";
 /// platform path cannot be resolved (e.g. headless test env).
 pub fn app_data_dir(app_handle: &tauri::AppHandle) -> PathBuf {
     let mut path = app_handle.path().app_data_dir().unwrap_or_else(|_| {
-        let mut fallback = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let mut fallback =
+            std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         fallback.push("melody-hub_data");
         fallback
     });
