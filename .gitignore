@@ -47,5 +47,8 @@ Cargo.lock
 # Test results
 test-results/
 
+# AI tool artifacts
+docs/
+
 # Development scripts
 scripts/
