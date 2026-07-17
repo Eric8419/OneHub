@@ -52,3 +52,7 @@ docs/
 
 # Development scripts
 scripts/
+app-icon.png
+sub2api-analysis/
+src-tauri/icons/android/
+src-tauri/icons/ios/
