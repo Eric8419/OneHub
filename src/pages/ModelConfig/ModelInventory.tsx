@@ -277,7 +277,7 @@ export const ModelInventory: React.FC = () => {
                         style={{
                           display: 'flex',
                           gap: 'var(--spacer-6)',
-                          marginTop: 'var(--spacer-8)',
+                          marginTop: 'var(--spacer-10)',
                           flexWrap: 'wrap',
                         }}
                       >
@@ -287,10 +287,10 @@ export const ModelInventory: React.FC = () => {
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: 'var(--spacer-2)',
+                              gap: 'var(--spacer-4)',
                               height: 22,
                               padding: '0 var(--spacer-8)',
-                              borderRadius: 'var(--radius-4)',
+                              borderRadius: 'var(--radius-6)',
                               background: 'var(--bg-overlay-l1)',
                               color: 'var(--text-tertiary)',
                               fontSize: 'var(--body-xs-font-size)',

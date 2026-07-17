@@ -33,6 +33,7 @@
   --spacer-8: 8px;
   --spacer-10: 10px;
   --spacer-12: 12px;
+  --spacer-14: 14px;
   --spacer-16: 16px;
   --spacer-20: 20px;
   --spacer-24: 24px;
@@ -116,11 +117,11 @@
   --bg-invert-disabled: rgba(115, 115, 115, 0.20);
 
   /* ── bg-brand ─────────────────────────────────────────── */
-  --bg-brand: #4B3FE3;
-  --bg-brand-hover: #6A6FFF;
-  --bg-brand-active: #3F31C6;
-  --bg-brand-disabled: rgba(75, 63, 227, 0.22);
-  --bg-brand-popup: rgba(170, 183, 255, 0.36);
+  --bg-brand: #00B95C;
+  --bg-brand-hover: #1FC170;
+  --bg-brand-active: #00A753;
+  --bg-brand-disabled: rgba(0, 185, 92, 0.22);
+  --bg-brand-popup: rgba(51, 199, 125, 0.36);
 
   /* ── text ─────────────────────────────────────────────── */
   --text-default: #171717;
@@ -130,15 +131,15 @@
   --text-disabled: #A1A1A1;
   --text-onbrand: #FFFFFF;
   --text-onaccent: #FFFFFF;
-  --text-brand: #4B3FE3;
-  --text-brand-hover: #6A6FFF;
+  --text-brand: #00B95C;
+  --text-brand-hover: #1FC170;
 
   /* ── icon ─────────────────────────────────────────────── */
   --icon-default: #262626;
   --icon-secondary: #404040;
   --icon-tertiary: #737373;
   --icon-disabled: #A1A1A1;
-  --icon-brand: #4B3FE3;
+  --icon-brand: #00B95C;
   --icon-onbrand: #FFFFFF;
 
   /* ── border ───────────────────────────────────────────── */
@@ -146,7 +147,7 @@
   --border-neutral-l2: rgba(115, 115, 115, 0.18);
   --border-neutral-l3: rgba(115, 115, 115, 0.36);
   --border-contrast: #000000;
-  --border-brand: #4B3FE3;
+  --border-brand: #00B95C;
 
   /* ── accent ───────────────────────────────────────────── */
   --accent-teal: #00B983;
@@ -178,16 +179,16 @@
   --status-error-surface-l1: rgba(232, 70, 58, 0.12);
 
   /* ── brand scale ──────────────────────────────────────── */
-  --brand-50: #F2F7FF;
-  --brand-100: #E5EAFF;
-  --brand-200: #CFD8FF;
-  --brand-300: #AAB7FF;
-  --brand-400: #8894FF;
-  --brand-500: #6A6FFF;
-  --brand-600: #4B3FE3;
-  --brand-700: #3F31C6;
-  --brand-800: #2C2290;
-  --brand-900: #1A1759;
+  --brand-50: #EBFAF1;
+  --brand-100: #D6F5E2;
+  --brand-200: #AEEBC6;
+  --brand-300: #75DA9E;
+  --brand-400: #3CCB78;
+  --brand-500: #1FC170;
+  --brand-600: #00B95C;
+  --brand-700: #00A753;
+  --brand-800: #008B45;
+  --brand-900: #006F37;
   --brand-grey-100: #F5F5F5;
   --brand-grey-200: #E5E5E5;
   --brand-grey-300: #D4D4D4;
@@ -241,11 +242,11 @@
   --bg-invert-disabled: rgba(255, 255, 255, 0.10);
 
   /* ── bg-brand ─────────────────────────────────────────── */
-  --bg-brand: #6A6FFF;
-  --bg-brand-hover: #8894FF;
-  --bg-brand-active: #4B3FE3;
-  --bg-brand-disabled: rgba(106, 111, 255, 0.30);
-  --bg-brand-popup: rgba(106, 111, 255, 0.20);
+  --bg-brand: #26C474;
+  --bg-brand-hover: #40CB85;
+  --bg-brand-active: #00B95C;
+  --bg-brand-disabled: rgba(38, 196, 116, 0.30);
+  --bg-brand-popup: rgba(38, 196, 116, 0.20);
 
   /* ── text ─────────────────────────────────────────────── */
   --text-default: #E5E5E5;
@@ -255,15 +256,15 @@
   --text-disabled: #525252;
   --text-onbrand: #FFFFFF;
   --text-onaccent: #FFFFFF;
-  --text-brand: #8894FF;
-  --text-brand-hover: #AAB7FF;
+  --text-brand: #40CB85;
+  --text-brand-hover: #5DD698;
 
   /* ── icon ─────────────────────────────────────────────── */
   --icon-default: #E5E5E5;
   --icon-secondary: #A1A1A1;
   --icon-tertiary: #737373;
   --icon-disabled: #525252;
-  --icon-brand: #8894FF;
+  --icon-brand: #40CB85;
   --icon-onbrand: #FFFFFF;
 
   /* ── border ───────────────────────────────────────────── */
@@ -271,19 +272,19 @@
   --border-neutral-l2: rgba(255, 255, 255, 0.16);
   --border-neutral-l3: rgba(255, 255, 255, 0.30);
   --border-contrast: #FFFFFF;
-  --border-brand: #6A6FFF;
+  --border-brand: #26C474;
 
   /* ── brand scale ──────────────────────────────────────── */
-  --brand-50: #1A1759;
-  --brand-100: #2C2290;
-  --brand-200: #3F31C6;
-  --brand-300: #4B3FE3;
-  --brand-400: #6A6FFF;
-  --brand-500: #8894FF;
-  --brand-600: #AAB7FF;
-  --brand-700: #CFD8FF;
-  --brand-800: #E5EAFF;
-  --brand-900: #F2F7FF;
+  --brand-50: #006F37;
+  --brand-100: #008B45;
+  --brand-200: #00A753;
+  --brand-300: #00B95C;
+  --brand-400: #26C474;
+  --brand-500: #40CB85;
+  --brand-600: #5DD698;
+  --brand-700: #88E3B5;
+  --brand-800: #B3EFD2;
+  --brand-900: #DFF7EB;
   --brand-grey-100: #252525;
   --brand-grey-200: #333333;
   --brand-grey-300: #404040;
@@ -587,6 +588,41 @@ button {
     box-shadow var(--transition-normal),
     transform var(--transition-normal),
     background var(--transition-normal);
+}
+
+.ds-switch-btn:focus-visible {
+  box-shadow: 0 0 0 3px rgba(0, 185, 92, 0.3);
+}
+
+.icon-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-8);
+  background: transparent;
+  color: var(--icon-tertiary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+.icon-action-btn:hover:not(:disabled) {
+  background: var(--bg-overlay-l1);
+  color: var(--text-default);
+}
+.icon-action-btn:active:not(:disabled) {
+  background: var(--bg-overlay-l2);
+}
+.icon-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.icon-action-btn:focus-visible {
+  outline: 2px solid var(--bg-brand);
+  outline-offset: 1px;
 }
 
 /* ── Scrollbar hidden utility ────────────────────────────── */

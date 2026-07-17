@@ -2,76 +2,209 @@ import { useState, useEffect } from 'react';
 import { useSettingsStore } from '../../store/settingsStore';
 import {
   Button,
-  FormField,
-  FormGrid,
-  SectionTitle,
   Input,
-  Dropdown,
   Switch,
   Card,
   toast,
   AnimatedContent,
+  SegmentedControl,
 } from '../../components/ui';
+import type { SegmentOption } from '../../components/ui/SegmentedControl';
 import { desktopApi } from '../../lib/desktopApi';
-import { useT } from '../../i18n';
-import { Save, RotateCcw, TriangleAlert } from 'lucide-react';
+import { isValidHex, normalizeHex } from '../../lib/colorUtils';
+import { Sun, Moon, Monitor, RefreshCw, Copy, Eye, EyeOff, Check } from 'lucide-react';
 
-const sel = (opts: { value: string; label: string }[]) => opts;
-const concurrencyOptions = sel([
+function generateAuthToken(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+const languageOptions: SegmentOption[] = [
+  { value: 'zh-CN', label: '简体中文' },
+  { value: 'en', label: 'English' },
+];
+
+const themeOptions: SegmentOption[] = [
+  { value: 'light', label: '浅色', icon: <Sun size={15} /> },
+  { value: 'dark', label: '深色', icon: <Moon size={15} /> },
+  { value: 'system', label: '系统', icon: <Monitor size={15} /> },
+];
+
+const concurrencyOptions: SegmentOption[] = [
   { value: '1', label: '1' },
   { value: '5', label: '5' },
   { value: '10', label: '10' },
   { value: '20', label: '20' },
   { value: '50', label: '50' },
-]);
-const languageOptions = sel([
-  { value: 'zh-CN', label: '简体中文' },
-  { value: 'en', label: 'English' },
-]);
-const themeOptions = sel([
-  { value: 'light', label: '浅色' },
-  { value: 'dark', label: '深色' },
-]);
-const pageSizeOptions = sel([
+];
+
+const pageSizeOptions: SegmentOption[] = [
   { value: '10', label: '10' },
   { value: '20', label: '20' },
   { value: '50', label: '50' },
   { value: '100', label: '100' },
-]);
-const proxyProtocolOptions = sel([
+];
+
+const proxyProtocolOptions: SegmentOption[] = [
   { value: 'http', label: 'HTTP' },
   { value: 'socks5', label: 'SOCKS5' },
-]);
-const rateLimitOptions = sel([
+];
+
+const rateLimitOptions: SegmentOption[] = [
   { value: '0', label: '不限' },
-  { value: '60', label: '60/分钟' },
-  { value: '30', label: '30/分钟' },
-  { value: '10', label: '10/分钟' },
-]);
-const retryOptions = sel([
+  { value: '60', label: '60/分' },
+  { value: '30', label: '30/分' },
+  { value: '10', label: '10/分' },
+];
+
+const retryOptions: SegmentOption[] = [
   { value: '0', label: '不重试' },
   { value: '1', label: '1次' },
   { value: '3', label: '3次' },
   { value: '5', label: '5次' },
-]);
-const updateChannelOptions = sel([
+];
+
+const updateChannelOptions: SegmentOption[] = [
   { value: 'stable', label: '稳定版' },
   { value: 'beta', label: '测试版' },
-]);
+];
 
-const errorMessage = (e: unknown, fallback: string) => (e instanceof Error ? e.message : e ? String(e) : fallback);
+const COLOR_PRESETS = [
+  '#00B95C',
+  '#2F74FF',
+  '#7C3AED',
+  '#E8463A',
+  '#F2A90C',
+  '#E91E8C',
+  '#00B6F5',
+  '#171717',
+];
+
+const errorMessage = (e: unknown, fallback: string) =>
+  e instanceof Error ? e.message : e ? String(e) : fallback;
+
+interface SettingsGroupProps {
+  title: string;
+  isNew?: boolean;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}
+
+const SettingsGroup: React.FC<SettingsGroupProps> = ({ title, isNew, children, style }) => (
+  <Card
+    padding="0"
+    style={{
+      marginBottom: 16,
+      overflow: 'hidden',
+      background: 'var(--bg-base-default)',
+      ...style,
+    }}
+  >
+    <div
+      style={{
+        padding: '16px 20px',
+        fontSize: 16,
+        fontWeight: 600,
+        lineHeight: 1.4,
+        color: 'var(--text-default)',
+        borderBottom: '1px solid var(--border-neutral-l1)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+      }}
+    >
+      {title}
+      {isNew && (
+        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--bg-brand)' }}>New</span>
+      )}
+    </div>
+    {children}
+  </Card>
+);
+
+interface SettingsRowProps {
+  label: string;
+  children: React.ReactNode;
+  hint?: string;
+  isLast?: boolean;
+}
+
+const SettingsRow: React.FC<SettingsRowProps> = ({ label, children, hint, isLast }) => (
+  <div
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '13px 20px',
+      minHeight: 48,
+      boxSizing: 'border-box',
+      borderBottom: isLast ? 'none' : '1px solid var(--border-neutral-l1)',
+      gap: 16,
+    }}
+  >
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
+      <span style={{ fontSize: 15, color: 'var(--text-default)' }}>{label}</span>
+      {hint && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{hint}</span>}
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>{children}</div>
+  </div>
+);
+
+const NumberInput: React.FC<{
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  placeholder?: string;
+  width?: number;
+}> = ({ value, onChange, min, placeholder, width = 80 }) => (
+  <Input
+    type="number"
+    value={value.toString()}
+    onChange={(e) => {
+      const parsed = parseInt(e.target.value);
+      onChange(isNaN(parsed) ? (min ?? 0) : parsed);
+    }}
+    placeholder={placeholder}
+    wrapperStyle={{ width }}
+    style={{ textAlign: 'right' }}
+  />
+);
+
+const TextInput: React.FC<{
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  type?: string;
+  width?: number;
+}> = ({ value, onChange, placeholder, type = 'text', width }) => (
+  <Input
+    type={type}
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    placeholder={placeholder}
+    wrapperStyle={width ? { width } : { width: 240 }}
+  />
+);
 
 export const SettingsForm: React.FC = () => {
-  const t = useT();
-  const { settings, activeCategory, loaded, isDirty, loadSettings, saveSettings, updateSettings, resetSettings } =
+  const { settings, activeCategory, loaded, loadSettings, updateSettings, error, clearError } =
     useSettingsStore();
-  const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [openingDir, setOpeningDir] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!loaded) loadSettings();
   }, [loaded, loadSettings]);
+
+  useEffect(() => {
+    if (error) {
+      toast(error, 'error');
+      clearError();
+    }
+  }, [error, clearError]);
 
   useEffect(() => {
     try {
@@ -103,351 +236,357 @@ export const SettingsForm: React.FC = () => {
       setOpeningDir(false);
     }
   };
-  const handleSaveSettings = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    setSaving(true);
-    try {
-      await saveSettings();
-      toast(t('settings.saved'), 'success');
-    } catch (e: unknown) {
-      toast(errorMessage(e, '保存失败'), 'error');
-    } finally {
-      setSaving(false);
+
+  const handleRefreshToken = () => {
+    const msg = settings.authToken
+      ? '刷新令牌后旧令牌将失效，所有使用旧令牌的请求需要更新，确定继续？'
+      : '将生成一个新的随机认证令牌，确定继续？';
+    if (window.confirm(msg)) {
+      updateSettings({ authToken: generateAuthToken() });
+      toast('令牌已刷新', 'success');
     }
   };
 
-  const handleResetWithConfirm = () => {
-    if (window.confirm('确定恢复所有默认值？未保存的修改将丢失。')) {
-      resetSettings();
-      toast('已恢复默认值', 'info');
+  const handleCopyToken = async () => {
+    if (!settings.authToken) return;
+    try {
+      await navigator.clipboard.writeText(settings.authToken);
+      setCopied(true);
+      toast('令牌已复制到剪贴板', 'success');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast('复制失败', 'error');
     }
   };
 
   return (
-    <div
-      style={{
-        paddingBottom: isDirty ? 72 : undefined,
-        transition: 'padding-bottom var(--transition-normal, 0.2s) ease',
-      }}
-    >
-      <form onSubmit={handleSaveSettings}>
-        {/* ═══════════════════════════════════════════════════ 通用设置 */}
-        {activeCategory === 'general' && (
-          <AnimatedContent>
-            <Card style={{ marginBottom: 'var(--spacer-24)' }}>
-              <SectionTitle>{t('settings.appearance')}</SectionTitle>
-              <FormGrid>
-                <FormField label="语言">
-                  <Dropdown
-                    options={languageOptions}
-                    value={settings.language}
-                    onChange={(v) => updateSettings({ language: v })}
-                    size="sm"
-                  />
-                </FormField>
-                <FormField label="主题">
-                  <Dropdown
-                    options={themeOptions}
-                    value={settings.theme}
-                    onChange={(v) => updateSettings({ theme: v })}
-                    size="sm"
-                  />
-                </FormField>
-                <FormField label="每页条数">
-                  <Dropdown
-                    options={pageSizeOptions}
-                    value={settings.pageSize.toString()}
-                    onChange={(v) => updateSettings({ pageSize: parseInt(v) })}
-                    size="sm"
-                  />
-                </FormField>
-              </FormGrid>
-            </Card>
+    <div>
+      {/* ═══════════════════════════════════════════════════ 通用设置 */}
+      {activeCategory === 'general' && (
+        <AnimatedContent>
+          <SettingsGroup title="显示设置">
+            <SettingsRow label="语言">
+              <SegmentedControl
+                options={languageOptions}
+                value={settings.language}
+                onChange={(v) => updateSettings({ language: v })}
+              />
+            </SettingsRow>
+            <SettingsRow label="主题">
+              <SegmentedControl
+                options={themeOptions}
+                value={settings.theme}
+                onChange={(v) => updateSettings({ theme: v })}
+              />
+            </SettingsRow>
+            <SettingsRow label="主题色">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {COLOR_PRESETS.map((color) => {
+                    const isSelected = normalizeHex(settings.accentColor) === normalizeHex(color);
+                    return (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => updateSettings({ accentColor: normalizeHex(color) })}
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: '50%',
+                          background: color,
+                          border: isSelected ? `2px solid ${color}` : '2px solid transparent',
+                          boxShadow: isSelected
+                            ? `0 0 0 2px var(--bg-base-default), 0 0 0 4px ${color}`
+                            : '0 0 0 1px var(--border-neutral-l2)',
+                          cursor: 'pointer',
+                          padding: 0,
+                          transition: 'box-shadow 0.15s ease',
+                        }}
+                        aria-label={`选择主题色 ${color}`}
+                      />
+                    );
+                  })}
+                </div>
+                <Input
+                  type="text"
+                  value={settings.accentColor}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (isValidHex(v) || v === '#' || v.length < 7) {
+                      updateSettings({ accentColor: v.toUpperCase() });
+                    }
+                  }}
+                  onBlur={(e) => {
+                    if (isValidHex(e.target.value)) {
+                      updateSettings({ accentColor: normalizeHex(e.target.value) });
+                    } else {
+                      updateSettings({ accentColor: '#00B95C' });
+                    }
+                  }}
+                  wrapperStyle={{ width: 96 }}
+                  style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 13, textAlign: 'center' }}
+                  maxLength={7}
+                />
+              </div>
+            </SettingsRow>
+            <SettingsRow label="每页条数" isLast>
+              <SegmentedControl
+                options={pageSizeOptions}
+                value={settings.pageSize.toString()}
+                onChange={(v) => updateSettings({ pageSize: parseInt(v) })}
+                size="sm"
+              />
+            </SettingsRow>
+          </SettingsGroup>
 
-            <Card style={{ marginBottom: 'var(--spacer-24)' }}>
-              <SectionTitle>{t('settings.basic')}</SectionTitle>
-              <FormGrid>
-                <FormField label="服务地址">
-                  <Input type="text" value={settings.host} onChange={(e) => updateSettings({ host: e.target.value })} />
-                </FormField>
-                <FormField label="代理端口">
-                  <Input
-                    type="number"
-                    value={settings.port.toString()}
-                    onChange={(e) => updateSettings({ port: parseInt(e.target.value) || 8080 })}
-                  />
-                </FormField>
-                <FormField label="自动启动">
-                  <Switch checked={settings.autoStart} onChange={(v) => updateSettings({ autoStart: v })} />
-                </FormField>
-                <FormField label="最大并发">
-                  <Dropdown
-                    options={concurrencyOptions}
-                    value={settings.maxConcurrency.toString()}
-                    onChange={(v) => updateSettings({ maxConcurrency: parseInt(v) })}
-                    size="sm"
-                  />
-                </FormField>
-              </FormGrid>
-            </Card>
+          <SettingsGroup title="基础配置">
+            <SettingsRow label="服务地址">
+              <TextInput value={settings.host} onChange={(v) => updateSettings({ host: v })} />
+            </SettingsRow>
+            <SettingsRow label="代理端口">
+              <NumberInput value={settings.port} onChange={(v) => updateSettings({ port: v })} min={1} />
+            </SettingsRow>
+            <SettingsRow label="自动启动" hint="应用启动时自动运行代理服务">
+              <Switch checked={settings.autoStart} onChange={(v) => updateSettings({ autoStart: v })} />
+            </SettingsRow>
+            <SettingsRow label="最大并发" isLast>
+              <SegmentedControl
+                options={concurrencyOptions}
+                value={settings.maxConcurrency.toString()}
+                onChange={(v) => updateSettings({ maxConcurrency: parseInt(v) })}
+                size="sm"
+              />
+            </SettingsRow>
+          </SettingsGroup>
 
-            <Card>
-              <SectionTitle>{t('settings.notifications.title')}</SectionTitle>
-              <FormGrid>
-                <FormField label="启用通知">
-                  <Switch
-                    checked={settings.notificationsEnabled}
-                    onChange={(v) => updateSettings({ notificationsEnabled: v })}
-                  />
-                </FormField>
-                <FormField label="桌面通知">
-                  <Switch
-                    checked={settings.desktopNotifications}
-                    onChange={(v) => updateSettings({ desktopNotifications: v })}
-                  />
-                </FormField>
-              </FormGrid>
-            </Card>
-          </AnimatedContent>
-        )}
+          <SettingsGroup title="通知设置">
+            <SettingsRow label="启用通知">
+              <Switch
+                checked={settings.notificationsEnabled}
+                onChange={(v) => updateSettings({ notificationsEnabled: v })}
+              />
+            </SettingsRow>
+            <SettingsRow label="桌面通知" isLast>
+              <Switch
+                checked={settings.desktopNotifications}
+                onChange={(v) => updateSettings({ desktopNotifications: v })}
+              />
+            </SettingsRow>
+          </SettingsGroup>
 
-        {/* ═══════════════════════════════════════════════════ 安全与认证 */}
-        {activeCategory === 'security' && (
-          <AnimatedContent>
-            <Card>
-              <SectionTitle>{t('settings.security.title')}</SectionTitle>
-              <FormGrid>
-                <FormField label="本地认证令牌">
-                  <Input
-                    type="text"
-                    value={settings.authToken}
-                    onChange={(e) => updateSettings({ authToken: e.target.value })}
-                    placeholder="输入令牌..."
-                  />
-                </FormField>
-                <FormField label="IP 白名单">
-                  <Input
-                    type="text"
-                    value={settings.ipWhitelist}
-                    onChange={(e) => updateSettings({ ipWhitelist: e.target.value })}
-                    placeholder="127.0.0.1, 192.168.1.*"
-                  />
-                </FormField>
-                <FormField label="启用 CORS">
-                  <Switch checked={settings.corsEnabled} onChange={(v) => updateSettings({ corsEnabled: v })} />
-                </FormField>
-                <FormField label="请求速率限制">
-                  <Dropdown
-                    options={rateLimitOptions}
-                    value={settings.rateLimit}
-                    onChange={(v) => updateSettings({ rateLimit: v })}
-                    size="sm"
-                  />
-                </FormField>
-              </FormGrid>
-            </Card>
-          </AnimatedContent>
-        )}
+          <SettingsGroup title="应用设置" isNew>
+            <SettingsRow label="开机启动" hint="系统启动时自动运行 Melody Hub">
+              <Switch
+                checked={settings.launchAtLogin}
+                onChange={(v) => updateSettings({ launchAtLogin: v })}
+              />
+            </SettingsRow>
+            <SettingsRow label="启动时最小化到托盘" hint="下次启动生效" isLast>
+              <Switch
+                checked={settings.startMinimized}
+                onChange={(v) => updateSettings({ startMinimized: v })}
+              />
+            </SettingsRow>
+          </SettingsGroup>
+        </AnimatedContent>
+      )}
 
-        {/* ═══════════════════════════════════════════════════ 网络代理 */}
-        {activeCategory === 'proxy' && (
-          <AnimatedContent>
-            <Card>
-              <SectionTitle>{t('settings.proxyConfig')}</SectionTitle>
-              <FormGrid>
-                <FormField label="启用代理">
-                  <Switch checked={settings.proxyEnabled} onChange={(v) => updateSettings({ proxyEnabled: v })} />
-                </FormField>
-                <FormField label="代理主机">
-                  <Input
-                    type="text"
-                    value={settings.proxyHost}
-                    onChange={(e) => updateSettings({ proxyHost: e.target.value })}
-                    placeholder="127.0.0.1"
-                  />
-                </FormField>
-                <FormField label="代理端口">
-                  <Input
-                    type="number"
-                    value={settings.proxyPort.toString()}
-                    onChange={(e) => updateSettings({ proxyPort: parseInt(e.target.value) || 7890 })}
-                  />
-                </FormField>
-                <FormField label="代理协议">
-                  <Dropdown
-                    options={proxyProtocolOptions}
-                    value={settings.proxyProtocol}
-                    onChange={(v) => updateSettings({ proxyProtocol: v })}
-                    size="sm"
-                  />
-                </FormField>
-                <FormField label="用户名">
-                  <Input
-                    type="text"
-                    value={settings.proxyUsername}
-                    onChange={(e) => updateSettings({ proxyUsername: e.target.value })}
-                    placeholder="可选"
-                  />
-                </FormField>
-                <FormField label="密码">
-                  <Input
-                    type="password"
-                    value={settings.proxyPassword}
-                    onChange={(e) => updateSettings({ proxyPassword: e.target.value })}
-                    placeholder="可选"
-                  />
-                </FormField>
-              </FormGrid>
-            </Card>
-          </AnimatedContent>
-        )}
+      {/* ═══════════════════════════════════════════════════ 安全与认证 */}
+      {activeCategory === 'security' && (
+        <AnimatedContent>
+          <SettingsGroup title="安全与认证">
+            <SettingsRow label="本地认证令牌">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Input
+                  type={showToken ? 'text' : 'password'}
+                  value={settings.authToken}
+                  onChange={(e) => updateSettings({ authToken: e.target.value })}
+                  placeholder="点击右侧按钮生成随机令牌"
+                  wrapperStyle={{ width: 280, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 13 }}
+                  style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 13 }}
+                />
+                <button
+                  type="button"
+                  className="icon-action-btn"
+                  onClick={() => setShowToken(v => !v)}
+                  aria-label={showToken ? '隐藏令牌' : '显示令牌'}
+                  title={showToken ? '隐藏令牌' : '显示令牌'}
+                >
+                  {showToken ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+                <button
+                  type="button"
+                  className="icon-action-btn"
+                  onClick={handleCopyToken}
+                  disabled={!settings.authToken}
+                  aria-label="复制令牌"
+                  title="复制令牌"
+                >
+                  {copied ? <Check size={18} /> : <Copy size={18} />}
+                </button>
+                <button
+                  type="button"
+                  className="icon-action-btn"
+                  onClick={handleRefreshToken}
+                  aria-label="刷新令牌"
+                  title="生成新令牌"
+                >
+                  <RefreshCw size={18} />
+                </button>
+              </div>
+            </SettingsRow>
+            <SettingsRow label="IP 白名单">
+              <TextInput
+                value={settings.ipWhitelist}
+                onChange={(v) => updateSettings({ ipWhitelist: v })}
+                placeholder="127.0.0.1, 192.168.1.*"
+              />
+            </SettingsRow>
+            <SettingsRow label="启用 CORS">
+              <Switch checked={settings.corsEnabled} onChange={(v) => updateSettings({ corsEnabled: v })} />
+            </SettingsRow>
+            <SettingsRow label="请求速率限制" isLast>
+              <SegmentedControl
+                options={rateLimitOptions}
+                value={settings.rateLimit}
+                onChange={(v) => updateSettings({ rateLimit: v })}
+                size="sm"
+              />
+            </SettingsRow>
+          </SettingsGroup>
+        </AnimatedContent>
+      )}
 
-        {/* ═══════════════════════════════════════════════════ 高级选项 */}
-        {activeCategory === 'advanced' && (
-          <AnimatedContent>
-            <Card style={{ marginBottom: 'var(--spacer-24)' }}>
-              <SectionTitle>{t('settings.advanced.title')}</SectionTitle>
-              <FormGrid>
-                <FormField label="API 超时(秒)">
-                  <Input
-                    type="number"
-                    value={settings.apiTimeout.toString()}
-                    onChange={(e) => updateSettings({ apiTimeout: parseInt(e.target.value) || 60 })}
-                  />
-                </FormField>
-                <FormField label="最大重试次数">
-                  <Dropdown
-                    options={retryOptions}
-                    value={settings.maxRetries}
-                    onChange={(v) => updateSettings({ maxRetries: v })}
-                    size="sm"
-                  />
-                </FormField>
-              </FormGrid>
-            </Card>
+      {/* ═══════════════════════════════════════════════════ 网络代理 */}
+      {activeCategory === 'proxy' && (
+        <AnimatedContent>
+          <SettingsGroup title="网络代理配置">
+            <SettingsRow label="启用代理">
+              <Switch checked={settings.proxyEnabled} onChange={(v) => updateSettings({ proxyEnabled: v })} />
+            </SettingsRow>
+            <SettingsRow label="代理主机">
+              <TextInput
+                value={settings.proxyHost}
+                onChange={(v) => updateSettings({ proxyHost: v })}
+                placeholder="127.0.0.1"
+              />
+            </SettingsRow>
+            <SettingsRow label="代理端口">
+              <NumberInput
+                value={settings.proxyPort}
+                onChange={(v) => updateSettings({ proxyPort: v })}
+                min={1}
+              />
+            </SettingsRow>
+            <SettingsRow label="代理协议">
+              <SegmentedControl
+                options={proxyProtocolOptions}
+                value={settings.proxyProtocol}
+                onChange={(v) => updateSettings({ proxyProtocol: v })}
+                size="sm"
+              />
+            </SettingsRow>
+            <SettingsRow label="用户名">
+              <TextInput
+                value={settings.proxyUsername}
+                onChange={(v) => updateSettings({ proxyUsername: v })}
+                placeholder="可选"
+              />
+            </SettingsRow>
+            <SettingsRow label="密码" isLast>
+              <TextInput
+                value={settings.proxyPassword}
+                onChange={(v) => updateSettings({ proxyPassword: v })}
+                placeholder="可选"
+                type="password"
+              />
+            </SettingsRow>
+          </SettingsGroup>
+        </AnimatedContent>
+      )}
 
-            <Card>
-              <SectionTitle>{t('settings.logging.title')}</SectionTitle>
-              <FormGrid>
-                <FormField label="日志保留天数">
-                  <Input
-                    type="number"
-                    value={settings.logRetentionDays.toString()}
-                    onChange={(e) => updateSettings({ logRetentionDays: parseInt(e.target.value) || 30 })}
-                  />
-                </FormField>
-                <FormField label="自动清理日志">
-                  <Switch checked={settings.logAutoClean} onChange={(v) => updateSettings({ logAutoClean: v })} />
-                </FormField>
-                <FormField label="">
-                  <Button disabled={exporting} onClick={handleExportLogs}>
-                    {exporting ? '导出中...' : '导出日志'}
-                  </Button>
-                </FormField>
-                <FormField label="">
-                  <Button disabled={openingDir} onClick={handleOpenLogDir}>
-                    {openingDir ? '打开中...' : '打开日志目录'}
-                  </Button>
-                </FormField>
-              </FormGrid>
-            </Card>
-          </AnimatedContent>
-        )}
+      {/* ═══════════════════════════════════════════════════ 高级选项 */}
+      {activeCategory === 'advanced' && (
+        <AnimatedContent>
+          <SettingsGroup title="高级选项">
+            <SettingsRow label="API 超时(秒)">
+              <NumberInput
+                value={settings.apiTimeout}
+                onChange={(v) => updateSettings({ apiTimeout: v })}
+                min={1}
+              />
+            </SettingsRow>
+            <SettingsRow label="最大重试次数" isLast>
+              <SegmentedControl
+                options={retryOptions}
+                value={settings.maxRetries}
+                onChange={(v) => updateSettings({ maxRetries: v })}
+                size="sm"
+              />
+            </SettingsRow>
+          </SettingsGroup>
 
-        {/* ═══════════════════════════════════════════════════ 关于 */}
-        {activeCategory === 'about' && (
-          <AnimatedContent>
-            <Card style={{ marginBottom: 'var(--spacer-24)' }}>
-              <SectionTitle>{t('settings.aboutUpdate')}</SectionTitle>
-              <FormGrid>
-                <FormField label="启动时检查更新">
-                  <Switch
-                    checked={settings.checkUpdatesOnStart}
-                    onChange={(v) => updateSettings({ checkUpdatesOnStart: v })}
-                  />
-                </FormField>
-                <FormField label="更新通道">
-                  <Dropdown
-                    options={updateChannelOptions}
-                    value={settings.updateChannel}
-                    onChange={(v) => updateSettings({ updateChannel: v })}
-                    size="sm"
-                  />
-                </FormField>
-              </FormGrid>
-            </Card>
-
-            <Card>
-              <SectionTitle>{t('settings.dataManagement.title')}</SectionTitle>
-              <FormGrid>
-                <FormField label="">
-                  <Button
-                    onClick={() => toast('配置导出功能开发中', 'info')}
-                  >
-                    导出配置
-                  </Button>
-                </FormField>
-                <FormField label="">
-                  <Button
-                    variant="secondary"
-                    onClick={() => toast('配置导入功能开发中', 'info')}
-                  >
-                    导入配置
-                  </Button>
-                </FormField>
-                <FormField label="">
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      if (window.confirm('确定重置所有数据？此操作不可撤销。')) {
-                        toast('重置功能开发中', 'info');
-                      }
-                    }}
-                  >
-                    重置所有数据
-                  </Button>
-                </FormField>
-              </FormGrid>
-            </Card>
-          </AnimatedContent>
-        )}
-      </form>
-
-      {/* ═══════════════════════════════════════════════════ Sticky Save Bar */}
-      {isDirty && (
-        <AnimatedContent duration={220} distance={4}>
-          <div
-            className="settings-sticky-save"
-            style={{
-              position: 'fixed',
-              bottom: 0,
-              left: 220,
-              right: 0,
-              zIndex: 30,
-              padding: 'var(--spacer-10) var(--spacer-24)',
-              background: 'var(--bg-base-default)',
-              borderTop: '1px solid var(--border-neutral-l1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              boxShadow: '0 -4px 24px color-mix(in srgb, var(--text-default) 6%, transparent)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-8)' }}>
-              <TriangleAlert size={14} style={{ color: 'var(--status-alert-default)' }} />
-              <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)' }}>
-                有未保存的修改
-              </span>
-            </div>
-            <div style={{ display: 'flex', gap: 'var(--spacer-8)', alignItems: 'center' }}>
-              <Button variant="secondary" size="sm" icon={RotateCcw} onClick={handleResetWithConfirm}>
-                撤销
+          <SettingsGroup title="日志与监控">
+            <SettingsRow label="日志保留天数">
+              <NumberInput
+                value={settings.logRetentionDays}
+                onChange={(v) => updateSettings({ logRetentionDays: v })}
+                min={1}
+              />
+            </SettingsRow>
+            <SettingsRow label="自动清理日志">
+              <Switch checked={settings.logAutoClean} onChange={(v) => updateSettings({ logAutoClean: v })} />
+            </SettingsRow>
+            <SettingsRow label="" isLast>
+              <Button disabled={exporting} onClick={handleExportLogs}>
+                {exporting ? '导出中...' : '导出日志'}
               </Button>
-              <Button variant="brand" size="sm" icon={Save} disabled={saving} onClick={handleSaveSettings}>
-                {saving ? '保存中...' : '保存'}
+              <Button disabled={openingDir} variant="secondary" onClick={handleOpenLogDir}>
+                {openingDir ? '打开中...' : '打开日志目录'}
               </Button>
-            </div>
-          </div>
+            </SettingsRow>
+          </SettingsGroup>
+        </AnimatedContent>
+      )}
+
+      {/* ═══════════════════════════════════════════════════ 关于 */}
+      {activeCategory === 'about' && (
+        <AnimatedContent>
+          <SettingsGroup title="更新检查">
+            <SettingsRow label="启动时检查更新">
+              <Switch
+                checked={settings.checkUpdatesOnStart}
+                onChange={(v) => updateSettings({ checkUpdatesOnStart: v })}
+              />
+            </SettingsRow>
+            <SettingsRow label="更新通道" isLast>
+              <SegmentedControl
+                options={updateChannelOptions}
+                value={settings.updateChannel}
+                onChange={(v) => updateSettings({ updateChannel: v })}
+                size="sm"
+              />
+            </SettingsRow>
+          </SettingsGroup>
+
+          <SettingsGroup title="数据管理">
+            <SettingsRow label="" isLast>
+              <Button onClick={() => toast('配置导出功能开发中', 'info')}>导出配置</Button>
+              <Button variant="secondary" onClick={() => toast('配置导入功能开发中', 'info')}>
+                导入配置
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  if (window.confirm('确定重置所有数据？此操作不可撤销。')) {
+                    toast('重置功能开发中', 'info');
+                  }
+                }}
+              >
+                重置所有数据
+              </Button>
+            </SettingsRow>
+          </SettingsGroup>
         </AnimatedContent>
       )}
     </div>

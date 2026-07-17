@@ -320,9 +320,9 @@ const CapabilityItem: React.FC<{ icon: React.ReactNode; label: string; enabled: 
       display: 'flex',
       alignItems: 'center',
       gap: 'var(--spacer-10)',
-      padding: 'var(--spacer-12) var(--spacer-14)',
-      borderRadius: 'var(--radius-8)',
-      background: enabled ? 'var(--brand-100)' : 'var(--bg-overlay-l1)',
+      padding: 'var(--spacer-16) var(--spacer-24)',
+      borderRadius: 'var(--radius-10)',
+      background: enabled ? 'var(--brand-50)' : 'var(--bg-overlay-l1)',
       opacity: enabled ? 1 : 0.5,
     }}
   >
@@ -472,19 +472,20 @@ const DirectDetailRow: React.FC<{ source: DirectMapping }> = ({ source }) => {
           <Spec label="默认思考强度" value={source.model.defaultReasoningEffort} />
         )}
         {tags.length > 0 && (
-          <div style={{ display: 'flex', gap: 'var(--spacer-4)', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 'var(--spacer-8)', alignItems: 'center', flexWrap: 'wrap' }}>
             {tags.map(t => (
               <span
                 key={t}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  height: 22,
-                  padding: '0 var(--spacer-8)',
-                  borderRadius: 'var(--radius-4)',
+                  height: 28,
+                  padding: '0 var(--spacer-16)',
+                  borderRadius: 'var(--radius-6)',
                   background: 'var(--bg-overlay-l2)',
-                  color: 'var(--text-tertiary)',
+                  color: 'var(--text-secondary)',
                   fontSize: 'var(--body-xs-font-size)',
+                  fontWeight: 'var(--font-weight-medium)',
                 }}
               >
                 {t}

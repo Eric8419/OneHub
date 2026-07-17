@@ -32,7 +32,11 @@ pub struct AppSettings {
     // ── 界面 ──
     pub language: String,
     pub theme: String,
+    pub accent_color: String,
     pub page_size: u32,
+    // ── 应用 ──
+    pub launch_at_login: bool,
+    pub start_minimized: bool,
     // ── 通知 ──
     pub notifications_enabled: bool,
     pub desktop_notifications: bool,
@@ -67,7 +71,10 @@ impl Default for AppSettings {
             max_concurrency: 20,
             language: "zh-CN".into(),
             theme: "light".into(),
+            accent_color: "#00B95C".into(),
             page_size: 10,
+            launch_at_login: false,
+            start_minimized: false,
             notifications_enabled: true,
             desktop_notifications: false,
             proxy_enabled: false,
@@ -192,6 +199,18 @@ pub async fn save_settings(
     write_settings(&app_handle, &settings)?;
     apply_settings_to_state(state.inner(), &settings).await?;
     restart_running_proxy_if_needed(state.inner().clone(), &settings).await?;
+
+    #[cfg(desktop)]
+    {
+        use tauri_plugin_autostart::ManagerExt;
+        let manager = app_handle.autolaunch();
+        if settings.launch_at_login {
+            let _ = manager.enable();
+        } else {
+            let _ = manager.disable();
+        }
+    }
+
     Ok(())
 }
 

@@ -8,7 +8,12 @@ export interface AppSettings {
   // ── 界面 ──
   language: string;
   theme: string;
+  accentColor: string;
   pageSize: number;
+
+  // ── 应用 ──
+  launchAtLogin: boolean;
+  startMinimized: boolean;
 
   // ── 通知 ──
   notificationsEnabled: boolean;

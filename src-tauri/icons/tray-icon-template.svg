@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Bold S curve - scaled to 80% with padding, rotated 22deg to match logo -->
+  <g transform="translate(64,64) rotate(22) scale(0.78) translate(-64,-64)">
+    <path d="
+      M 34,22
+      C 90,20 92,64 62,64
+      C 32,64 24,106 78,108
+      "
+      stroke="black"
+      stroke-width="26"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      fill="none"/>
+  </g>
+</svg>

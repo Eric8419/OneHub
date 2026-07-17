@@ -4,6 +4,8 @@ export { Input } from './Input';
 export { Dropdown } from './Dropdown';
 export type { DropdownOption } from './Dropdown';
 export { Switch } from './Switch';
+export { SegmentedControl } from './SegmentedControl';
+export type { SegmentOption } from './SegmentedControl';
 export { Tag } from './Tag';
 export { Tabs } from './Tabs';
 export { Avatar } from './Avatar';

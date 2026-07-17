@@ -1,25 +1,18 @@
-import { useEffect } from 'react';
-import { useSettingsStore } from '../../store/settingsStore';
 import { AnimatedContent } from '../../components/ui';
 import { SettingsNav } from './SettingsNav';
 import { SettingsForm } from './SettingsForm';
 
 export const Settings: React.FC = () => {
-  const isDirty = useSettingsStore(s => s.isDirty);
-
-  // Warn before closing / reloading with unsaved changes
-  useEffect(() => {
-    if (!isDirty) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [isDirty]);
-
   return (
-    <div>
+    <div
+      style={{
+        background: 'var(--bg-base-secondary)',
+        minHeight: 'calc(100vh - var(--header-height, 0px))',
+        margin: '-24px -24px -24px',
+        padding: '24px 28px 48px',
+        boxSizing: 'border-box',
+      }}
+    >
       <AnimatedContent distance={6}>
         <SettingsNav />
       </AnimatedContent>

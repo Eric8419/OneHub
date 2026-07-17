@@ -1,7 +1,8 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Shell } from './components/shell/Shell';
 import { useSettingsStore } from './store/settingsStore';
+import { applyAccentColor } from './lib/colorUtils';
 
 const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
 const ModelConfig = lazy(() => import('./pages/ModelConfig/ModelConfig').then(m => ({ default: m.ModelConfig })));
@@ -11,13 +12,41 @@ const AddProviderPage = lazy(() => import('./pages/Providers/AddProviderPage').t
 const EditProviderPage = lazy(() => import('./pages/Providers/EditProviderPage').then(m => ({ default: m.EditProviderPage })));
 const Settings = lazy(() => import('./pages/Settings/Settings').then(m => ({ default: m.Settings })));
 
+function resolveTheme(theme: string): string {
+  if (theme !== 'system') return theme;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
 function App() {
   const theme = useSettingsStore(s => s.settings.theme);
+  const accentColor = useSettingsStore(s => s.settings.accentColor);
+  const loaded = useSettingsStore(s => s.loaded);
+  const [, setResolvedTheme] = useState(() => resolveTheme(theme));
 
-  // Apply theme to <html> element
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
+    const resolved = resolveTheme(theme);
+    setResolvedTheme(resolved);
+    document.documentElement.setAttribute('data-theme', resolved);
+
+    if (theme !== 'system') return;
+
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e: MediaQueryListEvent) => {
+      const next = e.matches ? 'dark' : 'light';
+      setResolvedTheme(next);
+      document.documentElement.setAttribute('data-theme', next);
+      applyAccentColor(accentColor, next === 'dark');
+    };
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, [theme, accentColor]);
+
+  useEffect(() => {
+    if (loaded) {
+      const isDark = resolveTheme(theme) === 'dark';
+      applyAccentColor(accentColor, isDark);
+    }
+  }, [accentColor, loaded, theme]);
 
   return (
     <HashRouter>
