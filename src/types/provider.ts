@@ -16,6 +16,12 @@ export interface Model {
   supportsJsonMode?: boolean;
 }
 
+export interface ProviderProxyConfig {
+  enabled: boolean;
+  /** Full proxy URL, e.g. "http://127.0.0.1:7890" or "socks5://127.0.0.1:1080". */
+  url: string;
+}
+
 export interface Provider {
   id: string;
   name: string;
@@ -27,4 +33,11 @@ export interface Provider {
   /** True when `apiKey` holds ciphertext (disk form). Always
    * false for values returned to the UI at runtime. */
   apiKeyEncrypted?: boolean;
+  /** Optional model name mapping. Keys are logical model names
+   * (what the client requests); values are the actual model names
+   * sent to the upstream provider. Keys support a trailing `*`
+   * wildcard (e.g. "claude-*"). */
+  modelMapping?: Record<string, string>;
+  /** Optional per-provider HTTP proxy configuration. */
+  proxyConfig?: ProviderProxyConfig;
 }

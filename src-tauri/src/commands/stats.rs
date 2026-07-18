@@ -218,6 +218,8 @@ mod tests {
             status: "success".into(),
             latency_ms,
             error_category: String::new(),
+            failover_count: 0,
+            original_provider: String::new(),
         }
     }
 

@@ -5,6 +5,14 @@ import type { Provider } from '../types/provider';
 import type { Aggregation } from '../types/aggregation';
 import type { UsageStats, RequestRecord, DailyUsage } from '../types/stats';
 
+export interface ProviderHealthSnapshot {
+  providerId: string;
+  status: 'healthy' | 'rate_limited' | 'unhealthy' | 'auth_error';
+  cooldownSecs: number;
+  inFlight: number;
+  consecutiveFailures: number;
+}
+
 export interface DesktopApi {
   loadSettings(): Promise<AppSettings>;
   saveSettings(settings: AppSettings): Promise<void>;
@@ -33,6 +41,7 @@ export interface DesktopApi {
     apiBase: string,
     apiKey: string,
   ): Promise<{ success: boolean; modelCount?: number; error?: { kind: string; message: string }; message: string }>;
+  getProviderHealth(): Promise<Record<string, ProviderHealthSnapshot>>;
 }
 
 export const desktopApi: DesktopApi = {
@@ -56,6 +65,7 @@ export const desktopApi: DesktopApi = {
   exportLogs: () => invoke<string>('export_logs'),
   fetchProviderModels: (flavor, apiBase, apiKey) => invoke('fetch_provider_models', { flavor, apiBase, apiKey }),
   testProviderConnection: (flavor, apiBase, apiKey) => invoke('test_provider_connection', { flavor, apiBase, apiKey }),
+  getProviderHealth: () => invoke<Record<string, ProviderHealthSnapshot>>('get_provider_health'),
 };
 
 /**

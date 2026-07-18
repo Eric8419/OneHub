@@ -77,7 +77,10 @@ pub async fn start(
             .route("/health", get(health_handler))
             .route("/v1/models", get(models_handler))
             .route("/v1/chat/completions", post(chat_completions_handler))
-            .route("/v1/anthropic", post(anthropic_handler))
+            .route("/v1/messages", post(messages_handler))
+            .route("/v1/responses", post(responses_handler))
+            // Backward-compatible alias for the old endpoint name.
+            .route("/v1/anthropic", post(messages_handler))
             .layer(cors)
             .with_state(state);
 
@@ -358,6 +361,190 @@ fn standard_error_body(
 
 // ── Generic upstream proxy ──────────────────────────────────
 
+/// Determine if an HTTP status code is retryable on a different
+/// provider. Connection-level errors are always retryable.
+fn is_retryable_status(status: u16) -> bool {
+    matches!(status, 401 | 403 | 429 | 500 | 502 | 503 | 504 | 529)
+}
+
+/// Parse the capabilities a request needs from its body. Used by
+/// the router to skip models that don't support required features.
+fn parse_request_capabilities(body: &Value) -> crate::proxy::routing::RequestCapabilities {
+    use crate::proxy::routing::RequestCapabilities;
+
+    let needs_tools = body.get("tools").is_some();
+
+    // Vision: check if any message has an image_url content part
+    // (OpenAI format) or a source/image content block (Anthropic
+    // format).
+    let needs_vision = body
+        .get("messages")
+        .and_then(|m| m.as_array())
+        .map(|msgs| {
+            msgs.iter().any(|m| {
+                // OpenAI: content array with type "image_url"
+                if let Some(parts) = m.get("content").and_then(|c| c.as_array()) {
+                    if parts.iter().any(|p| {
+                        p.get("type").and_then(|t| t.as_str()) == Some("image_url")
+                    }) {
+                        return true;
+                    }
+                }
+                // Anthropic: content array with type "image"
+                if let Some(parts) = m.get("content").and_then(|c| c.as_array()) {
+                    if parts
+                        .iter()
+                        .any(|p| p.get("type").and_then(|t| t.as_str()) == Some("image"))
+                    {
+                        return true;
+                    }
+                }
+                false
+            })
+        })
+        .unwrap_or(false);
+
+    let needs_json_mode = body
+        .get("response_format")
+        .and_then(|r| r.get("type"))
+        .and_then(|t| t.as_str())
+        .map(|t| t == "json_object" || t == "json_schema")
+        .unwrap_or(false);
+
+    let needs_reasoning = body.get("reasoning_effort").is_some();
+
+    RequestCapabilities {
+        needs_tools,
+        needs_vision,
+        needs_json_mode,
+        needs_reasoning,
+    }
+}
+
+/// Map an HTTP status code to a health error kind for provider
+/// health tracking. Non-retryable statuses are mapped to
+/// `ServerError` as a fallback (they won't trigger health
+/// degradation because the failover loop won't call this for
+/// non-retryable statuses).
+fn status_to_health_kind(status: u16) -> crate::proxy::routing::HealthErrorKind {
+    use crate::proxy::routing::HealthErrorKind;
+    match status {
+        429 => HealthErrorKind::RateLimit,
+        401 | 403 => HealthErrorKind::AuthError,
+        _ => HealthErrorKind::ServerError,
+    }
+}
+
+/// Handle an upstream proxy request with automatic failover across
+/// providers. On retryable errors (429, 5xx, 401/403, connection
+/// failures), the failed provider is marked unhealthy and the next
+/// available provider is tried. Up to 5 attempts are made.
+///
+/// Streaming safety: failover only happens BEFORE the response body
+/// starts streaming. Once SSE data is sent to the client, the stream
+/// is committed and cannot be switched.
+async fn proxy_request_with_failover(
+    state: &SharedAppState,
+    model_name: &str,
+    body: Value,
+    is_streaming: bool,
+    request_id: &str,
+    inbound_flavor: &str,
+) -> Result<Response, (StatusCode, Json<Value>)> {
+    use std::collections::HashSet;
+
+    let capabilities = parse_request_capabilities(&body);
+    let max_attempts = 5;
+    let mut excluded: HashSet<String> = HashSet::new();
+    let mut last_error: Option<(StatusCode, Json<Value>)> = None;
+
+    for _ in 0..max_attempts {
+        // Route to an available provider (skips excluded + unhealthy
+        // + capability-mismatched + protocol-incompatible).
+        let route = match route_request(
+            &state.routing,
+            model_name,
+            &excluded,
+            &capabilities,
+            inbound_flavor,
+        )
+        .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                // No more providers available. If we had a previous
+                // error from an actual upstream attempt, return that
+                // (more informative than the routing error).
+                if let Some(err) = last_error {
+                    return Err(err);
+                }
+                return Err((StatusCode::BAD_REQUEST, Json(json!({"error": e}))));
+            }
+        };
+
+        let provider_id = route.provider.id.clone();
+        let adapter = crate::proxy::adapter::resolve(&route.provider.api_flavor);
+
+        // Try this provider. proxy_request records metrics for each
+        // attempt, giving visibility into intermediate failures.
+        match proxy_request(
+            state,
+            route,
+            body.clone(),
+            is_streaming,
+            request_id,
+            adapter.as_ref(),
+        )
+        .await
+        {
+            Ok(response) => {
+                // Success - mark provider healthy and release slot.
+                crate::proxy::routing::mark_provider_healthy(
+                    &state.routing,
+                    &provider_id,
+                )
+                .await;
+                crate::proxy::routing::release_provider_slot(
+                    &state.routing,
+                    &provider_id,
+                )
+                .await;
+                return Ok(response);
+            }
+            Err((status, json_val)) => {
+                let status_u16 = status.as_u16();
+                // Release the in-flight slot regardless of outcome.
+                crate::proxy::routing::release_provider_slot(
+                    &state.routing,
+                    &provider_id,
+                )
+                .await;
+                if is_retryable_status(status_u16) {
+                    // Retryable: mark provider unhealthy and try next.
+                    let kind = status_to_health_kind(status_u16);
+                    crate::proxy::routing::mark_provider_unhealthy(
+                        &state.routing,
+                        &provider_id,
+                        kind,
+                    )
+                    .await;
+                    excluded.insert(provider_id);
+                    last_error = Some((status, json_val));
+                    continue;
+                }
+                // Non-retryable: return immediately.
+                return Err((status, json_val));
+            }
+        }
+    }
+
+    // Exhausted all attempts.
+    Err(last_error.unwrap_or((
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(json!({"error": "All providers exhausted or unavailable"})),
+    )))
+}
+
 /// Handle an upstream proxy request using the given adapter.
 async fn proxy_request(
     state: &SharedAppState,
@@ -391,6 +578,7 @@ async fn proxy_request(
 
     let provider_name = route.provider.name.clone();
     let selected_model = route.model.clone();
+    let upstream_model = route.upstream_model.clone();
 
     // Reject requests with an empty API key early. This happens when
     // the OS keyring encryption key was regenerated (system reinstall,
@@ -419,6 +607,8 @@ async fn proxy_request(
                 status: "error".into(),
                 latency_ms: 0,
                 error_category: "missing_api_key".into(),
+                failover_count: 0,
+                original_provider: String::new(),
             },
             &route.aggregation_name,
         )
@@ -434,27 +624,28 @@ async fn proxy_request(
         ));
     }
 
-    let upstream_url = adapter.build_url(&route.provider.api_base, &selected_model);
+    let upstream_url = adapter.build_url(&route.provider.api_base, &upstream_model);
 
     let mut upstream_body = body.clone();
-    upstream_body["model"] = json!(selected_model);
+    upstream_body["model"] = json!(upstream_model);
 
     let start = Instant::now();
     let timeout_secs = state.runtime.read().await.api_timeout_secs;
     let max_retries = state.runtime.read().await.max_retries;
-    // Reuse the shared pooled client; per-request timeout applied on the builder.
-    let client = {
-        let req_builder = state.http_client.read().await.clone();
-        match req_builder {
-            Some(c) => c,
-            None => {
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"error": "HTTP client not initialized"})),
-                ))
-            }
+    // Use per-provider client (if provider has custom proxy) or
+    // fall back to the shared global client.
+    let client = match state.get_provider_client(&route.provider).await {
+        Ok(c) => c,
+        Err(e) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e})),
+            ))
         }
     };
+
+    // Track in-flight count for this provider.
+    crate::proxy::routing::acquire_provider_slot(&state.routing, &route.provider.id).await;
 
     let mut req_builder = client
         .post(&upstream_url)
@@ -489,6 +680,8 @@ async fn proxy_request(
                     status: "error".into(),
                     latency_ms: start.elapsed().as_millis() as i64,
                     error_category: "upstream_connection_error".into(),
+                    failover_count: 0,
+                    original_provider: String::new(),
                 },
                 &route.aggregation_name,
             )
@@ -524,6 +717,8 @@ async fn proxy_request(
                 status: format!("upstream_{}", status.as_u16()),
                 latency_ms,
                 error_category: "upstream_error".into(),
+                failover_count: 0,
+                original_provider: String::new(),
             },
             &route.aggregation_name,
         )
@@ -615,6 +810,8 @@ async fn proxy_request(
                     } else {
                         String::new()
                     },
+                    failover_count: 0,
+                    original_provider: String::new(),
                 },
                 &aggregation_name_clone,
             )
@@ -676,6 +873,8 @@ async fn proxy_request(
             status: "success".into(),
             latency_ms,
             error_category: String::new(),
+            failover_count: 0,
+            original_provider: String::new(),
         },
         &route.aggregation_name,
     )
@@ -829,28 +1028,25 @@ async fn chat_completions_handler(
     let model_name = body
         .get("model")
         .and_then(|m| m.as_str())
-        .unwrap_or("unknown");
+        .unwrap_or("unknown")
+        .to_string();
     let request_id = Uuid::new_v4().to_string();
     let is_streaming = is_streaming_request(&body);
 
-    let route = route_request(&state.routing, model_name)
-        .await
-        .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": e}))))?;
-
-    let adapter = crate::proxy::adapter::resolve(&route.provider.api_flavor);
-
-    proxy_request(
+    proxy_request_with_failover(
         &state,
-        route,
+        &model_name,
         body,
         is_streaming,
         &request_id,
-        adapter.as_ref(),
+        crate::proxy::adapter::FLAVOR_OPENAI,
     )
     .await
 }
 
-async fn anthropic_handler(
+/// `POST /v1/messages` - Anthropic Messages API compatible endpoint.
+/// Also served at `/v1/anthropic` for backward compatibility.
+async fn messages_handler(
     State(state): State<SharedAppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
@@ -868,24 +1064,53 @@ async fn anthropic_handler(
     let model_name = body
         .get("model")
         .and_then(|m| m.as_str())
-        .unwrap_or("unknown");
+        .unwrap_or("unknown")
+        .to_string();
     let request_id = Uuid::new_v4().to_string();
     let is_streaming = is_streaming_request(&body);
 
-    let route = route_request(&state.routing, model_name)
-        .await
-        .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": e}))))?;
-
-    let adapter =
-        crate::proxy::adapter::resolve(crate::proxy::adapter::FLAVOR_ANTHROPIC);
-
-    proxy_request(
+    proxy_request_with_failover(
         &state,
-        route,
+        &model_name,
         body,
         is_streaming,
         &request_id,
-        adapter.as_ref(),
+        crate::proxy::adapter::FLAVOR_ANTHROPIC,
+    )
+    .await
+}
+
+/// `POST /v1/responses` - OpenAI Responses API compatible endpoint.
+async fn responses_handler(
+    State(state): State<SharedAppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> Result<Response, (StatusCode, Json<Value>)> {
+    {
+        let mut limits = state.runtime.write().await;
+        let auth = state.auth.read().await;
+        require_ip(addr.ip(), &auth)?;
+        require_auth(&headers, &auth)?;
+        check_body_size(&body, limits.max_body_size)?;
+        check_rate_limit(&mut limits)?;
+    }
+
+    let model_name = body
+        .get("model")
+        .and_then(|m| m.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let request_id = Uuid::new_v4().to_string();
+    let is_streaming = is_streaming_request(&body);
+
+    proxy_request_with_failover(
+        &state,
+        &model_name,
+        body,
+        is_streaming,
+        &request_id,
+        crate::proxy::adapter::FLAVOR_RESPONSES,
     )
     .await
 }
@@ -1007,6 +1232,8 @@ mod tests {
             status: "active".into(),
             api_key_encrypted: false,
             api_flavor: "openai-compatible".into(),
+            model_mapping: None,
+            proxy_config: None,
             models: vec![
                 crate::types::Model {
                     id: "gpt-4".into(),
@@ -1102,6 +1329,8 @@ mod tests {
             status: "active".into(),
             api_key_encrypted: false,
             api_flavor: "openai-compatible".into(),
+            model_mapping: None,
+            proxy_config: None,
             models: vec![
                 crate::types::Model {
                     id: "m1".into(),

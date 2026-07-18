@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProviderStore } from '../../store/providerStore';
-import { Stepper, Step, Dropdown, toast, ProviderLogo } from '../../components/ui';
+import { Stepper, Step, Dropdown, toast, ProviderLogo, Switch } from '../../components/ui';
 import type { DropdownOption } from '../../components/ui';
 import type { Model } from '../../types/provider';
 import { buildModelFromName } from '../../lib/modelPresets';
 import { invoke } from '@tauri-apps/api/core';
-import { ArrowLeft, Check, Loader2, RefreshCw, Download, Plus, Trash2, Eye, Brain, SlidersHorizontal, Wrench, Braces } from 'lucide-react';
+import { ArrowLeft, Check, Loader2, RefreshCw, Download, Plus, Trash2, Eye, Brain, SlidersHorizontal, Wrench, Braces, ChevronDown, ChevronRight } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -161,6 +161,12 @@ export const AddProviderPage: React.FC = () => {
   const [finishError, setFinishError] = useState('');
   const nameInputRef = useRef<HTMLInputElement>(null);
 
+  // Model mapping & proxy state
+  const [modelMappingEntries, setModelMappingEntries] = useState<Array<{ key: string; value: string }>>([]);
+  const [modelMappingExpanded, setModelMappingExpanded] = useState(false);
+  const [proxyEnabled, setProxyEnabled] = useState(false);
+  const [proxyUrl, setProxyUrl] = useState('');
+
   useEffect(() => {
     invoke<ProviderProfileEntry[]>('list_provider_profiles')
       .then(setProfiles)
@@ -233,6 +239,20 @@ export const AddProviderPage: React.FC = () => {
 
   const removeModel = (index: number) => {
     setModels((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // ── Model mapping management ────────────────────────────
+
+  const addModelMappingEntry = () => {
+    setModelMappingEntries((prev) => [...prev, { key: '', value: '' }]);
+  };
+
+  const updateModelMappingEntry = (index: number, patch: Partial<{ key: string; value: string }>) => {
+    setModelMappingEntries((prev) => prev.map((entry, i) => (i === index ? { ...entry, ...patch } : entry)));
+  };
+
+  const removeModelMappingEntry = (index: number) => {
+    setModelMappingEntries((prev) => prev.filter((_, i) => i !== index));
   };
 
   const addManualModel = () => {
@@ -311,6 +331,15 @@ export const AddProviderPage: React.FC = () => {
       }))
       .filter((model) => model.name);
 
+    const modelMapping: Record<string, string> = {};
+    for (const entry of modelMappingEntries) {
+      const key = entry.key.trim();
+      const value = entry.value.trim();
+      if (key && value) {
+        modelMapping[key] = value;
+      }
+    }
+
     const id = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
     try {
       await addProvider({
@@ -321,6 +350,8 @@ export const AddProviderPage: React.FC = () => {
         apiFlavor,
         status: testResult === 'success' ? 'connected' : 'configuring',
         models: configuredModels,
+        modelMapping: Object.keys(modelMapping).length > 0 ? modelMapping : undefined,
+        proxyConfig: { enabled: proxyEnabled, url: proxyUrl.trim() },
       });
       toast('提供商已添加', 'success');
       navigate('/providers');
@@ -538,6 +569,28 @@ export const AddProviderPage: React.FC = () => {
                 <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
                   选择适配协议，Anthropic API 需选 Anthropic
                 </span>
+              </div>
+
+              {/* Proxy config */}
+              <div style={fieldStyle}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--spacer-12)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-2)' }}>
+                    <label style={labelStyle}>使用独立代理</label>
+                    <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
+                      为该提供商单独配置 HTTP/SOCKS 代理
+                    </span>
+                  </div>
+                  <Switch checked={proxyEnabled} onChange={setProxyEnabled} />
+                </div>
+                {proxyEnabled && (
+                  <input
+                    type="text"
+                    placeholder="http://127.0.0.1:7890 或 socks5://127.0.0.1:1080"
+                    value={proxyUrl}
+                    onChange={(e) => setProxyUrl(e.target.value)}
+                    style={inputBaseStyle}
+                  />
+                )}
               </div>
             </div>
           </Step>
@@ -919,6 +972,147 @@ export const AddProviderPage: React.FC = () => {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Model mapping (collapsible) */}
+              <div
+                style={{
+                  border: '1px solid var(--border-neutral-l1)',
+                  borderRadius: 'var(--radius-8)',
+                  background: 'var(--bg-base-secondary)',
+                  overflow: 'hidden',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setModelMappingExpanded((v) => !v)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: 'var(--spacer-12)',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    fontSize: 'var(--body-sm-font-size)',
+                    color: 'var(--text-default)',
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-2)', alignItems: 'flex-start' }}>
+                    <span style={{ fontWeight: 'var(--font-weight-medium)' }}>模型映射</span>
+                    <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
+                      将客户端请求的模型名映射到上游实际模型名（支持通配符 *）
+                    </span>
+                  </div>
+                  {modelMappingExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                </button>
+                {modelMappingExpanded && (
+                  <div
+                    style={{
+                      padding: 'var(--spacer-12)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 'var(--spacer-8)',
+                      borderTop: '1px solid var(--border-neutral-l1)',
+                    }}
+                  >
+                    {modelMappingEntries.length === 0 ? (
+                      <div
+                        style={{
+                          minHeight: 48,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'var(--text-tertiary)',
+                          fontSize: 'var(--body-sm-font-size)',
+                        }}
+                      >
+                        暂无映射规则
+                      </div>
+                    ) : (
+                      modelMappingEntries.map((entry, index) => (
+                        <div
+                          key={index}
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr) auto',
+                            gap: 'var(--spacer-8)',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <input
+                            type="text"
+                            placeholder="逻辑模型名，如 gpt-4 或 claude-*"
+                            value={entry.key}
+                            onChange={(e) => updateModelMappingEntry(index, { key: e.target.value })}
+                            style={{
+                              ...inputBaseStyle,
+                              height: 32,
+                              fontFamily: 'var(--font-family-mono)',
+                              fontSize: 'var(--body-sm-font-size)',
+                            }}
+                          />
+                          <span style={{ color: 'var(--text-tertiary)', fontSize: 'var(--body-sm-font-size)' }}>-&gt;</span>
+                          <input
+                            type="text"
+                            placeholder="上游模型名，如 gpt-4o-2024-08-06"
+                            value={entry.value}
+                            onChange={(e) => updateModelMappingEntry(index, { value: e.target.value })}
+                            style={{
+                              ...inputBaseStyle,
+                              height: 32,
+                              fontFamily: 'var(--font-family-mono)',
+                              fontSize: 'var(--body-sm-font-size)',
+                            }}
+                          />
+                          <button
+                            type="button"
+                            aria-label="删除映射"
+                            title="删除映射"
+                            onClick={() => removeModelMappingEntry(index)}
+                            style={{
+                              width: 32,
+                              height: 32,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: 'var(--radius-8)',
+                              border: '1px solid var(--border-neutral-l1)',
+                              background: 'transparent',
+                              color: 'var(--icon-tertiary)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                    <button
+                      type="button"
+                      onClick={addModelMappingEntry}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 'var(--spacer-6)',
+                        height: 32,
+                        padding: '0 var(--spacer-12)',
+                        borderRadius: 'var(--radius-8)',
+                        background: 'transparent',
+                        color: 'var(--text-brand)',
+                        border: '1px dashed var(--border-brand)',
+                        cursor: 'pointer',
+                        fontSize: 'var(--body-sm-font-size)',
+                        fontFamily: 'inherit',
+                        alignSelf: 'flex-start',
+                      }}
+                    >
+                      <Plus size={14} /> 添加映射规则
+                    </button>
                   </div>
                 )}
               </div>

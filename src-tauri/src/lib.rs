@@ -75,6 +75,7 @@ pub fn run() {
             commands::providers::stop_proxy,
             commands::providers::get_proxy_status,
             commands::providers::exit_app,
+            commands::providers::get_provider_health,
             // Stats
             commands::stats::get_stats,
             commands::stats::get_recent_requests,

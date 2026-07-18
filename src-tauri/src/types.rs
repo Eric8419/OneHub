@@ -7,6 +7,8 @@
 // the Zustand stores.
 // ═══════════════════════════════════════════════════════════════
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 // ── Routing Strategy (enum, not localized strings) ──────────
@@ -56,6 +58,22 @@ impl RoutingStrategy {
 }
 
 // ── Provider ────────────────────────────────────────────────
+
+/// Optional per-provider HTTP proxy configuration. When enabled,
+/// requests to this provider are routed through the specified proxy
+/// URL, overriding the global upstream proxy setting. Useful for
+/// routing domestic providers directly and foreign providers
+/// through a proxy.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderProxyConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    /// Full proxy URL, e.g. "http://127.0.0.1:7890" or
+    /// "socks5://127.0.0.1:1080".
+    #[serde(default)]
+    pub url: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -107,6 +125,19 @@ pub struct Provider {
     /// false for in-memory/runtime values returned to the UI.
     #[serde(default)]
     pub api_key_encrypted: bool,
+    /// Optional model name mapping. Keys are logical model names
+    /// (what the client requests); values are the actual model
+    /// names sent to the upstream provider. Keys support a
+    /// trailing `*` wildcard (e.g. `"claude-*"`). When `None` or
+    /// empty, the requested model name is passed through verbatim.
+    /// Matching priority: exact match > longest wildcard prefix
+    /// > passthrough.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_mapping: Option<HashMap<String, String>>,
+    /// Optional per-provider proxy configuration. When `None` or
+    /// disabled, the global upstream proxy setting is used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy_config: Option<ProviderProxyConfig>,
 }
 
 fn default_flavor() -> String {
@@ -179,6 +210,33 @@ pub struct RequestRecord {
     pub latency_ms: i64,
     #[serde(default)]
     pub error_category: String,
+    /// How many times the request failed over to a different
+    /// provider before succeeding (or failing). 0 = no failover.
+    #[serde(default)]
+    pub failover_count: u32,
+    /// The first provider attempted. When failover occurs, this
+    /// differs from `provider` (the final provider used).
+    #[serde(default)]
+    pub original_provider: String,
+}
+
+// ── Provider Health Snapshot ────────────────────────────────
+
+/// Serializable health state for a provider, returned to the UI
+/// so the provider card can show real-time status (healthy,
+/// rate-limited, circuit-broken, etc.).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderHealthSnapshot {
+    pub provider_id: String,
+    /// "healthy" | "rate_limited" | "unhealthy" | "auth_error"
+    pub status: String,
+    /// Seconds until the cooldown expires (0 if healthy).
+    pub cooldown_secs: u32,
+    /// Current in-flight request count.
+    pub in_flight: u32,
+    /// Consecutive failure count.
+    pub consecutive_failures: u32,
 }
 
 // ── Proxy Status ────────────────────────────────────────────

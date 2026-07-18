@@ -28,12 +28,19 @@ export interface RequestRecord {
   id: string;
   timestamp: string;
   model: string;
+  provider: string;
   /** Serialized as `type` on the wire (Rust `r#type`). */
   type: string;
   tokens: number;
   status: string;
   latencyMs: number;
   errorCategory: string;
+  /** How many times the request failed over to a different
+   * provider before succeeding (or failing). 0 = no failover. */
+  failoverCount?: number;
+  /** The first provider attempted. When failover occurs, this
+   * differs from `provider` (the final provider used). */
+  originalProvider?: string;
 }
 
 export interface DailyUsage {

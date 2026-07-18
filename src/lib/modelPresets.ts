@@ -793,11 +793,11 @@ const PRESETS: ModelPreset[] = [
     supportsToolCalls: true,
     supportsJsonMode: true,
   },
-  // ── DeepSeek V4-Flash (1M ctx) ──────────────────────────
+  // ── DeepSeek V4-Flash (1M ctx, 384K out) ──────────────────
   {
     pattern: /deepseek-v4/i,
     contextWindow: 1048576,
-    maxOutputTokens: 8192,
+    maxOutputTokens: 384000,
     supportsReasoning: true,
     supportsReasoningEffort: true,
     supportsToolCalls: true,

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProviderStore } from '../../store/providerStore';
 import type { Model } from '../../types/provider';
+import type { ProviderHealthSnapshot } from '../../lib/desktopApi';
 import { ConfirmDialog, SpotlightCard, Tag, toast, ProviderLogo } from '../../components/ui';
 import { ChevronRight, Pencil, Trash2, Bot, Copy, Power, PowerOff, Loader2 } from 'lucide-react';
 
@@ -23,9 +24,13 @@ const STATUS_CONFIG: Record<string, { tagVariant: 'green' | 'orange' | 'danger' 
   error:       { tagVariant: 'danger',  label: '连接失败',   cardStatus: 'failed' },
   disabled:    { tagVariant: 'neutral', label: '已禁用',     cardStatus: 'disabled' },
   testing:     { tagVariant: 'orange',  label: '测试中',     cardStatus: 'testing' },
+  // Health-driven states (override provider.status Tag when not healthy)
+  rate_limited: { tagVariant: 'orange', label: '限流中',     cardStatus: 'testing' },
+  unhealthy:    { tagVariant: 'danger', label: '熔断中',     cardStatus: 'failed' },
+  auth_error:   { tagVariant: 'danger', label: '认证失败',   cardStatus: 'failed' },
 };
 
-export const ProviderCard: React.FC<{ providerId: string }> = ({ providerId }) => {
+export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealthSnapshot }> = ({ providerId, health }) => {
   const navigate = useNavigate();
   const provider = useProviderStore(s => s.providers.find(p => p.id === providerId));
   const updateProvider = useProviderStore(s => s.updateProvider);
@@ -35,6 +40,10 @@ export const ProviderCard: React.FC<{ providerId: string }> = ({ providerId }) =
   if (!provider) return null;
 
   const statusCfg = STATUS_CONFIG[provider.status] || STATUS_CONFIG.configuring;
+  // Health status takes priority over provider.status for the Tag display
+  const healthCfg = health && health.status !== 'healthy' ? STATUS_CONFIG[health.status] : null;
+  const tagVariant = healthCfg?.tagVariant ?? statusCfg.tagVariant;
+  const tagLabel = healthCfg?.label ?? statusCfg.label;
 
   const handleCopyKey = () => {
     if (provider.apiKey) {
@@ -118,8 +127,8 @@ export const ProviderCard: React.FC<{ providerId: string }> = ({ providerId }) =
               测试中
             </span>
           ) : (
-            <Tag variant={statusCfg.tagVariant} style={{ border: 'none' }}>
-              {statusCfg.label}
+            <Tag variant={tagVariant} style={{ border: 'none' }}>
+              {tagLabel}
             </Tag>
           )}
         </div>
@@ -144,6 +153,27 @@ export const ProviderCard: React.FC<{ providerId: string }> = ({ providerId }) =
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = isDisabled ? 'var(--status-success-default)' : 'var(--icon-tertiary)'; }}
           >
             {isDisabled ? <PowerOff size={14} /> : <Power size={14} />}
+          </button>
+          <button
+            className="mc-icon-btn"
+            aria-label="供应商详情"
+            title="详情"
+            onClick={() => navigate(`/providers/${provider.id}`)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 28, height: 28,
+              borderRadius: 'var(--radius-6)', border: 'none',
+              background: 'transparent',
+              color: 'var(--icon-tertiary)',
+              cursor: 'pointer',
+              transition: 'background var(--transition-fast, 0.12s) ease, color var(--transition-fast, 0.12s) ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; e.currentTarget.style.color = 'var(--icon-default)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--icon-tertiary)'; }}
+          >
+            <ChevronRight size={14} />
           </button>
           <button
             className="mc-icon-btn"

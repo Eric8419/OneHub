@@ -43,7 +43,7 @@ const DURATION_FAST = { duration: 0.25, ease: [0.22, 1, 0.36, 1] as const };
 export const ProxyControl: React.FC = () => {
   const [status, setStatus] = useState<ProxyStatus | null>(null);
   const [toggling, setToggling] = useState(false);
-  const [copiedUrl, setCopiedUrl] = useState(false);
+  const [copiedEndpoint, setCopiedEndpoint] = useState<number | null>(null);
   const [copiedToken, setCopiedToken] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -75,7 +75,12 @@ export const ProxyControl: React.FC = () => {
     };
   }, [poll]);
 
-  const proxyUrl = `http://${settings.host}:${settings.port}`;
+  const baseUrl = `http://${settings.host}:${settings.port}`;
+  const endpoints = [
+    { label: 'OpenAI', path: '/v1/chat/completions', url: `${baseUrl}/v1/chat/completions` },
+    { label: 'Anthropic', path: '/v1/messages', url: `${baseUrl}/v1/messages` },
+    { label: 'Responses', path: '/v1/responses', url: `${baseUrl}/v1/responses` },
+  ];
   const authToken = settings.authToken;
   const running = status?.running ?? false;
   const showUptime = running && status !== null;
@@ -107,12 +112,12 @@ export const ProxyControl: React.FC = () => {
     }
   };
 
-  const copyUrl = async () => {
+  const copyEndpoint = async (index: number) => {
     try {
-      await navigator.clipboard.writeText(proxyUrl);
-      setCopiedUrl(true);
-      setTimeout(() => setCopiedUrl(false), 2000);
-      toast('代理地址已复制', 'success');
+      await navigator.clipboard.writeText(endpoints[index].url);
+      setCopiedEndpoint(index);
+      setTimeout(() => setCopiedEndpoint(null), 2000);
+      toast('端点地址已复制', 'success');
     } catch {
       /* ignore */
     }
@@ -388,108 +393,112 @@ export const ProxyControl: React.FC = () => {
               </div>
             </div>
 
-            <motion.div
-              initial={false}
-              animate={{
-                background: running
-                  ? 'rgba(255,255,255,0.10)'
-                  : 'rgba(255,255,255,0.06)',
-                borderColor: running
-                  ? 'rgba(255,255,255,0.16)'
-                  : 'rgba(255,255,255,0.10)',
-              }}
-              transition={DURATION_FAST}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--spacer-8)',
-                padding: 'var(--spacer-8) var(--spacer-10)',
-                borderRadius: 'var(--radius-8)',
-                backdropFilter: 'blur(14px) saturate(150%)',
-                WebkitBackdropFilter: 'blur(14px) saturate(150%)',
-                border: '1px solid',
-                marginBottom: 'var(--spacer-6)',
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 'var(--body-xs-font-size)',
-                  color: 'var(--text-tertiary)',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}
-              >
-                地址
-              </span>
-              <motion.code
+            {endpoints.map((ep, idx) => (
+              <motion.div
+                key={ep.label}
                 initial={false}
                 animate={{
-                  color: running ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.25)',
+                  background: running
+                    ? 'rgba(255,255,255,0.10)'
+                    : 'rgba(255,255,255,0.06)',
+                  borderColor: running
+                    ? 'rgba(255,255,255,0.16)'
+                    : 'rgba(255,255,255,0.10)',
                 }}
-                transition={DURATION_SLOW}
+                transition={DURATION_FAST}
                 style={{
-                  flex: 1,
-                  fontSize: 'var(--body-sm-font-size)',
-                  fontFamily: 'var(--font-family-mono)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {proxyUrl}
-              </motion.code>
-              <button
-                onClick={copyUrl}
-                title="复制地址"
-                style={{
-                  display: 'inline-flex',
+                  display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 26,
-                  height: 26,
-                  borderRadius: 'var(--radius-6)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  background: 'rgba(255,255,255,0.08)',
-                  backdropFilter: 'blur(10px) saturate(140%)',
-                  WebkitBackdropFilter: 'blur(10px) saturate(140%)',
-                  color: copiedUrl ? 'var(--status-success-default)' : 'var(--icon-tertiary)',
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                  transition:
-                    'color var(--transition-fast, 0.12s) ease, background var(--transition-fast, 0.12s) ease',
-                }}
-                onMouseEnter={(e) => {
-                  if (!copiedUrl) e.currentTarget.style.background = 'rgba(255,255,255,0.16)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                  gap: 'var(--spacer-8)',
+                  padding: 'var(--spacer-8) var(--spacer-10)',
+                  borderRadius: 'var(--radius-8)',
+                  backdropFilter: 'blur(14px) saturate(150%)',
+                  WebkitBackdropFilter: 'blur(14px) saturate(150%)',
+                  border: '1px solid',
+                  marginBottom: 'var(--spacer-6)',
                 }}
               >
-                <AnimatePresence mode="wait" initial={false}>
-                  {copiedUrl ? (
-                    <motion.span
-                      key="check"
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.5, opacity: 0 }}
-                      transition={SPRING}
-                    >
-                      <Check size={14} />
-                    </motion.span>
-                  ) : (
-                    <motion.span
-                      key="copy"
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.5, opacity: 0 }}
-                      transition={SPRING}
-                    >
-                      <Copy size={14} />
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-              </button>
-            </motion.div>
+                <span
+                  style={{
+                    fontSize: 'var(--body-xs-font-size)',
+                    color: 'var(--text-tertiary)',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    minWidth: 64,
+                  }}
+                >
+                  {ep.label}
+                </span>
+                <motion.code
+                  initial={false}
+                  animate={{
+                    color: running ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.25)',
+                  }}
+                  transition={DURATION_SLOW}
+                  style={{
+                    flex: 1,
+                    fontSize: 'var(--body-sm-font-size)',
+                    fontFamily: 'var(--font-family-mono)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {ep.url}
+                </motion.code>
+                <button
+                  onClick={() => copyEndpoint(idx)}
+                  title="复制地址"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 26,
+                    height: 26,
+                    borderRadius: 'var(--radius-6)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    background: 'rgba(255,255,255,0.08)',
+                    backdropFilter: 'blur(10px) saturate(140%)',
+                    WebkitBackdropFilter: 'blur(10px) saturate(140%)',
+                    color: copiedEndpoint === idx ? 'var(--status-success-default)' : 'var(--icon-tertiary)',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    transition:
+                      'color var(--transition-fast, 0.12s) ease, background var(--transition-fast, 0.12s) ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (copiedEndpoint !== idx) e.currentTarget.style.background = 'rgba(255,255,255,0.16)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                  }}
+                >
+                  <AnimatePresence mode="wait" initial={false}>
+                    {copiedEndpoint === idx ? (
+                      <motion.span
+                        key="check"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.5, opacity: 0 }}
+                        transition={SPRING}
+                      >
+                        <Check size={14} />
+                      </motion.span>
+                    ) : (
+                      <motion.span
+                        key="copy"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.5, opacity: 0 }}
+                        transition={SPRING}
+                      >
+                        <Copy size={14} />
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </button>
+              </motion.div>
+            ))}
 
             <motion.div
               initial={false}

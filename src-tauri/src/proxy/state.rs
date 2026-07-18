@@ -7,6 +7,7 @@
 // routing/auth data.
 // ═══════════════════════════════════════════════════════════════
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
@@ -95,6 +96,10 @@ pub struct AppState {
     /// upstream proxy settings change). Reusing one client across
     /// requests enables connection pooling.
     pub http_client: RwLock<Option<reqwest::Client>>,
+    /// Per-provider reqwest clients for providers that have a
+    /// custom proxy config. Keyed by provider id. Built lazily
+    /// and cached for connection reuse.
+    pub provider_clients: RwLock<HashMap<String, reqwest::Client>>,
     /// Tauri AppHandle for emitting events to the frontend.
     /// Set once during bootstrap; read by `finalize_record` to
     /// push `request-completed` events (replaces polling).
@@ -109,6 +114,7 @@ impl AppState {
             runtime: RwLock::new(RuntimeLimits::new()),
             metrics: Arc::new(MetricsStore::new()),
             http_client: RwLock::new(None),
+            provider_clients: RwLock::new(HashMap::new()),
             app_handle: RwLock::new(None),
         })
     }
@@ -132,6 +138,54 @@ impl AppState {
         *guard = Some(client);
         Ok(())
     }
+
+    /// Get the HTTP client for a specific provider. If the provider
+    /// has a custom proxy config that is enabled, a dedicated client
+    /// is built and cached (keyed by provider id). Otherwise the
+    /// shared global client is returned.
+    ///
+    /// Returns an error if the global client is not initialized and
+    /// the provider has no custom proxy.
+    pub async fn get_provider_client(
+        &self,
+        provider: &crate::types::Provider,
+    ) -> Result<reqwest::Client, String> {
+        // Check if provider has a custom proxy config.
+        if let Some(config) = provider.proxy_config.as_ref() {
+            if config.enabled && !config.url.is_empty() {
+                // Check cache first.
+                {
+                    let cache = self.provider_clients.read().await;
+                    if let Some(client) = cache.get(&provider.id) {
+                        return Ok(client.clone());
+                    }
+                }
+                // Build a new client with the provider's proxy.
+                let client = build_provider_http_client(&config.url)?;
+                let mut cache = self.provider_clients.write().await;
+                cache.insert(provider.id.clone(), client.clone());
+                return Ok(client);
+            }
+        }
+
+        // Fall back to the global client.
+        let guard = self.http_client.read().await;
+        guard
+            .clone()
+            .ok_or_else(|| "HTTP client not initialized".into())
+    }
+}
+
+/// Build a reqwest client with a specific proxy URL for a provider.
+fn build_provider_http_client(proxy_url: &str) -> Result<reqwest::Client, String> {
+    let proxy = reqwest::Proxy::all(proxy_url)
+        .map_err(|e| format!("Invalid provider proxy URL '{}': {}", proxy_url, e))?;
+    reqwest::Client::builder()
+        .pool_idle_timeout(std::time::Duration::from_secs(90))
+        .tcp_keepalive(std::time::Duration::from_secs(30))
+        .proxy(proxy)
+        .build()
+        .map_err(|e| format!("Failed to build provider HTTP client: {}", e))
 }
 
 pub type SharedAppState = Arc<AppState>;

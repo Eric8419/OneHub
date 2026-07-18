@@ -141,3 +141,78 @@ pub async fn exit_app(state: tauri::State<'_, SharedAppState>) -> Result<(), Str
     let _ = proxy::stop().await;
     std::process::exit(0);
 }
+
+/// Get real-time health status for all providers. Used by the
+/// provider list UI to show rate-limited / circuit-broken / auth
+/// error states.
+#[tauri::command]
+pub async fn get_provider_health(
+    state: tauri::State<'_, SharedAppState>,
+) -> Result<std::collections::HashMap<String, crate::types::ProviderHealthSnapshot>, String> {
+    use crate::types::ProviderHealthSnapshot;
+    use std::time::Instant;
+
+    let cfg = state.routing.read().await;
+    let now = Instant::now();
+    let mut result = std::collections::HashMap::new();
+
+    for provider in &cfg.providers {
+        let health = cfg.provider_health.get(&provider.id);
+        let snapshot = if let Some(h) = health {
+            let status = if h.temp_unschedulable_until
+                .map(|until| now < until)
+                .unwrap_or(false)
+            {
+                // Distinguish auth error from generic unhealthy by
+                // checking which cooldown is active.
+                if h.consecutive_failures == 0
+                    && h.temp_unschedulable_until.map(|until| {
+                        now + std::time::Duration::from_secs(300) <= until
+                    }).unwrap_or(false)
+                {
+                    "auth_error".to_string()
+                } else {
+                    "unhealthy".to_string()
+                }
+            } else if h.rate_limit_reset_at
+                .map(|until| now < until)
+                .unwrap_or(false)
+            {
+                "rate_limited".to_string()
+            } else {
+                "healthy".to_string()
+            };
+
+            let cooldown_secs = h
+                .temp_unschedulable_until
+                .or(h.rate_limit_reset_at)
+                .map(|until| {
+                    if now < until {
+                        until.duration_since(now).as_secs() as u32
+                    } else {
+                        0
+                    }
+                })
+                .unwrap_or(0);
+
+            ProviderHealthSnapshot {
+                provider_id: provider.id.clone(),
+                status,
+                cooldown_secs,
+                in_flight: h.in_flight,
+                consecutive_failures: h.consecutive_failures,
+            }
+        } else {
+            ProviderHealthSnapshot {
+                provider_id: provider.id.clone(),
+                status: "healthy".to_string(),
+                cooldown_secs: 0,
+                in_flight: 0,
+                consecutive_failures: 0,
+            }
+        };
+        result.insert(provider.id.clone(), snapshot);
+    }
+
+    Ok(result)
+}

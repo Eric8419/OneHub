@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProviderStore } from '../../store/providerStore';
+import { desktopApi, type ProviderHealthSnapshot } from '../../lib/desktopApi';
 import { AnimatedContent, Card } from '../../components/ui';
 import { ProviderCard } from './ProviderCard';
 import { Plus, Cpu } from 'lucide-react';
@@ -10,10 +11,33 @@ export const Providers: React.FC = () => {
   const providers = useProviderStore(s => s.providers);
   const loadProviders = useProviderStore(s => s.loadProviders);
   const loaded = useProviderStore(s => s.loaded);
+  const [healthMap, setHealthMap] = useState<Record<string, ProviderHealthSnapshot>>({});
 
   useEffect(() => {
     if (!loaded) loadProviders();
   }, [loaded, loadProviders]);
+
+  const refreshHealth = useCallback(async () => {
+    try {
+      const map = await desktopApi.getProviderHealth();
+      setHealthMap(map);
+    } catch (e) {
+      console.error('Failed to fetch provider health:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshHealth();
+    const interval = setInterval(refreshHealth, 5000);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refreshHealth();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [refreshHealth]);
 
   return (
     <div>
@@ -84,7 +108,7 @@ export const Providers: React.FC = () => {
         >
           {providers.map((p, idx) => (
             <AnimatedContent key={p.id} delay={80 + idx * 70}>
-              <ProviderCard providerId={p.id} />
+              <ProviderCard providerId={p.id} health={healthMap[p.id]} />
             </AnimatedContent>
           ))}
         </div>

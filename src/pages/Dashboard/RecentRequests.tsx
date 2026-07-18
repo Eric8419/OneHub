@@ -121,6 +121,7 @@ export const RecentRequests: React.FC = () => {
                 <tr>
                   <th style={{ padding: 'var(--spacer-16) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'left', fontSize: 'var(--body-md-font-size)', color: 'var(--text-tertiary)', fontWeight: 'var(--font-weight-medium)', textTransform: 'uppercase', letterSpacing: 'var(--body-md-letter-spacing)' }}>时间</th>
                   <th style={{ padding: 'var(--spacer-16) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'left', fontSize: 'var(--body-md-font-size)', color: 'var(--text-tertiary)', fontWeight: 'var(--font-weight-medium)', textTransform: 'uppercase', letterSpacing: 'var(--body-md-letter-spacing)' }}>模型</th>
+                  <th style={{ padding: 'var(--spacer-16) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'left', fontSize: 'var(--body-md-font-size)', color: 'var(--text-tertiary)', fontWeight: 'var(--font-weight-medium)', textTransform: 'uppercase', letterSpacing: 'var(--body-md-letter-spacing)' }}>提供商</th>
                   <th style={{ padding: 'var(--spacer-16) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'left', fontSize: 'var(--body-md-font-size)', color: 'var(--text-tertiary)', fontWeight: 'var(--font-weight-medium)', textTransform: 'uppercase', letterSpacing: 'var(--body-md-letter-spacing)' }}>请求类型</th>
                   <th style={{ padding: 'var(--spacer-16) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'right', fontSize: 'var(--body-md-font-size)', color: 'var(--text-tertiary)', fontWeight: 'var(--font-weight-medium)', textTransform: 'uppercase', letterSpacing: 'var(--body-md-letter-spacing)' }}>Token用量</th>
                   <th style={{ padding: 'var(--spacer-16) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'left', fontSize: 'var(--body-md-font-size)', color: 'var(--text-tertiary)', fontWeight: 'var(--font-weight-medium)', textTransform: 'uppercase', letterSpacing: 'var(--body-md-letter-spacing)' }}>状态</th>
@@ -146,7 +147,12 @@ export const RecentRequests: React.FC = () => {
                       <td style={{ padding: 'var(--spacer-12) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)' }}>
                         <Tag variant={ts?.variant ?? 'brand'} style={ts?.customColor ? { background: 'var(--bg-overlay-l1)', color: ts.customColor, border: 'none' } : { border: 'none' }}>{req.model}</Tag>
                       </td>
-                      <td style={{ padding: 'var(--spacer-12) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', color: 'var(--text-secondary)' }}>{req.type}</td>
+                      <td style={{ padding: 'var(--spacer-12) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', color: 'var(--text-secondary)' }}>
+                        <span>{req.provider || req.type}</span>
+                        {req.failoverCount && req.failoverCount > 0 && (
+                          <Tag variant="orange" style={{ marginLeft: 'var(--spacer-4)', border: 'none', fontSize: 'var(--body-xs-font-size)' }}>切换×{req.failoverCount}</Tag>
+                        )}
+                      </td>
                       <td style={{ padding: 'var(--spacer-12) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'right', fontFamily: 'var(--font-family-metric)', color: 'var(--text-default)' }}>{req.tokens.toLocaleString()}</td>
                       <td style={{ padding: 'var(--spacer-12) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)' }}>
                         <Tag variant={req.status === 'success' || req.status === 'streaming' ? 'success' : 'danger'} style={{ border: 'none' }}>{req.status === 'success' || req.status === 'streaming' ? '成功' : '失败'}</Tag>
