@@ -1,42 +1,44 @@
+<p align="center">
+  <img src="./public/brand/app-icon-1024.png" alt="Melody Hub" width="112" />
+</p>
+
 <h1 align="center">Melody Hub</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-0.1.0-blue?style=flat-square" alt="version" />
-  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license" />
   <img src="https://github.com/Lhy723/MelodyHub/actions/workflows/ci.yml/badge.svg" alt="ci" />
   <img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square" alt="tauri" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square" alt="react" />
 </p>
 
 <p align="center">
-  <em>一个本地优先的 LLM API 聚合代理桌面应用，统一管理多家模型提供商、路由策略和用量监控。</em>
+  <em>本地优先的 LLM API 网关与桌面控制台。</em>
 </p>
 
 
 ## 项目简介
 
-Melody Hub 是一个基于 Tauri 的本地桌面应用，用来把 OpenAI、Anthropic、DeepSeek 以及 OpenAI-compatible 服务聚合到统一入口。它在本机启动一个 OpenAI 兼容代理服务，让客户端只需要接入一个地址，就可以按配置路由到不同模型提供商，同时在仪表盘里查看请求、Token、延迟和模型使用情况。
+Melody Hub 基于 Tauri、React 和 Rust 构建，用一个本地地址统一接入 OpenAI、Anthropic、DeepSeek 及其他 OpenAI-compatible 服务。你可以在桌面界面中管理提供商与模型、组合路由规则，并查看请求量、Token 用量、延迟和上游健康状态。
 
 **核心特性：**
 
-- **多提供商管理** - 管理 OpenAI、Anthropic、DeepSeek 与自定义 OpenAI-compatible API。
-- **聚合路由策略** - 支持轮询、最低延迟、随机、顺序等模型选择策略。
-- **本地代理服务** - 提供 `/v1/chat/completions` OpenAI 兼容接口，并支持 SSE 流式响应。
-- **安全本地存储** - API Key 使用 AES-256-GCM 加密保存，认证令牌首次启动自动生成。
-- **用量监控面板** - 展示 Token 用量、请求数、活跃模型、平均响应时间、趋势和热力图。
-- **请求记录与导出** - JSONL 滚动日志持久化，可导出请求记录并打开日志目录。
-- **双语界面** - 内置简体中文和 English 界面。
+- **多协议统一入口** - 提供 `/v1/chat/completions`、`/v1/responses`、`/v1/messages` 和 `/v1/models`，支持 SSE 流式响应。
+- **多提供商与模型管理** - 内置常用服务预设，也可连接自定义 OpenAI-compatible API；支持模型别名、能力参数和详情查看。
+- **聚合路由与故障转移** - 支持轮询、最低延迟、随机和顺序策略，并根据能力、并发与上游健康状态选择可用模型。
+- **安全的本地配置** - API Key 使用 AES-256-GCM 加密保存；首次启动自动生成代理认证令牌。
+- **用量与健康监控** - 展示 Token、请求数、响应时间、趋势、热力图、近期请求和提供商健康状态。
+- **可调代理策略** - 支持速率限制、超时、重试、并发数、IP 白名单、CORS 与上游网络代理。
+- **桌面体验** - 设置自动保存，支持中英文、主题与强调色、系统托盘和开机启动。
+- **本地日志** - 请求记录以 JSONL 滚动持久化，可导出记录并直接打开日志目录。
 
 
-## 示例 / 截图
+## 界面预览
 
 | 仪表盘 | 模型配置 | 设置 |
 |---|---|---|
-| <img src="./dashboard.png" alt="Dashboard" width="280" /> | <img src="./model-config.png" alt="Model config" width="280" /> | <img src="./app-settings.png" alt="Settings" width="280" /> |
+| <img src="./docs/screenshots/dashboard.png" alt="Melody Hub 仪表盘" width="280" /> | <img src="./docs/screenshots/models.png" alt="Melody Hub 模型配置" width="280" /> | <img src="./docs/screenshots/settings.png" alt="Melody Hub 设置" width="280" /> |
 
-| 构建仪表盘 | 构建模型配置 | 构建设置 |
-|---|---|---|
-| <img src="./build-dashboard.png" alt="Build dashboard" width="280" /> | <img src="./build-models.png" alt="Build models" width="280" /> | <img src="./build-settings.png" alt="Build settings" width="280" /> |
+截图源文件与历史稿的目录约定见 [docs/screenshots/README.md](./docs/screenshots/README.md)。
 
 
 ## 安装指南
@@ -47,7 +49,8 @@ Melody Hub 是一个基于 Tauri 的本地桌面应用，用来把 OpenAI、Anth
 - pnpm `>= 9`
 - Rust stable `>= 1.77`，建议通过 [rustup](https://rustup.rs/) 安装
 - Windows 10+，系统需具备 WebView2 Runtime
-- macOS / Linux 理论可运行；Linux 需要 Tauri 依赖，如 `webkit2gtk-4.1`、`libappindicator` 等
+- macOS（需安装 Xcode Command Line Tools）
+- Linux 需要安装 Tauri 系统依赖，如 `webkit2gtk-4.1`、`libappindicator` 等
 
 ### 从源码运行
 
@@ -93,7 +96,7 @@ src-tauri/target/release/bundle/nsis/
 2. 在「模型配置」中添加提供商，填写 Base URL、API Key 和模型列表。
 3. 创建聚合规则，选择路由策略和参与路由的模型。
 4. 在「设置」中确认本地代理端口、认证令牌、并发数和超时配置。
-5. 在其它客户端中把 API Base URL 指向 Melody Hub 本地代理。
+5. 在其他客户端中把 API Base URL 指向 Melody Hub 本地代理，并使用设置页中的认证令牌。
 
 默认代理地址：
 
@@ -136,6 +139,16 @@ curl http://127.0.0.1:8080/v1/chat/completions \
 curl http://127.0.0.1:8080/health
 ```
 
+### 支持的本地端点
+
+| 方法 | 路径 | 用途 |
+|------|------|------|
+| `GET` | `/health` | 本地代理健康检查，无需认证。 |
+| `GET` | `/v1/models` | 返回当前可路由的模型。 |
+| `POST` | `/v1/chat/completions` | OpenAI Chat Completions 兼容接口。 |
+| `POST` | `/v1/responses` | OpenAI Responses API 兼容接口。 |
+| `POST` | `/v1/messages` | Anthropic Messages API 兼容接口。 |
+
 ### 核心概念
 
 | 概念 | 说明 |
@@ -157,10 +170,12 @@ curl http://127.0.0.1:8080/health
 | `port` | `8080` | 本地代理监听端口。 |
 | `autoStart` | `true` | 启动应用后是否自动启动代理服务。 |
 | `maxConcurrency` | `20` | 最大并发请求数。 |
-| `timeoutMs` | `30000` | 上游请求超时时间。 |
+| `apiTimeout` | `60` | 上游请求超时时间，单位为秒。 |
 | `authToken` | 首次启动生成 | 访问代理接口需要使用的 Bearer Token。 |
 | `proxyEnabled` | `false` | 是否为上游请求启用网络代理。 |
-| `proxyPort` | `7890` | 上游网络代理端口。 |
+| `rateLimit` | `0` | 每分钟请求限制；`0` 表示不限制。 |
+| `maxRetries` | `0` | 上游请求失败后的最大重试次数。 |
+| `logRetentionDays` | `30` | 本地请求日志保留天数。 |
 
 </details>
 
@@ -212,6 +227,7 @@ MelodyHub/
 │   ├── src/proxy/         # 本地代理、路由、指标和适配器
 │   └── tauri.conf.json    # Tauri 应用配置
 ├── e2e/                   # Playwright 测试
+├── docs/screenshots/      # README 截图、历史稿与调试截图
 ├── public/                # 静态资源
 ├── CHANGELOG.md           # 版本变更记录
 └── package.json           # 前端脚本和依赖
@@ -233,25 +249,6 @@ MelodyHub/
 | Windows | `%APPDATA%/com.melody-hub.app/melody-hub/` |
 | macOS | `~/Library/Application Support/com.melody-hub.app/melody-hub/` |
 | Linux | `~/.local/share/com.melody-hub.app/melody-hub/` |
-
-
-## 发布与首次远程推送
-
-首次推送到 GitHub 前建议检查：
-
-- 确认 `pnpm-lock.yaml`、`src-tauri/Cargo.lock`、截图和图标资源都已纳入版本控制。
-- 确认 `.gitignore` 已排除 `node_modules/`、`dist/`、`src-tauri/target/` 等构建产物。
-- 如需正式开源，请补充 `LICENSE` 文件；当前 README 按既有文档标记为 MIT。
-- 如需启用自动更新，请替换 `src-tauri/tauri.conf.json` 中的 updater `pubkey`。
-- Windows 正式分发前建议配置代码签名，减少 SmartScreen 拦截。
-
-推送示例：
-
-```bash
-git add .
-git commit -m "chore: prepare initial release"
-git push -u origin main
-```
 
 
 ## Changelog

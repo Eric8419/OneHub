@@ -47,8 +47,10 @@ Cargo.lock
 # Test results
 test-results/
 
-# AI tool artifacts
-docs/
+# AI tool artifacts（产品截图目录除外）
+docs/*
+!docs/screenshots/
+!docs/screenshots/**
 
 # Development scripts
 scripts/
