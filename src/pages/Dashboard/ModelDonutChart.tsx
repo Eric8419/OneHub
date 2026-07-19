@@ -172,7 +172,7 @@ export const ModelDonutChart: React.FC = () => {
                       opacity: isHidden ? 0.4 : 1,
                       padding: 'var(--spacer-4) var(--spacer-6)',
                       borderRadius: 'var(--radius-6)',
-                      transition: 'opacity var(--transition-fast, 0.12s) ease, background var(--transition-fast, 0.12s) ease',
+                      transition: 'opacity var(--transition-fast, 0.12s ease), background var(--transition-fast, 0.12s ease)',
                     }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
@@ -184,7 +184,7 @@ export const ModelDonutChart: React.FC = () => {
                         borderRadius: 'var(--radius-full)',
                         background: isHidden ? 'var(--border-neutral-l2)' : item.color,
                         flexShrink: 0,
-                        transition: 'background var(--transition-fast, 0.12s) ease',
+                        transition: 'background var(--transition-fast, 0.12s ease)',
                       }}
                     />
                     <span
@@ -193,7 +193,7 @@ export const ModelDonutChart: React.FC = () => {
                         color: isHidden ? 'var(--text-tertiary)' : 'var(--text-secondary)',
                         whiteSpace: 'nowrap',
                         textDecoration: isHidden ? 'line-through' : 'none',
-                        transition: 'color var(--transition-fast, 0.12s) ease',
+                        transition: 'color var(--transition-fast, 0.12s ease)',
                       }}
                     >
                       {item.name}
@@ -221,7 +221,7 @@ export const ModelDonutChart: React.FC = () => {
                     color: 'var(--text-brand)',
                     cursor: 'pointer',
                     padding: 'var(--spacer-4) 0',
-                    transition: 'opacity var(--transition-fast, 0.12s) ease',
+                    transition: 'opacity var(--transition-fast, 0.12s ease)',
                   }}
                   onMouseEnter={e => { e.currentTarget.style.opacity = '0.7'; }}
                   onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}

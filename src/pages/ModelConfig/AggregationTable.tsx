@@ -88,9 +88,10 @@ export const AggregationTable: React.FC = () => {
               {aggregations.map((a, idx) => (
                 <tr
                   key={a.id}
+                  className="mc-aggregation-row"
                   style={{
                     background: idx % 2 === 0 ? 'transparent' : 'var(--bg-overlay-l1)',
-                    transition: 'background var(--transition-fast, 0.12s) ease',
+                    transition: 'background var(--transition-fast, 0.12s ease)',
                     animation: `slideInUp 0.2s ease-out both`,
                     animationDelay: `${idx * 30}ms`,
                   }}
@@ -142,7 +143,7 @@ export const AggregationTable: React.FC = () => {
                             background: 'var(--bg-brand)', color: 'var(--text-onbrand)',
                             cursor: 'pointer', fontSize: 'var(--body-xs-font-size)',
                             fontFamily: 'inherit',
-                            transition: 'background var(--transition-fast, 0.12s) ease',
+                            transition: 'background var(--transition-fast, 0.12s ease)',
                           }}
                           onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-brand-hover)'; }}
                           onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-brand)'; }}
@@ -154,7 +155,7 @@ export const AggregationTable: React.FC = () => {
                             background: 'transparent', color: 'var(--text-secondary)',
                             cursor: 'pointer', fontSize: 'var(--body-xs-font-size)',
                             fontFamily: 'inherit',
-                            transition: 'background var(--transition-fast, 0.12s) ease',
+                            transition: 'background var(--transition-fast, 0.12s ease)',
                           }}
                           onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
                           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
@@ -166,7 +167,7 @@ export const AggregationTable: React.FC = () => {
                             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                             width: 28, height: 28, borderRadius: 'var(--radius-6)',
                             border: 'none', background: 'transparent', color: 'var(--icon-tertiary)', cursor: 'pointer',
-                            transition: 'background var(--transition-fast, 0.12s) ease, color var(--transition-fast, 0.12s) ease',
+                            transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease)',
                           }}
                           onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; e.currentTarget.style.color = 'var(--icon-default)'; }}
                           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--icon-tertiary)'; }}
@@ -177,7 +178,7 @@ export const AggregationTable: React.FC = () => {
                             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                             width: 28, height: 28, borderRadius: 'var(--radius-6)',
                             border: 'none', background: 'transparent', color: 'var(--icon-tertiary)', cursor: 'pointer',
-                            transition: 'background var(--transition-fast, 0.12s) ease, color var(--transition-fast, 0.12s) ease',
+                            transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease)',
                           }}
                           onMouseEnter={e => { e.currentTarget.style.background = 'var(--status-error-surface-l1)'; e.currentTarget.style.color = 'var(--status-error-default)'; }}
                           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--icon-tertiary)'; }}

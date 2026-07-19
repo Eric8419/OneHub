@@ -115,7 +115,7 @@ const inputBaseStyle: React.CSSProperties = {
   outline: 'none',
   width: '100%',
   boxSizing: 'border-box',
-  transition: 'border-color var(--transition-fast, 0.12s) ease',
+  transition: 'border-color var(--transition-fast, 0.12s ease)',
 };
 
 const fieldStyle: React.CSSProperties = {
@@ -405,7 +405,7 @@ export const AddProviderPage: React.FC = () => {
             background: 'var(--bg-base-default)',
             color: 'var(--text-secondary)',
             cursor: 'pointer',
-            transition: 'background var(--transition-fast, 0.12s) ease',
+            transition: 'background var(--transition-fast, 0.12s ease)',
           }}
           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-base-default)'; }}

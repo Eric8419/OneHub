@@ -255,7 +255,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
               height: 8,
               borderRadius: 'var(--radius-full)',
               display: 'inline-block',
-              transition: 'background var(--transition-normal, 0.2s) ease, box-shadow var(--transition-normal, 0.2s) ease',
+              transition: 'background var(--transition-normal, 0.2s ease), box-shadow var(--transition-normal, 0.2s ease)',
             }}
           />
           <span

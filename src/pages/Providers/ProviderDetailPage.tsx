@@ -112,7 +112,7 @@ const iconBtnStyle: React.CSSProperties = {
   background: 'transparent',
   color: 'var(--text-secondary)',
   cursor: 'pointer',
-  transition: 'background var(--transition-fast, 0.12s) ease, color var(--transition-fast, 0.12s) ease, border-color var(--transition-fast, 0.12s) ease',
+  transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease), border-color var(--transition-fast, 0.12s ease)',
 };
 
 const statCardStyle: React.CSSProperties = {

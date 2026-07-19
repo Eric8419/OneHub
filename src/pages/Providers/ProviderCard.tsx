@@ -86,7 +86,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
         overflow: 'hidden',
         opacity: isDisabled ? 0.7 : 1,
         filter: isDisabled ? 'saturate(0.7)' : 'none',
-        transition: 'opacity var(--transition-normal, 0.2s) ease, filter var(--transition-normal, 0.2s) ease',
+        transition: 'opacity var(--transition-normal, 0.2s ease), filter var(--transition-normal, 0.2s ease)',
       }}
     >
       {/* Header */}
@@ -106,7 +106,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
             size={20}
             style={{
               color: isDisabled ? 'var(--text-disabled)' : 'var(--text-secondary)',
-              transition: 'color var(--transition-normal, 0.2s) ease',
+              transition: 'color var(--transition-normal, 0.2s ease)',
             }}
           />
           <span
@@ -116,7 +116,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
               fontWeight: 'var(--heading-xs-font-weight)',
               lineHeight: 'var(--heading-xs-line-height)',
               color: isDisabled ? 'var(--text-disabled)' : 'var(--text-default)',
-              transition: 'color var(--transition-normal, 0.2s) ease',
+              transition: 'color var(--transition-normal, 0.2s ease)',
             }}
           >
             {provider.name}
@@ -147,7 +147,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
               background: 'transparent',
               color: isDisabled ? 'var(--status-success-default)' : 'var(--icon-tertiary)',
               cursor: 'pointer',
-              transition: 'background var(--transition-fast, 0.12s) ease, color var(--transition-fast, 0.12s) ease',
+              transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease)',
             }}
             onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; e.currentTarget.style.color = isDisabled ? 'var(--status-success-hover)' : 'var(--status-error-default)'; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = isDisabled ? 'var(--status-success-default)' : 'var(--icon-tertiary)'; }}
@@ -168,7 +168,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
               background: 'transparent',
               color: 'var(--icon-tertiary)',
               cursor: 'pointer',
-              transition: 'background var(--transition-fast, 0.12s) ease, color var(--transition-fast, 0.12s) ease',
+              transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease)',
             }}
             onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; e.currentTarget.style.color = 'var(--icon-default)'; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--icon-tertiary)'; }}
@@ -189,7 +189,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
               background: 'transparent',
               color: 'var(--icon-tertiary)',
               cursor: 'pointer',
-              transition: 'background var(--transition-fast, 0.12s) ease, color var(--transition-fast, 0.12s) ease',
+              transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease)',
             }}
             onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; e.currentTarget.style.color = 'var(--icon-default)'; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--icon-tertiary)'; }}
@@ -210,7 +210,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
               background: 'transparent',
               color: 'var(--icon-tertiary)',
               cursor: 'pointer',
-              transition: 'background var(--transition-fast, 0.12s) ease, color var(--transition-fast, 0.12s) ease',
+              transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease)',
             }}
             onMouseEnter={e => { e.currentTarget.style.background = 'var(--status-error-surface-l1)'; e.currentTarget.style.color = 'var(--status-error-default)'; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--icon-tertiary)'; }}
@@ -269,7 +269,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
                   width: 20, height: 20, border: 'none', background: 'transparent',
                   color: 'var(--icon-tertiary)', cursor: 'pointer', borderRadius: 'var(--radius-4)',
                   padding: 0,
-                  transition: 'color var(--transition-fast, 0.12s) ease',
+                  transition: 'color var(--transition-fast, 0.12s ease)',
                 }}
                 onMouseEnter={e => { e.currentTarget.style.color = 'var(--icon-brand)'; }}
                 onMouseLeave={e => { e.currentTarget.style.color = 'var(--icon-tertiary)'; }}
@@ -351,15 +351,16 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
           color: 'var(--text-tertiary)',
           fontSize: 'var(--body-xs-font-size)',
           lineHeight: 'var(--body-xs-line-height)',
-          transition: 'color var(--transition-fast, 0.12s) ease, background var(--transition-fast, 0.12s) ease',
+          transition: 'color var(--transition-fast, 0.12s ease), background var(--transition-fast, 0.12s ease)',
         }}
         onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
         onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-tertiary)'; e.currentTarget.style.background = 'transparent'; }}
       >
         <span
+          className="mc-provider-card__chevron"
           style={{
             display: 'inline-flex',
-            transition: 'transform var(--transition-normal, 0.2s) ease',
+            transition: 'transform var(--transition-normal, 0.2s ease)',
             transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
           }}
         >
@@ -374,7 +375,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
         style={{
           maxHeight: expanded ? 500 : 0,
           overflow: 'hidden',
-          transition: 'max-height var(--transition-normal, 0.2s) ease, opacity var(--transition-fast, 0.12s) ease',
+          transition: 'max-height var(--transition-normal, 0.2s ease), opacity var(--transition-fast, 0.12s ease)',
           opacity: expanded ? 1 : 0,
           padding: expanded ? 'var(--spacer-8) var(--spacer-16) var(--spacer-12)' : '0 var(--spacer-16)',
           borderTop: expanded ? '1px solid var(--border-neutral-l1)' : 'none',

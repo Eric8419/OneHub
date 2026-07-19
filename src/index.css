@@ -316,7 +316,7 @@
 
 /* ── Smooth theme transition ──────────────────────────────── */
 html {
-  transition: background var(--transition-normal, 0.2s) ease, color var(--transition-normal, 0.2s) ease;
+  transition: background var(--transition-normal, 0.2s ease), color var(--transition-normal, 0.2s ease);
 }
 
 /* ── Global Reset ─────────────────────────────────────────── */
@@ -352,6 +352,43 @@ button {
   font-family: inherit;
 }
 
+.ds-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.ds-confirm-overlay {
+  opacity: 1;
+  transition: opacity 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.ds-confirm-overlay[data-entering],
+.ds-confirm-overlay[data-exiting] {
+  opacity: 0;
+}
+
+.ds-confirm-overlay[data-exiting] {
+  transition-duration: 160ms;
+}
+
+.ds-confirm-dialog {
+  opacity: 1;
+  transform: scale(1);
+  transform-origin: center;
+  transition:
+    opacity 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.ds-confirm-dialog[data-entering],
+.ds-confirm-dialog[data-exiting] {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.ds-confirm-dialog[data-exiting] {
+  transition-duration: 160ms;
+}
+
 /* ── Focus visible for keyboard accessibility ─────────────── */
 :focus-visible {
   outline: 2px solid var(--bg-brand);
@@ -359,14 +396,9 @@ button {
 }
 
 /* ── Keyframes ───────────────────────────────────────────── */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to   { opacity: 1; transform: scale(1); }
+@keyframes reducedFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes countUp {
@@ -425,10 +457,6 @@ button {
 @keyframes highlightFade {
   0%   { background-color: var(--bg-brand-popup); }
   100% { background-color: transparent; }
-}
-
-@keyframes ripple {
-  to { transform: scale(4); opacity: 0; }
 }
 
 .rb-animated-content {
@@ -689,10 +717,30 @@ button {
   scrollbar-color: var(--bg-overlay-l2) transparent;
 }
 
-/* ── Dropdown entrance animation ─────────────────────────── */
-@keyframes dsDropdownIn {
-  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+/* ── Origin-aware, interruptible dropdown motion ─────────── */
+.ds-dropdown__popup {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transform-origin: top left;
+}
+
+.ds-dropdown__popup[data-motion="true"] {
+  transition:
+    opacity 160ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.ds-dropdown__popup[data-open="false"] {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.97);
+  pointer-events: none;
+}
+
+@starting-style {
+  .ds-dropdown__popup[data-motion="true"][data-open="true"] {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
 }
 
 /* ── Visual regression: table overflow & long text ──────── */
@@ -747,12 +795,65 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
-    transition-duration: 0.001ms !important;
+  html {
+    scroll-behavior: auto;
+  }
+
+  .rb-recent-request-new,
+  .mc-aggregation-row {
+    animation: reducedFadeIn 200ms ease both !important;
+    animation-delay: 0ms !important;
+    transform: none !important;
+  }
+
+  .ds-confirm-overlay,
+  .ds-confirm-dialog {
+    transition: opacity 200ms ease !important;
+  }
+
+  .ds-confirm-dialog,
+  .ds-confirm-dialog[data-entering],
+  .ds-confirm-dialog[data-exiting] {
+    transform: none !important;
+  }
+
+  .ds-dropdown__popup,
+  .ds-menu {
+    transform: none !important;
+  }
+
+  .ds-dropdown__popup[data-motion="true"],
+  .ds-menu[data-motion="true"] {
+    transition: opacity 200ms ease !important;
+  }
+
+  .ds-dropdown__popup[data-motion="false"],
+  .ds-menu[data-motion="false"] {
+    transition: none !important;
+  }
+
+  .mc-provider-card__models {
+    transition: opacity 200ms ease !important;
+  }
+
+  .ds-dropdown__chevron,
+  .ds-switch-thumb,
+  .ds-segmented-control__indicator,
+  .mc-provider-card__chevron {
+    transition: none !important;
+  }
+
+  .rb-pulse-dot,
+  .rb-status-dot--error,
+  .rb-status-dot--checking,
+  .rb-shiny-text.is-active {
+    animation: none !important;
+  }
+
+  .ds-btn:active:not(:disabled),
+  .rb-spotlight-card,
+  .rb-spotlight-card:hover,
+  .rb-spotlight-card.is-active {
+    transform: none !important;
   }
 }

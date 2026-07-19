@@ -135,8 +135,9 @@ export const RecentRequests: React.FC = () => {
                   return (
                     <tr
                       key={req.id}
+                      className={isNewRow ? 'rb-recent-request-new' : undefined}
                       style={{
-                        transition: 'background var(--transition-fast, 0.12s) ease, opacity 0.3s ease',
+                        transition: 'background var(--transition-fast, 0.12s ease), opacity 0.3s ease',
                         animation: isNewRow ? 'slideInUp 0.25s ease-out both' : 'none',
                         animationDelay: isNewRow ? `${idx * 30}ms` : '0ms',
                       }}
@@ -176,7 +177,7 @@ export const RecentRequests: React.FC = () => {
                   background: 'transparent', color: safePage === 0 ? 'var(--text-disabled)' : 'var(--text-secondary)',
                   border: '1px solid var(--border-neutral-l1)', borderRadius: 'var(--radius-8)',
                   font: 'inherit', fontSize: 'var(--body-base-font-size)', cursor: safePage === 0 ? 'not-allowed' : 'pointer',
-                  transition: 'background var(--transition-fast, 0.12s) ease, color var(--transition-fast, 0.12s) ease',
+                  transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease)',
                 }}
                 onMouseEnter={e => { if (safePage !== 0) e.currentTarget.style.background = 'var(--bg-overlay-l2)'; }}
                 onMouseLeave={e => { if (safePage !== 0) e.currentTarget.style.background = 'transparent'; }}
@@ -193,7 +194,7 @@ export const RecentRequests: React.FC = () => {
                     color: i === safePage ? 'var(--text-default)' : 'var(--text-secondary)',
                     border: '1px solid var(--border-neutral-l1)', borderRadius: 'var(--radius-8)',
                     font: 'inherit', fontSize: 'var(--body-base-font-size)', cursor: 'pointer',
-                    transition: 'background var(--transition-fast, 0.12s) ease',
+                    transition: 'background var(--transition-fast, 0.12s ease)',
                   }}
                   onMouseEnter={e => { if (i !== safePage) e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
                   onMouseLeave={e => { if (i !== safePage) e.currentTarget.style.background = 'transparent'; }}
@@ -209,7 +210,7 @@ export const RecentRequests: React.FC = () => {
                   background: 'transparent', color: safePage >= totalPages - 1 ? 'var(--text-disabled)' : 'var(--text-secondary)',
                   border: '1px solid var(--border-neutral-l1)', borderRadius: 'var(--radius-8)',
                   font: 'inherit', fontSize: 'var(--body-base-font-size)', cursor: safePage >= totalPages - 1 ? 'not-allowed' : 'pointer',
-                  transition: 'background var(--transition-fast, 0.12s) ease, color var(--transition-fast, 0.12s) ease',
+                  transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease)',
                 }}
                 onMouseEnter={e => { if (safePage < totalPages - 1) e.currentTarget.style.background = 'var(--bg-overlay-l2)'; }}
                 onMouseLeave={e => { if (safePage < totalPages - 1) e.currentTarget.style.background = 'transparent'; }}

@@ -59,6 +59,8 @@ export const Dropdown: React.FC<DropdownProps> = ({
   maxItems = 8,
 }) => {
   const [open, setOpen] = useState(false);
+  const [renderPopup, setRenderPopup] = useState(false);
+  const [motionEnabled, setMotionEnabled] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(-1);
   const [popupRect, setPopupRect] = useState<{ top: number; left: number; width: number } | null>(null);
@@ -84,6 +86,23 @@ export const Dropdown: React.FC<DropdownProps> = ({
   // for keyboard navigation indexing.
   const flatSelectable = filtered;
 
+  const openDropdown = useCallback((withMotion: boolean) => {
+    setMotionEnabled(withMotion);
+    setRenderPopup(true);
+    setOpen(true);
+  }, []);
+
+  const closeDropdown = useCallback((withMotion: boolean) => {
+    setMotionEnabled(withMotion);
+    setOpen(false);
+    setQuery('');
+
+    if (!withMotion) {
+      setRenderPopup(false);
+      setPopupRect(null);
+    }
+  }, []);
+
   // Close on outside click (also accounts for portal popup).
   useEffect(() => {
     if (!open) return;
@@ -92,15 +111,15 @@ export const Dropdown: React.FC<DropdownProps> = ({
       const inWrapper = wrapRef.current?.contains(target);
       const inPopup = popupRef.current?.contains(target);
       if (!inWrapper && !inPopup) {
-        setOpen(false);
-        setQuery('');
+        closeDropdown(true);
       }
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
-  }, [open]);
+  }, [open, closeDropdown]);
 
-  // Measure trigger position and reposition on scroll/resize while open.
+  // Measure trigger position and reposition on scroll/resize while rendered,
+  // including while an exit transition is completing.
   const updatePosition = useCallback(() => {
     if (wrapRef.current) {
       const rect = wrapRef.current.getBoundingClientRect();
@@ -109,19 +128,18 @@ export const Dropdown: React.FC<DropdownProps> = ({
   }, []);
 
   useEffect(() => {
-    if (open) {
+    if (renderPopup) {
       updatePosition();
       window.addEventListener('scroll', updatePosition, true);
       window.addEventListener('resize', updatePosition);
       return () => {
         window.removeEventListener('scroll', updatePosition, true);
         window.removeEventListener('resize', updatePosition);
-        setPopupRect(null);
       };
     }
     setPopupRect(null);
     return;
-  }, [open, updatePosition]);
+  }, [renderPopup, updatePosition]);
 
   // Reset active index when opening / when filter changes.
   useEffect(() => {
@@ -144,7 +162,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
       if (!open) {
         if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          setOpen(true);
+          openDropdown(false);
         }
         return;
       }
@@ -169,17 +187,16 @@ export const Dropdown: React.FC<DropdownProps> = ({
           e.preventDefault();
           if (activeIndex >= 0 && activeIndex < flatSelectable.length) {
             onChange(flatSelectable[activeIndex].value);
-            setOpen(false);
+            closeDropdown(false);
           }
           break;
         case 'Escape':
           e.preventDefault();
-          setOpen(false);
-          setQuery('');
+          closeDropdown(false);
           break;
       }
     },
-    [open, activeIndex, flatSelectable, onChange],
+    [open, activeIndex, flatSelectable, onChange, openDropdown, closeDropdown],
   );
 
   // Render grouped: preserve option order, insert group headers.
@@ -218,7 +235,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
           aria-selected={isSelected}
           onClick={() => {
             onChange(opt.value);
-            setOpen(false);
+            closeDropdown(true);
           }}
           onMouseEnter={() => setActiveIndex(i)}
           style={{
@@ -269,7 +286,13 @@ export const Dropdown: React.FC<DropdownProps> = ({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setOpen(o => !o)}
+        onClick={() => {
+          if (open) {
+            closeDropdown(true);
+          } else {
+            openDropdown(true);
+          }
+        }}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}
@@ -301,6 +324,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
           </span>
         </span>
         <ChevronDown
+          className="ds-dropdown__chevron"
           size={16}
           style={{
             color: 'var(--icon-secondary)',
@@ -312,12 +336,20 @@ export const Dropdown: React.FC<DropdownProps> = ({
       </button>
 
       {/* Popup via portal (avoids parent scrollbar issues) */}
-      {open && popupRect && createPortal(
+      {renderPopup && popupRect && createPortal(
         <div
+          className="ds-dropdown__popup"
+          data-open={open}
+          data-motion={motionEnabled}
           ref={popupRef}
           role="listbox"
           id={listboxId}
           aria-activedescendant={activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined}
+          onTransitionEnd={(event) => {
+            if (event.target !== event.currentTarget || event.propertyName !== 'opacity' || open) return;
+            setRenderPopup(false);
+            setPopupRect(null);
+          }}
           style={{
             position: 'fixed',
             top: popupRect.top,
@@ -333,7 +365,6 @@ export const Dropdown: React.FC<DropdownProps> = ({
             boxShadow:
               '0 12px 32px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.06)',
             overflow: 'hidden',
-            animation: 'dsDropdownIn var(--transition-fast) ease',
           }}
         >
           {/* Search */}

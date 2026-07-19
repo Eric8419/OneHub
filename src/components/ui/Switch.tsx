@@ -60,6 +60,7 @@ export const Switch: React.FC<SwitchProps> = (props) => {
       }}
     >
       <span
+        className="ds-switch-thumb"
         style={{
           position: 'absolute',
           top: 2,

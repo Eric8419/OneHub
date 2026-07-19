@@ -328,6 +328,7 @@ export const Dither: React.FC<DitherProps> = ({
     >
       <Canvas
         className="dither-container"
+        frameloop={disableAnimation ? 'demand' : 'always'}
         camera={{ position: [0, 0, 6] }}
         dpr={1}
         gl={{ antialias: true, alpha: true }}

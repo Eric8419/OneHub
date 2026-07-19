@@ -1,5 +1,5 @@
 import React, { useState, Children, useRef, useLayoutEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Check } from 'lucide-react';
 
 import './Stepper.css';
@@ -164,36 +164,39 @@ function StepContentWrapper({
   className: string;
 }) {
   const [parentHeight, setParentHeight] = useState(0);
+  const shouldReduceMotion = useReducedMotion();
+  const transitionContext: TransitionContext = {
+    direction,
+    reduced: Boolean(shouldReduceMotion),
+  };
 
   return (
-    <motion.div
+    <div
       className={className}
-      style={{ position: 'relative', overflow: 'hidden' }}
-      animate={{ height: isCompleted ? 0 : parentHeight }}
-      transition={{ type: 'spring', duration: 0.4 }}
+      style={{ position: 'relative', overflow: 'hidden', height: isCompleted ? 0 : parentHeight }}
     >
-      <AnimatePresence initial={false} mode="sync" custom={direction}>
+      <AnimatePresence initial={false} mode="sync" custom={transitionContext}>
         {!isCompleted && (
           <SlideTransition
             key={currentStep}
-            direction={direction}
+            transitionContext={transitionContext}
             onHeightReady={(h: number) => setParentHeight(h)}
           >
             {children}
           </SlideTransition>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }
 
 function SlideTransition({
   children,
-  direction,
+  transitionContext,
   onHeightReady,
 }: {
   children: React.ReactNode;
-  direction: number;
+  transitionContext: TransitionContext;
   onHeightReady: (h: number) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -205,12 +208,12 @@ function SlideTransition({
   return (
     <motion.div
       ref={containerRef}
-      custom={direction}
+      custom={transitionContext}
       variants={stepVariants}
       initial="enter"
       animate="center"
       exit="exit"
-      transition={{ duration: 0.4 }}
+      transition={transitionContext.reduced ? reducedTransition : normalTransition}
       style={{ position: 'absolute', left: 0, right: 0, top: 0 }}
     >
       {children}
@@ -218,19 +221,34 @@ function SlideTransition({
   );
 }
 
+interface TransitionContext {
+  direction: number;
+  reduced: boolean;
+}
+
 const stepVariants = {
-  enter: (dir: number) => ({
-    x: dir >= 0 ? '-100%' : '100%',
+  enter: ({ direction, reduced }: TransitionContext) => ({
+    transform: reduced ? 'translateX(0%)' : `translateX(${direction >= 0 ? '100%' : '-100%'})`,
     opacity: 0,
   }),
   center: {
-    x: '0%',
+    transform: 'translateX(0%)',
     opacity: 1,
   },
-  exit: (dir: number) => ({
-    x: dir >= 0 ? '50%' : '-50%',
+  exit: ({ direction, reduced }: TransitionContext) => ({
+    transform: reduced ? 'translateX(0%)' : `translateX(${direction >= 0 ? '-100%' : '100%'})`,
     opacity: 0,
   }),
+};
+
+const normalTransition = {
+  duration: 0.25,
+  ease: [0.77, 0, 0.175, 1] as const,
+};
+
+const reducedTransition = {
+  duration: 0.2,
+  ease: 'easeOut' as const,
 };
 
 export const Step: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -284,9 +302,17 @@ function StepIndicator({
 }
 
 function StepConnector({ isComplete }: { isComplete: boolean }) {
+  const shouldReduceMotion = useReducedMotion();
+  const reduced = Boolean(shouldReduceMotion);
   const lineVariants = {
-    incomplete: { width: '0%', backgroundColor: 'transparent' },
-    complete: { width: '100%', backgroundColor: 'var(--bg-brand)' },
+    incomplete: {
+      transform: reduced ? 'scaleX(1)' : 'scaleX(0)',
+      backgroundColor: 'transparent',
+    },
+    complete: {
+      transform: 'scaleX(1)',
+      backgroundColor: 'var(--bg-brand)',
+    },
   };
 
   return (
@@ -296,7 +322,7 @@ function StepConnector({ isComplete }: { isComplete: boolean }) {
         variants={lineVariants}
         initial={false}
         animate={isComplete ? 'complete' : 'incomplete'}
-        transition={{ duration: 0.4 }}
+        transition={reduced ? reducedTransition : normalTransition}
       />
     </div>
   );

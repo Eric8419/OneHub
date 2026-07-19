@@ -130,7 +130,7 @@ export const ProviderForm: React.FC<ProviderFormProps> = ({
     outline: 'none' as const,
     width: '100%' as const,
     boxSizing: 'border-box' as const,
-    transition: 'border-color var(--transition-fast, 0.12s) ease',
+    transition: 'border-color var(--transition-fast, 0.12s ease)',
   };
 
   const fieldStyle = {
@@ -158,7 +158,7 @@ export const ProviderForm: React.FC<ProviderFormProps> = ({
     fontWeight: 'var(--font-weight-medium)' as const,
     fontFamily: 'inherit' as const,
     border: 'none',
-    transition: 'background var(--transition-fast, 0.12s) ease, opacity var(--transition-fast, 0.12s) ease',
+    transition: 'background var(--transition-fast, 0.12s ease), opacity var(--transition-fast, 0.12s ease)',
   };
 
   return (

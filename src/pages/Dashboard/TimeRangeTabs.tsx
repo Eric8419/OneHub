@@ -47,7 +47,7 @@ export const TimeRangeTabs: React.FC = () => {
               fontWeight: 'var(--font-weight-medium)',
               borderRadius: isActive ? 'var(--radius-8) var(--radius-8) 0 0' : 0,
               position: 'relative',
-              transition: 'background var(--transition-fast, 0.12s) ease, color var(--transition-fast, 0.12s) ease',
+              transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease)',
             }}
             onMouseEnter={e => {
               if (!isActive) e.currentTarget.style.color = 'var(--text-default)';

@@ -45,8 +45,8 @@
 
 .rb-stepper-btn-back {
   transition:
-    background var(--transition-fast, 0.12s) ease,
-    color var(--transition-fast, 0.12s) ease;
+    background var(--transition-fast, 0.12s ease),
+    color var(--transition-fast, 0.12s ease);
   border-radius: var(--radius-8);
   padding: var(--spacer-6) var(--spacer-12);
   color: var(--text-secondary);
@@ -68,8 +68,8 @@
 
 .rb-stepper-btn-next {
   transition:
-    background var(--transition-fast, 0.12s) ease,
-    opacity var(--transition-fast, 0.12s) ease;
+    background var(--transition-fast, 0.12s ease),
+    opacity var(--transition-fast, 0.12s ease);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -142,7 +142,9 @@
   position: absolute;
   left: 0;
   top: 0;
+  width: 100%;
   height: 100%;
+  transform-origin: left center;
 }
 
 .rb-stepper-check-icon {

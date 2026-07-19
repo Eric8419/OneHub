@@ -337,7 +337,7 @@ export const ModelInventory: React.FC = () => {
               cursor: 'pointer',
               fontSize: 'var(--body-sm-font-size)',
               fontFamily: 'inherit',
-              transition: 'background var(--transition-fast, 0.12s) ease',
+              transition: 'background var(--transition-fast, 0.12s ease)',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'var(--bg-overlay-l1)';

@@ -81,7 +81,7 @@ export const QuickAddPanel: React.FC = () => {
                 background: 'var(--bg-white)',
                 fontSize: 'var(--body-base-font-size)', color: 'var(--text-default)', outline: 'none',
                 boxSizing: 'border-box', width: '100%',
-                transition: 'border-color var(--transition-fast, 0.12s) ease',
+                transition: 'border-color var(--transition-fast, 0.12s ease)',
               }}
             />
             {nameError && (
@@ -106,7 +106,7 @@ export const QuickAddPanel: React.FC = () => {
               cursor: 'pointer', border: '1px solid var(--border-neutral-l1)',
               background: 'var(--bg-overlay-l1)', color: 'var(--text-secondary)',
               fontFamily: 'inherit',
-              transition: 'background var(--transition-fast, 0.12s) ease',
+              transition: 'background var(--transition-fast, 0.12s ease)',
             }}
             onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l2)'; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
@@ -144,7 +144,7 @@ export const QuickAddPanel: React.FC = () => {
                     background: selected ? 'var(--bg-brand-popup)' : 'var(--bg-overlay-l1)',
                     color: selected ? 'var(--text-brand)' : 'var(--text-secondary)',
                     border: selected ? '1px solid var(--bg-brand)' : '1px solid transparent',
-                    transition: 'all var(--transition-fast, 0.12s) ease',
+                    transition: 'all var(--transition-fast, 0.12s ease)',
                     fontFamily: 'inherit',
                   }}
                   title={provider}

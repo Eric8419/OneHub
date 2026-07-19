@@ -24,6 +24,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 }) => {
   return (
     <ModalOverlay
+      className="ds-confirm-overlay"
       isOpen={open}
       onOpenChange={(isOpen) => { if (!isOpen) onCancel(); }}
       isDismissable
@@ -35,10 +36,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         background: 'var(--bg-overlay-l4)',
-        animation: 'fadeIn var(--transition-fast, 0.12s) ease',
       }}
     >
       <Modal
+        className="ds-confirm-dialog"
         style={{
           background: 'var(--bg-base-default)',
           border: '1px solid var(--border-neutral-l1)',
@@ -49,7 +50,6 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           color: 'var(--text-default)',
           boxShadow:
             '0 24px 64px color-mix(in srgb, var(--text-default) 14%, transparent), 0 4px 16px color-mix(in srgb, var(--text-default) 8%, transparent)',
-          animation: 'scaleIn var(--transition-normal, 0.2s) ease',
         }}
       >
         <Dialog aria-label={title} style={{ outline: 'none', padding: 0 }}>
@@ -100,7 +100,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 fontSize: 'var(--body-base-strong-font-size)',
                 fontWeight: 'var(--body-base-strong-font-weight)',
                 fontFamily: 'inherit',
-                transition: 'background var(--transition-fast, 0.12s) ease',
+                transition: 'background var(--transition-fast, 0.12s ease)',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = 'var(--bg-overlay-l1)';
@@ -128,7 +128,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 fontSize: 'var(--body-base-strong-font-size)',
                 fontWeight: 'var(--body-base-strong-font-weight)',
                 fontFamily: 'inherit',
-                transition: 'background var(--transition-fast, 0.12s) ease',
+                transition: 'background var(--transition-fast, 0.12s ease)',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background =

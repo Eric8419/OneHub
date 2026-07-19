@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { desktopApi } from '../../lib/desktopApi';
 import { Avatar, ConfirmDialog } from '../ui';
 import { useT } from '../../i18n';
@@ -13,43 +13,43 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
   const t = useT();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuMotionEnabled, setMenuMotionEnabled] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const avatarRef = useRef<HTMLButtonElement>(null);
-  const [titleKey, setTitleKey] = useState(0);
 
-  // Trigger title animation on title change
-  useEffect(() => {
-    setTitleKey((k) => k + 1);
-  }, [title]);
+  const closeMenu = useCallback((withMotion: boolean) => {
+    setMenuMotionEnabled(withMotion);
+    setMenuOpen(false);
+  }, []);
 
   // Click outside to close
   useEffect(() => {
     if (!menuOpen) return;
     const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
+        closeMenu(true);
       }
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [menuOpen]);
+  }, [menuOpen, closeMenu]);
 
   // Escape to close menu
   useEffect(() => {
     if (!menuOpen) return;
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setMenuOpen(false);
+        closeMenu(false);
         avatarRef.current?.focus();
       }
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [menuOpen]);
+  }, [menuOpen, closeMenu]);
 
   const handleExit = () => {
-    setMenuOpen(false);
+    closeMenu(true);
     setConfirmExit(true);
   };
 
@@ -75,9 +75,8 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
         zIndex: 10,
       }}
     >
-      {/* Page title with blur-in animation */}
+      {/* Page title */}
       <h1
-        key={titleKey}
         className="ds-shell__page-title"
         data-tauri-drag-region
         style={{
@@ -90,7 +89,6 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
-          animation: 'rbEnter 320ms var(--ease-out-expo) both',
           flex: 1,
           minWidth: 0,
           WebkitUserSelect: 'none',
@@ -112,13 +110,17 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
         <div ref={menuRef} style={{ position: 'relative' }}>
           <button
             ref={avatarRef}
-            onClick={() => setMenuOpen(!menuOpen)}
+            onClick={() => {
+              setMenuMotionEnabled(true);
+              setMenuOpen((current) => !current);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                setMenuOpen(!menuOpen);
+                setMenuMotionEnabled(false);
+                setMenuOpen((current) => !current);
               }
-              if (e.key === 'Escape') setMenuOpen(false);
+              if (e.key === 'Escape') closeMenu(false);
             }}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
@@ -129,7 +131,7 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
               padding: 0,
               fontFamily: 'inherit',
               borderRadius: 'var(--radius-full)',
-              transition: 'box-shadow var(--transition-fast, 0.12s) ease',
+              transition: 'box-shadow var(--transition-fast, 0.12s ease)',
             }}
             onFocus={(e) => {
               e.currentTarget.style.boxShadow = '0 0 0 2px var(--bg-brand)';
@@ -144,6 +146,8 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
           {/* Dropdown menu */}
           <div
             className="ds-menu"
+            data-open={menuOpen}
+            data-motion={menuMotionEnabled}
             role="menu"
             style={{
               position: 'absolute',
@@ -163,9 +167,12 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
               boxShadow:
                 '0 12px 32px color-mix(in srgb, var(--text-default) 12%, transparent), 0 2px 8px color-mix(in srgb, var(--text-default) 8%, transparent)',
               opacity: menuOpen ? 1 : 0,
-              transform: menuOpen ? 'translateY(0)' : 'translateY(-4px)',
+              transform: menuOpen ? 'translateY(0) scale(1)' : 'translateY(-4px) scale(0.97)',
+              transformOrigin: 'top right',
               pointerEvents: menuOpen ? 'auto' : 'none',
-              transition: 'opacity var(--transition-fast, 0.12s) ease, transform var(--transition-fast, 0.12s) ease',
+              transition: menuMotionEnabled
+                ? 'opacity 160ms cubic-bezier(0.23, 1, 0.32, 1), transform 160ms cubic-bezier(0.23, 1, 0.32, 1)'
+                : 'none',
             }}
           >
             <button
@@ -186,7 +193,7 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
                 fontFamily: 'inherit',
                 width: '100%',
                 textAlign: 'left',
-                transition: 'background var(--transition-fast, 0.12s) ease',
+                transition: 'background var(--transition-fast, 0.12s ease)',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = 'var(--bg-overlay-l1)';
@@ -194,7 +201,7 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent';
               }}
-              onClick={() => setMenuOpen(false)}
+              onClick={() => closeMenu(true)}
             >
               <Info size={14} style={{ color: 'var(--icon-tertiary)' }} />
               {t('header.about')}
@@ -221,7 +228,7 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
                 fontFamily: 'inherit',
                 width: '100%',
                 textAlign: 'left',
-                transition: 'background var(--transition-fast, 0.12s) ease',
+                transition: 'background var(--transition-fast, 0.12s ease)',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = 'var(--status-error-surface-l1)';

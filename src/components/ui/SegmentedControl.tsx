@@ -50,6 +50,7 @@ export const SegmentedControl: React.FC<SegmentedControlProps> = ({
   return (
     <div
       ref={containerRef}
+      className="ds-segmented-control"
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -61,6 +62,7 @@ export const SegmentedControl: React.FC<SegmentedControlProps> = ({
       }}
     >
       <div
+        className="ds-segmented-control__indicator"
         style={{
           position: 'absolute',
           borderRadius: 'var(--radius-8)',

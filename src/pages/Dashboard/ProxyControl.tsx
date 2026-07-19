@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useSettingsStore } from '../../store/settingsStore';
 import { desktopApi } from '../../lib/desktopApi';
 import { toast, Counter } from '../../components/ui';
@@ -41,6 +41,7 @@ const DURATION_SLOW = { duration: 0.4, ease: [0.22, 1, 0.36, 1] as const };
 const DURATION_FAST = { duration: 0.25, ease: [0.22, 1, 0.36, 1] as const };
 
 export const ProxyControl: React.FC = () => {
+  const shouldReduceMotion = useReducedMotion();
   const [status, setStatus] = useState<ProxyStatus | null>(null);
   const [toggling, setToggling] = useState(false);
   const [copiedEndpoint, setCopiedEndpoint] = useState<number | null>(null);
@@ -152,6 +153,7 @@ export const ProxyControl: React.FC = () => {
 
   const ditherWaveSpeed = running ? 0.4 : 0.08;
   const ditherWaveAmp = running ? 0.3 : 0.12;
+  const freezeDither = !running || Boolean(shouldReduceMotion);
 
   return (
     <div
@@ -175,7 +177,8 @@ export const ProxyControl: React.FC = () => {
           waveSpeed={ditherWaveSpeed}
           waveFrequency={3}
           waveAmplitude={ditherWaveAmp}
-          enableMouseInteraction={running}
+          disableAnimation={freezeDither}
+          enableMouseInteraction={running && !shouldReduceMotion}
           mouseRadius={0.3}
         />
       </motion.div>
@@ -464,7 +467,7 @@ export const ProxyControl: React.FC = () => {
                     cursor: 'pointer',
                     flexShrink: 0,
                     transition:
-                      'color var(--transition-fast, 0.12s) ease, background var(--transition-fast, 0.12s) ease',
+                      'color var(--transition-fast, 0.12s ease), background var(--transition-fast, 0.12s ease)',
                   }}
                   onMouseEnter={(e) => {
                     if (copiedEndpoint !== idx) e.currentTarget.style.background = 'rgba(255,255,255,0.16)';
@@ -569,7 +572,7 @@ export const ProxyControl: React.FC = () => {
                       cursor: 'pointer',
                       flexShrink: 0,
                       transition:
-                        'color var(--transition-fast, 0.12s) ease, background var(--transition-fast, 0.12s) ease',
+                        'color var(--transition-fast, 0.12s ease), background var(--transition-fast, 0.12s ease)',
                     }}
                     onMouseEnter={(e) => {
                       if (!copiedToken) e.currentTarget.style.background = 'rgba(255,255,255,0.16)';
