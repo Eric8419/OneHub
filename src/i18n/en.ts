@@ -115,10 +115,6 @@ const en: Record<string, string> = {
   'settings.appearanceTheme': 'Theme',
   'settings.appearancePageSize': 'Page Size',
 
-  'settings.notifications.title': 'Notifications',
-  'settings.notifications.enabled': 'Enable Notifications',
-  'settings.notifications.desktop': 'Desktop Notifications',
-
   'settings.proxyConfig': 'Proxy Configuration',
   'settings.proxyConfigEnable': 'Enable Proxy',
   'settings.proxyConfigHost': 'Proxy Host',

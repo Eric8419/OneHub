@@ -117,7 +117,8 @@ impl ProviderHealth {
         match kind {
             HealthErrorKind::RateLimit => {
                 // Cool down for 60 seconds on rate limit.
-                self.rate_limit_reset_at = Some(now + std::time::Duration::from_secs(60));
+                self.rate_limit_reset_at =
+                    Some(now + std::time::Duration::from_secs(60));
             }
             HealthErrorKind::ServerError => {
                 self.consecutive_failures += 1;
@@ -386,7 +387,8 @@ pub async fn route_request(
                         if !capabilities.is_satisfied_by(model) {
                             continue;
                         }
-                        let upstream_model = resolve_model_mapping(provider, &model.name);
+                        let upstream_model =
+                            resolve_model_mapping(provider, &model.name);
                         return Ok(RouteResult {
                             provider: provider.clone(),
                             model: model.name.clone(),
@@ -564,17 +566,23 @@ mod tests {
         // First request → provider 0.
         let excluded = std::collections::HashSet::new();
         let caps = RequestCapabilities::default();
-        let r1 = route_request(&state, "gpt-4", &excluded, &caps, "openai").await.unwrap();
+        let r1 = route_request(&state, "gpt-4", &excluded, &caps, "openai")
+            .await
+            .unwrap();
         // After completion, cursor advances to 1.
         record_routing_side_effects(&state, &None, "gpt-4", 100).await;
 
         // Second request → provider 1.
-        let r2 = route_request(&state, "gpt-4", &excluded, &caps, "openai").await.unwrap();
+        let r2 = route_request(&state, "gpt-4", &excluded, &caps, "openai")
+            .await
+            .unwrap();
         // After completion, cursor wraps to 0.
         record_routing_side_effects(&state, &None, "gpt-4", 100).await;
 
         // Third request → provider 0 again.
-        let r3 = route_request(&state, "gpt-4", &excluded, &caps, "openai").await.unwrap();
+        let r3 = route_request(&state, "gpt-4", &excluded, &caps, "openai")
+            .await
+            .unwrap();
 
         assert_ne!(r1.provider.id, r2.provider.id);
         assert_eq!(r1.provider.id, r3.provider.id);

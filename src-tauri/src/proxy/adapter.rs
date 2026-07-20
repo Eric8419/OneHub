@@ -40,7 +40,9 @@ pub fn is_protocol_compatible(inbound_flavor: &str, provider_flavor: &str) -> bo
     match (inbound_flavor, provider_flavor) {
         // OpenAI Chat Completions is compatible with both "openai"
         // and "openai-compatible" providers (same wire format).
-        (FLAVOR_OPENAI | FLAVOR_OPENAI_COMPAT, FLAVOR_OPENAI | FLAVOR_OPENAI_COMPAT) => true,
+        (FLAVOR_OPENAI | FLAVOR_OPENAI_COMPAT, FLAVOR_OPENAI | FLAVOR_OPENAI_COMPAT) => {
+            true
+        }
         // Anthropic Messages only works with Anthropic-native providers.
         (FLAVOR_ANTHROPIC, FLAVOR_ANTHROPIC) => true,
         // Responses API works with OpenAI native (Responses endpoint)

@@ -3,7 +3,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useSettingsStore } from '../../store/settingsStore';
 import { desktopApi } from '../../lib/desktopApi';
 import { toast, Counter } from '../../components/ui';
-import { Dither } from '../../components/ui/Dither';
+import Prism from '../../components/ui/Prism';
 import { Play, Square, Copy, Check, Loader2, Cpu } from 'lucide-react';
 
 interface ProxyStatus {
@@ -151,9 +151,25 @@ export const ProxyControl: React.FC = () => {
     fontWeight: 'inherit' as const,
   };
 
-  const ditherWaveSpeed = running ? 0.4 : 0.08;
-  const ditherWaveAmp = running ? 0.3 : 0.12;
-  const freezeDither = !running || Boolean(shouldReduceMotion);
+  // Combine endpoints + token into a 4-item list for 2x2 grid.
+  const gridItems = [
+    ...endpoints.map((ep, idx) => ({
+      kind: 'endpoint' as const,
+      key: `ep-${idx}`,
+      label: ep.label,
+      value: ep.url,
+      copied: copiedEndpoint === idx,
+      onCopy: () => void copyEndpoint(idx),
+    })),
+    {
+      kind: 'token' as const,
+      key: 'token',
+      label: '令牌',
+      value: authToken,
+      copied: copiedToken,
+      onCopy: () => void copyToken(),
+    },
+  ];
 
   return (
     <div
@@ -162,43 +178,46 @@ export const ProxyControl: React.FC = () => {
         borderRadius: 'var(--radius-12)',
         overflow: 'hidden',
         marginBottom: 'var(--spacer-24)',
+        minHeight: 180,
       }}
     >
-      <motion.div
-        initial={false}
-        animate={{ opacity: running ? 1 : 0.6 }}
-        transition={DURATION_SLOW}
-        style={{ position: 'absolute', inset: 0 }}
-      >
-        <Dither
-          waveColor={[1, 1, 1]}
-          colorNum={4}
-          pixelSize={2}
-          waveSpeed={ditherWaveSpeed}
-          waveFrequency={3}
-          waveAmplitude={ditherWaveAmp}
-          disableAnimation={freezeDither}
-          enableMouseInteraction={running && !shouldReduceMotion}
-          mouseRadius={0.3}
-        />
-      </motion.div>
-
-      <motion.div
-        initial={false}
-        animate={{
-          background: running
-            ? 'linear-gradient(135deg, rgba(0,0,0,0.50) 0%, rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.50) 100%)'
-            : 'linear-gradient(135deg, rgba(0,0,0,0.60) 0%, rgba(0,0,0,0.50) 50%, rgba(0,0,0,0.60) 100%)',
-        }}
-        transition={DURATION_SLOW}
+      {/* Prism background.
+          Renders a WebGL prism refractor on pure black. The prism's
+          built-in chromatic dispersion already produces a colorful
+          spectrum, so no theme-color tint is applied. zIndex:0 keeps
+          it behind content (zIndex:2). pointerEvents:none so it
+          stays decorative. */}
+      <div
         style={{
           position: 'absolute',
-          inset: 0,
-          zIndex: 1,
-          borderRadius: 'var(--radius-12)',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100%',
+          height: '100%',
+          zIndex: 0,
+          backgroundColor: '#000',
+          opacity: running ? 1 : 0.6,
+          transition: 'opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
           pointerEvents: 'none',
         }}
-      />
+      >
+        <Prism
+          animationType="rotate"
+          timeScale={running && !shouldReduceMotion ? 0.6 : 0.2}
+          height={3.5}
+          baseWidth={5.5}
+          scale={3.6}
+          hueShift={0}
+          colorFrequency={1}
+          noise={0.4}
+          glow={1}
+          bloom={1}
+          transparent
+          suspendWhenOffscreen
+        />
+      </div>
 
       <div
         style={{
@@ -212,442 +231,199 @@ export const ProxyControl: React.FC = () => {
       >
         <div
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--spacer-16)',
             padding: 'var(--spacer-16) var(--spacer-20)',
             ...CARD_THEME,
           }}
         >
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--spacer-10)',
-                marginBottom: 'var(--spacer-12)',
-              }}
-            >
-              <motion.div
-                initial={false}
-                animate={{
-                  background: running
-                    ? 'rgba(74,222,128,0.14)'
-                    : 'rgba(255,255,255,0.10)',
-                  borderColor: running
-                    ? 'rgba(74,222,128,0.25)'
-                    : 'rgba(255,255,255,0.14)',
-                }}
-                transition={DURATION_FAST}
+          {/* ── Header: icon + title + status, with toggle button on the right ── */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--spacer-16)',
+              marginBottom: 'var(--spacer-16)',
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 40,
-                  height: 40,
-                  borderRadius: 'var(--radius-10)',
-                  backdropFilter: 'blur(12px) saturate(140%)',
-                  WebkitBackdropFilter: 'blur(12px) saturate(140%)',
-                  border: '1px solid',
+                  gap: 'var(--spacer-10)',
                 }}
               >
                 <motion.div
-                  animate={running ? { scale: [1, 1.06, 1], opacity: [0.9, 1, 0.9] } : { scale: 1, opacity: 1 }}
-                  transition={running ? { duration: 2, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.3 }}
-                >
-                  <Cpu
-                    size={20}
-                    style={{
-                      color: running ? 'var(--status-success-default)' : 'var(--icon-tertiary)',
-                      transition: 'color 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
-                    }}
-                  />
-                </motion.div>
-              </motion.div>
-              <div>
-                <div
+                  initial={false}
+                  animate={{
+                    background: running
+                      ? 'rgba(74,222,128,0.14)'
+                      : 'rgba(255,255,255,0.10)',
+                    borderColor: running
+                      ? 'rgba(74,222,128,0.25)'
+                      : 'rgba(255,255,255,0.14)',
+                  }}
+                  transition={DURATION_FAST}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 'var(--spacer-8)',
-                    fontSize: 'var(--heading-xs-font-size)',
-                    fontWeight: 'var(--font-weight-strong)',
-                    color: 'var(--text-default)',
+                    justifyContent: 'center',
+                    width: 40,
+                    height: 40,
+                    borderRadius: 'var(--radius-10)',
+                    backdropFilter: 'blur(12px) saturate(140%)',
+                    WebkitBackdropFilter: 'blur(12px) saturate(140%)',
+                    border: '1px solid',
+                    flexShrink: 0,
                   }}
                 >
-                  本地代理
-                  <motion.span
-                    layout
-                    initial={false}
-                    animate={{
-                      background: running
-                        ? 'rgba(74,222,128,0.16)'
-                        : 'rgba(255,255,255,0.10)',
-                      borderColor: running
-                        ? 'rgba(74,222,128,0.25)'
-                        : 'rgba(255,255,255,0.14)',
-                      color: running ? 'var(--status-success-default)' : 'var(--text-tertiary)',
-                    }}
-                    transition={SPRING}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 'var(--spacer-4)',
-                      height: 22,
-                      padding: '0 var(--spacer-8)',
-                      borderRadius: 'var(--radius-6)',
-                      fontSize: 'var(--body-xs-font-size)',
-                      fontWeight: 'var(--font-weight-medium)',
-                      backdropFilter: 'blur(12px) saturate(140%)',
-                      WebkitBackdropFilter: 'blur(12px) saturate(140%)',
-                      border: '1px solid',
-                    }}
+                  <motion.div
+                    animate={running ? { scale: [1, 1.06, 1], opacity: [0.9, 1, 0.9] } : { scale: 1, opacity: 1 }}
+                    transition={running ? { duration: 2, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.3 }}
                   >
-                    <motion.span
-                      initial={false}
-                      animate={running
-                        ? {
-                            scale: [1, 1.5, 1],
-                            opacity: [1, 0.5, 1],
-                            background: 'var(--status-success-default)',
-                            boxShadow: '0 0 0 0 rgba(74,222,128,0.5)',
-                          }
-                        : {
-                            scale: 1,
-                            opacity: 1,
-                            background: 'var(--text-disabled)',
-                            boxShadow: '0 0 0 0 rgba(255,255,255,0)',
-                          }}
-                      transition={running
-                        ? {
-                            scale: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
-                            opacity: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
-                            background: { duration: 0.4 },
-                            boxShadow: { duration: 0.4 },
-                          }
-                        : { duration: 0.3 }}
+                    <Cpu
+                      size={20}
                       style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: 'var(--radius-full)',
-                        display: 'inline-block',
+                        color: running ? 'var(--status-success-default)' : 'var(--icon-tertiary)',
+                        transition: 'color 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
                       }}
                     />
+                  </motion.div>
+                </motion.div>
+
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--spacer-8)',
+                      fontSize: 'var(--heading-xs-font-size)',
+                      fontWeight: 'var(--font-weight-strong)',
+                      color: 'var(--text-default)',
+                    }}
+                  >
+                    本地代理
+                    <motion.span
+                      layout
+                      initial={false}
+                      animate={{
+                        background: running
+                          ? 'rgba(74,222,128,0.16)'
+                          : 'rgba(255,255,255,0.10)',
+                        borderColor: running
+                          ? 'rgba(74,222,128,0.25)'
+                          : 'rgba(255,255,255,0.14)',
+                        color: running ? 'var(--status-success-default)' : 'var(--text-tertiary)',
+                      }}
+                      transition={SPRING}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 'var(--spacer-4)',
+                        height: 22,
+                        padding: '0 var(--spacer-8)',
+                        borderRadius: 'var(--radius-6)',
+                        fontSize: 'var(--body-xs-font-size)',
+                        fontWeight: 'var(--font-weight-medium)',
+                        backdropFilter: 'blur(12px) saturate(140%)',
+                        WebkitBackdropFilter: 'blur(12px) saturate(140%)',
+                        border: '1px solid',
+                      }}
+                    >
+                      <motion.span
+                        initial={false}
+                        animate={running
+                          ? {
+                              scale: [1, 1.5, 1],
+                              opacity: [1, 0.5, 1],
+                              background: 'var(--status-success-default)',
+                              boxShadow: '0 0 0 0 rgba(74,222,128,0.5)',
+                            }
+                          : {
+                              scale: 1,
+                              opacity: 1,
+                              background: 'var(--text-disabled)',
+                              boxShadow: '0 0 0 0 rgba(255,255,255,0)',
+                            }}
+                        transition={running
+                          ? {
+                              scale: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
+                              opacity: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
+                              background: { duration: 0.4 },
+                              boxShadow: { duration: 0.4 },
+                            }
+                          : { duration: 0.3 }}
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: 'var(--radius-full)',
+                          display: 'inline-block',
+                        }}
+                      />
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.span
+                          key={running ? 'running' : 'stopped'}
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 4 }}
+                          transition={DURATION_FAST}
+                        >
+                          {running ? '运行中' : '已停止'}
+                        </motion.span>
+                      </AnimatePresence>
+                    </motion.span>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 'var(--body-sm-font-size)',
+                      color: 'var(--text-tertiary)',
+                      marginTop: 'var(--spacer-2)',
+                      minHeight: '16px',
+                    }}
+                  >
                     <AnimatePresence mode="wait" initial={false}>
-                      <motion.span
-                        key={running ? 'running' : 'stopped'}
-                        initial={{ opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 4 }}
-                        transition={DURATION_FAST}
-                      >
-                        {running ? '运行中' : '已停止'}
-                      </motion.span>
+                      {showUptime ? (
+                        <motion.span
+                          key="uptime"
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -6 }}
+                          transition={DURATION_FAST}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}
+                        >
+                          已运行
+                          {uptimeParts.hours > 0 && (
+                            <>
+                              <Counter value={uptimeParts.hours} {...counterProps} />
+                              <span>时</span>
+                            </>
+                          )}
+                          <Counter value={uptimeParts.mins} {...counterProps} />
+                          <span>分</span>
+                          {uptimeParts.hours === 0 && (
+                            <>
+                              <Counter value={uptimeParts.secs} {...counterProps} />
+                              <span>秒</span>
+                            </>
+                          )}
+                        </motion.span>
+                      ) : (
+                        <motion.span
+                          key="idle"
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -6 }}
+                          transition={DURATION_FAST}
+                        >
+                          其他应用可通过代理地址访问本服务
+                        </motion.span>
+                      )}
                     </AnimatePresence>
-                  </motion.span>
-                </div>
-                <div
-                  style={{
-                    fontSize: 'var(--body-sm-font-size)',
-                    color: 'var(--text-tertiary)',
-                    marginTop: 'var(--spacer-2)',
-                    minHeight: '16px',
-                  }}
-                >
-                  <AnimatePresence mode="wait" initial={false}>
-                    {showUptime ? (
-                      <motion.span
-                        key="uptime"
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -6 }}
-                        transition={DURATION_FAST}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}
-                      >
-                        已运行
-                        {uptimeParts.hours > 0 && (
-                          <>
-                            <Counter value={uptimeParts.hours} {...counterProps} />
-                            <span>时</span>
-                          </>
-                        )}
-                        <Counter value={uptimeParts.mins} {...counterProps} />
-                        <span>分</span>
-                        {uptimeParts.hours === 0 && (
-                          <>
-                            <Counter value={uptimeParts.secs} {...counterProps} />
-                            <span>秒</span>
-                          </>
-                        )}
-                      </motion.span>
-                    ) : (
-                      <motion.span
-                        key="idle"
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -6 }}
-                        transition={DURATION_FAST}
-                      >
-                        其他应用可通过代理地址访问本服务
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {endpoints.map((ep, idx) => (
-              <motion.div
-                key={ep.label}
-                initial={false}
-                animate={{
-                  background: running
-                    ? 'rgba(255,255,255,0.10)'
-                    : 'rgba(255,255,255,0.06)',
-                  borderColor: running
-                    ? 'rgba(255,255,255,0.16)'
-                    : 'rgba(255,255,255,0.10)',
-                }}
-                transition={DURATION_FAST}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--spacer-8)',
-                  padding: 'var(--spacer-8) var(--spacer-10)',
-                  borderRadius: 'var(--radius-8)',
-                  backdropFilter: 'blur(14px) saturate(150%)',
-                  WebkitBackdropFilter: 'blur(14px) saturate(150%)',
-                  border: '1px solid',
-                  marginBottom: 'var(--spacer-6)',
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 'var(--body-xs-font-size)',
-                    color: 'var(--text-tertiary)',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                    minWidth: 64,
-                  }}
-                >
-                  {ep.label}
-                </span>
-                <motion.code
-                  initial={false}
-                  animate={{
-                    color: running ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.25)',
-                  }}
-                  transition={DURATION_SLOW}
-                  style={{
-                    flex: 1,
-                    fontSize: 'var(--body-sm-font-size)',
-                    fontFamily: 'var(--font-family-mono)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {ep.url}
-                </motion.code>
-                <button
-                  onClick={() => copyEndpoint(idx)}
-                  title="复制地址"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: 26,
-                    height: 26,
-                    borderRadius: 'var(--radius-6)',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    background: 'rgba(255,255,255,0.08)',
-                    backdropFilter: 'blur(10px) saturate(140%)',
-                    WebkitBackdropFilter: 'blur(10px) saturate(140%)',
-                    color: copiedEndpoint === idx ? 'var(--status-success-default)' : 'var(--icon-tertiary)',
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                    transition:
-                      'color var(--transition-fast, 0.12s ease), background var(--transition-fast, 0.12s ease)',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (copiedEndpoint !== idx) e.currentTarget.style.background = 'rgba(255,255,255,0.16)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
-                  }}
-                >
-                  <AnimatePresence mode="wait" initial={false}>
-                    {copiedEndpoint === idx ? (
-                      <motion.span
-                        key="check"
-                        initial={{ scale: 0.5, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.5, opacity: 0 }}
-                        transition={SPRING}
-                      >
-                        <Check size={14} />
-                      </motion.span>
-                    ) : (
-                      <motion.span
-                        key="copy"
-                        initial={{ scale: 0.5, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.5, opacity: 0 }}
-                        transition={SPRING}
-                      >
-                        <Copy size={14} />
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </button>
-              </motion.div>
-            ))}
-
-            <motion.div
-              initial={false}
-              animate={{
-                background: running
-                  ? 'rgba(255,255,255,0.10)'
-                  : 'rgba(255,255,255,0.06)',
-                borderColor: running
-                  ? 'rgba(255,255,255,0.16)'
-                  : 'rgba(255,255,255,0.10)',
-              }}
-              transition={DURATION_FAST}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--spacer-8)',
-                padding: 'var(--spacer-8) var(--spacer-10)',
-                borderRadius: 'var(--radius-8)',
-                backdropFilter: 'blur(14px) saturate(150%)',
-                WebkitBackdropFilter: 'blur(14px) saturate(150%)',
-                border: '1px solid',
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 'var(--body-xs-font-size)',
-                  color: 'var(--text-tertiary)',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}
-              >
-                令牌
-              </span>
-              {authToken ? (
-                <>
-                  <motion.code
-                    initial={false}
-                    animate={{
-                      color: running ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.25)',
-                    }}
-                    transition={DURATION_SLOW}
-                    style={{
-                      flex: 1,
-                      fontSize: 'var(--body-sm-font-size)',
-                      fontFamily: 'var(--font-family-mono)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {authToken.length > 32 ? `${authToken.slice(0, 16)}...${authToken.slice(-8)}` : authToken}
-                  </motion.code>
-                  <button
-                    onClick={copyToken}
-                    title="复制令牌"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: 26,
-                      height: 26,
-                      borderRadius: 'var(--radius-6)',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      background: 'rgba(255,255,255,0.08)',
-                      backdropFilter: 'blur(10px) saturate(140%)',
-                      WebkitBackdropFilter: 'blur(10px) saturate(140%)',
-                      color: copiedToken ? 'var(--status-success-default)' : 'var(--icon-tertiary)',
-                      cursor: 'pointer',
-                      flexShrink: 0,
-                      transition:
-                        'color var(--transition-fast, 0.12s ease), background var(--transition-fast, 0.12s ease)',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!copiedToken) e.currentTarget.style.background = 'rgba(255,255,255,0.16)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
-                    }}
-                  >
-                    <AnimatePresence mode="wait" initial={false}>
-                      {copiedToken ? (
-                        <motion.span
-                          key="check"
-                          initial={{ scale: 0.5, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          exit={{ scale: 0.5, opacity: 0 }}
-                          transition={SPRING}
-                        >
-                          <Check size={14} />
-                        </motion.span>
-                      ) : (
-                        <motion.span
-                          key="copy"
-                          initial={{ scale: 0.5, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          exit={{ scale: 0.5, opacity: 0 }}
-                          transition={SPRING}
-                        >
-                          <Copy size={14} />
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                  </button>
-                </>
-              ) : (
-                <span
-                  style={{
-                    flex: 1,
-                    fontSize: 'var(--body-sm-font-size)',
-                    color: 'var(--text-tertiary)',
-                    fontStyle: 'italic',
-                  }}
-                >
-                  未设置（无需认证即可连接）
-                </span>
-              )}
-            </motion.div>
-          </div>
-
-          <motion.div
-            initial={false}
-            animate={{
-              background: running
-                ? 'linear-gradient(180deg, rgba(74,222,128,0) 0%, rgba(74,222,128,0.3) 50%, rgba(74,222,128,0) 100%)'
-                : 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0) 100%)',
-              opacity: running ? 1 : 0.6,
-              scaleY: running ? 1 : 0.7,
-            }}
-            transition={DURATION_SLOW}
-            style={{
-              width: 2,
-              height: 80,
-              flexShrink: 0,
-              borderRadius: 1,
-            }}
-          />
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 'var(--spacer-6)',
-              flexShrink: 0,
-              minWidth: 80,
-            }}
-          >
+            {/* Toggle button — moved to top right */}
             <motion.button
               onClick={handleToggle}
               disabled={toggling}
@@ -690,6 +466,7 @@ export const ProxyControl: React.FC = () => {
                 backdropFilter: 'blur(14px) saturate(160%)',
                 WebkitBackdropFilter: 'blur(14px) saturate(160%)',
                 color: 'var(--text-onbrand)',
+                flexShrink: 0,
               }}
             >
               <AnimatePresence mode="wait" initial={false}>
@@ -745,6 +522,142 @@ export const ProxyControl: React.FC = () => {
                 )}
               </AnimatePresence>
             </motion.button>
+          </div>
+
+          {/* ── 2x2 grid: OpenAI / Anthropic / Responses / 令牌 ── */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: 'var(--spacer-8)',
+            }}
+          >
+            {gridItems.map((item) => (
+              <motion.div
+                key={item.key}
+                initial={false}
+                animate={{
+                  background: running
+                    ? 'rgba(255,255,255,0.10)'
+                    : 'rgba(255,255,255,0.06)',
+                  borderColor: running
+                    ? 'rgba(255,255,255,0.16)'
+                    : 'rgba(255,255,255,0.10)',
+                }}
+                transition={DURATION_FAST}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--spacer-8)',
+                  padding: 'var(--spacer-8) var(--spacer-10)',
+                  borderRadius: 'var(--radius-8)',
+                  backdropFilter: 'blur(14px) saturate(150%)',
+                  WebkitBackdropFilter: 'blur(14px) saturate(150%)',
+                  border: '1px solid',
+                  minWidth: 0,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 'var(--body-xs-font-size)',
+                    color: 'var(--text-tertiary)',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    minWidth: 60,
+                  }}
+                >
+                  {item.label}
+                </span>
+                {item.kind === 'endpoint' || (item.kind === 'token' && item.value) ? (
+                  <>
+                    <motion.code
+                      initial={false}
+                      animate={{
+                        color: running ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.25)',
+                      }}
+                      transition={DURATION_SLOW}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        fontSize: 'var(--body-sm-font-size)',
+                        fontFamily: 'var(--font-family-mono)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {item.kind === 'token' && item.value.length > 32
+                        ? `${item.value.slice(0, 16)}...${item.value.slice(-8)}`
+                        : item.value}
+                    </motion.code>
+                    <button
+                      onClick={item.onCopy}
+                      title={item.kind === 'token' ? '复制令牌' : '复制地址'}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 26,
+                        height: 26,
+                        borderRadius: 'var(--radius-6)',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.08)',
+                        backdropFilter: 'blur(10px) saturate(140%)',
+                        WebkitBackdropFilter: 'blur(10px) saturate(140%)',
+                        color: item.copied
+                          ? 'var(--status-success-default)'
+                          : 'var(--icon-tertiary)',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        transition:
+                          'color var(--transition-fast, 0.12s ease), background var(--transition-fast, 0.12s ease)',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!item.copied) e.currentTarget.style.background = 'rgba(255,255,255,0.16)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                      }}
+                    >
+                      <AnimatePresence mode="wait" initial={false}>
+                        {item.copied ? (
+                          <motion.span
+                            key="check"
+                            initial={{ scale: 0.5, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.5, opacity: 0 }}
+                            transition={SPRING}
+                          >
+                            <Check size={14} />
+                          </motion.span>
+                        ) : (
+                          <motion.span
+                            key="copy"
+                            initial={{ scale: 0.5, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.5, opacity: 0 }}
+                            transition={SPRING}
+                          >
+                            <Copy size={14} />
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </button>
+                  </>
+                ) : (
+                  <span
+                    style={{
+                      flex: 1,
+                      fontSize: 'var(--body-sm-font-size)',
+                      color: 'var(--text-tertiary)',
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    未设置（无需认证即可连接）
+                  </span>
+                )}
+              </motion.div>
+            ))}
           </div>
         </div>
       </div>

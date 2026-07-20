@@ -21,6 +21,7 @@ export const TimeRangeTabs: React.FC = () => {
         gap: 'var(--spacer-8)',
         marginBottom: 'var(--spacer-24)',
         borderBottom: '1px solid var(--border-neutral-l1)',
+        paddingBottom: 0,
       }}
     >
       {rangeOptions.map(opt => {
@@ -36,27 +37,36 @@ export const TimeRangeTabs: React.FC = () => {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              padding: 'var(--spacer-8) var(--spacer-16)',
-              background: isActive ? 'var(--bg-brand)' : 'transparent',
-              color: isActive ? 'var(--text-onbrand)' : 'var(--text-tertiary)',
+              padding: 'var(--spacer-10) var(--spacer-20)',
+              borderRadius: 'var(--radius-8) var(--radius-8) 0 0',
               border: 'none',
-              cursor: 'pointer',
-              font: 'inherit',
+              borderBottom: isActive
+                ? '2px solid var(--bg-brand)'
+                : '2px solid transparent',
+              textDecoration: 'none',
+              color: isActive ? 'var(--bg-brand)' : 'var(--text-secondary)',
               fontSize: 'var(--body-base-font-size)',
+              fontWeight: isActive
+                ? 'var(--font-weight-strong)'
+                : 'var(--body-base-font-weight)',
               lineHeight: 'var(--body-base-line-height)',
-              fontWeight: 'var(--font-weight-medium)',
-              borderRadius: isActive ? 'var(--radius-8) var(--radius-8) 0 0' : 0,
-              position: 'relative',
-              transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease)',
+              cursor: 'pointer',
+              background: 'transparent',
+              fontFamily: 'inherit',
+              transition:
+                'color 0.18s cubic-bezier(0.22,1,0.36,1), border-color 0.18s cubic-bezier(0.22,1,0.36,1)',
+              marginBottom: '-1px',
             }}
             onMouseEnter={e => {
               if (!isActive) e.currentTarget.style.color = 'var(--text-default)';
             }}
             onMouseLeave={e => {
-              if (!isActive) e.currentTarget.style.color = 'var(--text-tertiary)';
+              if (!isActive) e.currentTarget.style.color = 'var(--text-secondary)';
             }}
           >
-            {opt.label}
+            <span style={{ whiteSpace: 'nowrap' }}>
+              {opt.label}
+            </span>
           </button>
         );
       })}

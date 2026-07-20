@@ -122,10 +122,6 @@ const zh: Record<string, string> = {
   'settings.appearanceTheme': '主题',
   'settings.appearancePageSize': '每页显示条数',
 
-  'settings.notifications.title': '通知设置',
-  'settings.notifications.enabled': '启用通知',
-  'settings.notifications.desktop': '桌面通知',
-
   'settings.proxyConfig': '网络代理配置',
   'settings.proxyConfigEnable': '启用代理',
   'settings.proxyConfigHost': '代理主机',

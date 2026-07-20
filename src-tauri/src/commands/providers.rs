@@ -148,7 +148,10 @@ pub async fn exit_app(state: tauri::State<'_, SharedAppState>) -> Result<(), Str
 #[tauri::command]
 pub async fn get_provider_health(
     state: tauri::State<'_, SharedAppState>,
-) -> Result<std::collections::HashMap<String, crate::types::ProviderHealthSnapshot>, String> {
+) -> Result<
+    std::collections::HashMap<String, crate::types::ProviderHealthSnapshot>,
+    String,
+> {
     use crate::types::ProviderHealthSnapshot;
     use std::time::Instant;
 
@@ -159,22 +162,24 @@ pub async fn get_provider_health(
     for provider in &cfg.providers {
         let health = cfg.provider_health.get(&provider.id);
         let snapshot = if let Some(h) = health {
-            let status = if h.temp_unschedulable_until
+            let status = if h
+                .temp_unschedulable_until
                 .map(|until| now < until)
                 .unwrap_or(false)
             {
                 // Distinguish auth error from generic unhealthy by
                 // checking which cooldown is active.
                 if h.consecutive_failures == 0
-                    && h.temp_unschedulable_until.map(|until| {
-                        now + std::time::Duration::from_secs(300) <= until
-                    }).unwrap_or(false)
+                    && h.temp_unschedulable_until
+                        .map(|until| now + std::time::Duration::from_secs(300) <= until)
+                        .unwrap_or(false)
                 {
                     "auth_error".to_string()
                 } else {
                     "unhealthy".to_string()
                 }
-            } else if h.rate_limit_reset_at
+            } else if h
+                .rate_limit_reset_at
                 .map(|until| now < until)
                 .unwrap_or(false)
             {

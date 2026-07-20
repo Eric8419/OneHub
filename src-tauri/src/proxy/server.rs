@@ -369,7 +369,9 @@ fn is_retryable_status(status: u16) -> bool {
 
 /// Parse the capabilities a request needs from its body. Used by
 /// the router to skip models that don't support required features.
-fn parse_request_capabilities(body: &Value) -> crate::proxy::routing::RequestCapabilities {
+fn parse_request_capabilities(
+    body: &Value,
+) -> crate::proxy::routing::RequestCapabilities {
     use crate::proxy::routing::RequestCapabilities;
 
     let needs_tools = body.get("tools").is_some();
@@ -377,32 +379,31 @@ fn parse_request_capabilities(body: &Value) -> crate::proxy::routing::RequestCap
     // Vision: check if any message has an image_url content part
     // (OpenAI format) or a source/image content block (Anthropic
     // format).
-    let needs_vision = body
-        .get("messages")
-        .and_then(|m| m.as_array())
-        .map(|msgs| {
-            msgs.iter().any(|m| {
-                // OpenAI: content array with type "image_url"
-                if let Some(parts) = m.get("content").and_then(|c| c.as_array()) {
-                    if parts.iter().any(|p| {
-                        p.get("type").and_then(|t| t.as_str()) == Some("image_url")
-                    }) {
-                        return true;
+    let needs_vision =
+        body.get("messages")
+            .and_then(|m| m.as_array())
+            .map(|msgs| {
+                msgs.iter().any(|m| {
+                    // OpenAI: content array with type "image_url"
+                    if let Some(parts) = m.get("content").and_then(|c| c.as_array()) {
+                        if parts.iter().any(|p| {
+                            p.get("type").and_then(|t| t.as_str()) == Some("image_url")
+                        }) {
+                            return true;
+                        }
                     }
-                }
-                // Anthropic: content array with type "image"
-                if let Some(parts) = m.get("content").and_then(|c| c.as_array()) {
-                    if parts
-                        .iter()
-                        .any(|p| p.get("type").and_then(|t| t.as_str()) == Some("image"))
-                    {
-                        return true;
+                    // Anthropic: content array with type "image"
+                    if let Some(parts) = m.get("content").and_then(|c| c.as_array()) {
+                        if parts.iter().any(|p| {
+                            p.get("type").and_then(|t| t.as_str()) == Some("image")
+                        }) {
+                            return true;
+                        }
                     }
-                }
-                false
+                    false
+                })
             })
-        })
-        .unwrap_or(false);
+            .unwrap_or(false);
 
     let needs_json_mode = body
         .get("response_format")
@@ -637,15 +638,13 @@ async fn proxy_request(
     let client = match state.get_provider_client(&route.provider).await {
         Ok(c) => c,
         Err(e) => {
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": e})),
-            ))
+            return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e}))))
         }
     };
 
     // Track in-flight count for this provider.
-    crate::proxy::routing::acquire_provider_slot(&state.routing, &route.provider.id).await;
+    crate::proxy::routing::acquire_provider_slot(&state.routing, &route.provider.id)
+        .await;
 
     let mut req_builder = client
         .post(&upstream_url)

@@ -15,10 +15,6 @@ export interface AppSettings {
   launchAtLogin: boolean;
   startMinimized: boolean;
 
-  // ── 通知 ──
-  notificationsEnabled: boolean;
-  desktopNotifications: boolean;
-
   // ── 网络代理 ──
   proxyEnabled: boolean;
   proxyHost: string;

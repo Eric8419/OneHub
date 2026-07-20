@@ -2,9 +2,10 @@ import { useEffect } from 'react';
 import { useProviderStore } from '../../store/providerStore';
 import { useAggregationStore } from '../../store/aggregationStore';
 import { AnimatedContent } from '../../components/ui';
-import { AggregationTable } from './AggregationTable';
-import { QuickAddPanel } from './QuickAddPanel';
 import { ModelInventory } from './ModelInventory';
+// 聚合规则 UI 暂时隐藏，待功能完善后再启用
+// import { AggregationTable } from './AggregationTable';
+// import { QuickAddPanel } from './QuickAddPanel';
 
 export const ModelConfig: React.FC = () => {
   const loadProviders = useProviderStore(s => s.loadProviders);
@@ -39,7 +40,7 @@ export const ModelConfig: React.FC = () => {
             margin: 0,
           }}
         >
-          管理模型聚合规则与路由策略
+          管理对外暴露的模型映射
         </p>
       </div>
 
@@ -48,15 +49,15 @@ export const ModelConfig: React.FC = () => {
         <ModelInventory />
       </AnimatedContent>
 
-      {/* Aggregation Table */}
+      {/* 聚合规则 UI 暂时隐藏，待功能完善后再启用
       <AnimatedContent delay={160}>
         <AggregationTable />
       </AnimatedContent>
 
-      {/* Quick Add */}
       <AnimatedContent delay={220}>
         <QuickAddPanel />
       </AnimatedContent>
+      */}
     </div>
   );
 };

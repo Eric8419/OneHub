@@ -359,21 +359,6 @@ export const SettingsForm: React.FC = () => {
             </SettingsRow>
           </SettingsGroup>
 
-          <SettingsGroup title="通知设置">
-            <SettingsRow label="启用通知">
-              <Switch
-                checked={settings.notificationsEnabled}
-                onChange={(v) => updateSettings({ notificationsEnabled: v })}
-              />
-            </SettingsRow>
-            <SettingsRow label="桌面通知" isLast>
-              <Switch
-                checked={settings.desktopNotifications}
-                onChange={(v) => updateSettings({ desktopNotifications: v })}
-              />
-            </SettingsRow>
-          </SettingsGroup>
-
           <SettingsGroup title="应用设置" isNew>
             <SettingsRow label="开机启动" hint="系统启动时自动运行 Melody Hub">
               <Switch

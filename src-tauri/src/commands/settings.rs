@@ -37,9 +37,6 @@ pub struct AppSettings {
     // ── 应用 ──
     pub launch_at_login: bool,
     pub start_minimized: bool,
-    // ── 通知 ──
-    pub notifications_enabled: bool,
-    pub desktop_notifications: bool,
     // ── 网络代理 ──
     pub proxy_enabled: bool,
     pub proxy_host: String,
@@ -75,8 +72,6 @@ impl Default for AppSettings {
             page_size: 10,
             launch_at_login: false,
             start_minimized: false,
-            notifications_enabled: true,
-            desktop_notifications: false,
             proxy_enabled: false,
             proxy_host: String::new(),
             proxy_port: 7890,

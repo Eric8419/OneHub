@@ -43,7 +43,10 @@ pub fn run() {
                 #[cfg(desktop)]
                 {
                     use tauri_plugin_autostart::MacosLauncher;
-                    let _ = handle.plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None::<Vec<&str>>));
+                    let _ = handle.plugin(tauri_plugin_autostart::init(
+                        MacosLauncher::LaunchAgent,
+                        None::<Vec<&str>>,
+                    ));
                     init_tray(&handle);
                 }
 
@@ -178,31 +181,59 @@ fn init_tray(app: &tauri::AppHandle) {
     use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
     use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
-    let show_i = match MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>) {
+    let show_i = match MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)
+    {
         Ok(i) => i,
-        Err(e) => { eprintln!("[tray] Failed to create show menu item: {}", e); return; }
+        Err(e) => {
+            eprintln!("[tray] Failed to create show menu item: {}", e);
+            return;
+        }
     };
-    let hide_i = match MenuItem::with_id(app, "hide", "隐藏窗口", true, None::<&str>) {
+    let hide_i = match MenuItem::with_id(app, "hide", "隐藏窗口", true, None::<&str>)
+    {
         Ok(i) => i,
-        Err(e) => { eprintln!("[tray] Failed to create hide menu item: {}", e); return; }
+        Err(e) => {
+            eprintln!("[tray] Failed to create hide menu item: {}", e);
+            return;
+        }
     };
     let sep = match PredefinedMenuItem::separator(app) {
         Ok(s) => s,
-        Err(e) => { eprintln!("[tray] Failed to create separator: {}", e); return; }
+        Err(e) => {
+            eprintln!("[tray] Failed to create separator: {}", e);
+            return;
+        }
     };
-    let quit_i = match MenuItem::with_id(app, "quit", "退出 Melody Hub", true, None::<&str>) {
-        Ok(i) => i,
-        Err(e) => { eprintln!("[tray] Failed to create quit menu item: {}", e); return; }
-    };
+    let quit_i =
+        match MenuItem::with_id(app, "quit", "退出 Melody Hub", true, None::<&str>) {
+            Ok(i) => i,
+            Err(e) => {
+                eprintln!("[tray] Failed to create quit menu item: {}", e);
+                return;
+            }
+        };
     let tray_menu = match Menu::with_items(app, &[&show_i, &hide_i, &sep, &quit_i]) {
         Ok(m) => m,
-        Err(e) => { eprintln!("[tray] Failed to build tray menu: {}", e); return; }
+        Err(e) => {
+            eprintln!("[tray] Failed to build tray menu: {}", e);
+            return;
+        }
     };
 
     let tray_icon_data = include_bytes!("../icons/tray-icon-template.rgba");
     let (width, height) = (
-        u32::from_le_bytes([tray_icon_data[0], tray_icon_data[1], tray_icon_data[2], tray_icon_data[3]]),
-        u32::from_le_bytes([tray_icon_data[4], tray_icon_data[5], tray_icon_data[6], tray_icon_data[7]]),
+        u32::from_le_bytes([
+            tray_icon_data[0],
+            tray_icon_data[1],
+            tray_icon_data[2],
+            tray_icon_data[3],
+        ]),
+        u32::from_le_bytes([
+            tray_icon_data[4],
+            tray_icon_data[5],
+            tray_icon_data[6],
+            tray_icon_data[7],
+        ]),
     );
     let rgba = &tray_icon_data[8..];
     let icon = tauri::image::Image::new_owned(rgba.to_vec(), width, height);

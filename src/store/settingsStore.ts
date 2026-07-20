@@ -15,8 +15,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   pageSize: 10,
   launchAtLogin: false,
   startMinimized: false,
-  notificationsEnabled: true,
-  desktopNotifications: false,
   proxyEnabled: false,
   proxyHost: '',
   proxyPort: 7890,
