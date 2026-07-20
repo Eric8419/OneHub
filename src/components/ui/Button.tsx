@@ -1,11 +1,30 @@
 import React from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Loader2 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'brand' | 'danger' | 'link';
 
 type ButtonSize = 'sm' | 'md' | 'lg';
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+// motion/react overrides the drag / animation / gesture handler
+// signatures (e.g. `onDrag` receives `PanInfo` as a second arg), so
+// we strip them out of `ButtonHTMLAttributes` before merging with
+// `HTMLMotionProps`. Without this, TS complains that React's
+// `DragEventHandler` isn't assignable to motion's `(event, info) => void`.
+type StripMotionHandlers<T> = {
+  [K in keyof T]: K extends
+    | 'onDrag'
+    | 'onDragStart'
+    | 'onDragEnd'
+    | 'onAnimationStart'
+    | 'onAnimationEnd'
+    | 'onAnimationIteration'
+    ? never
+    : T[K];
+};
+
+interface ButtonProps extends StripMotionHandlers<React.ButtonHTMLAttributes<HTMLButtonElement>> {
   variant?: ButtonVariant;
   size?: ButtonSize;
   icon?: LucideIcon;
@@ -21,6 +40,43 @@ const variantClasses: Record<ButtonVariant, string> = {
   danger:
     'background: var(--status-error-default); color: var(--text-onaccent); border-color: var(--status-error-default);',
   link: 'background: transparent; color: var(--text-default); border-color: transparent; padding: 0; height: auto;',
+};
+
+// Initial background per variant — used to restore the inline style
+// after onMouseLeave. We can't just clear `style.background` because
+// the variant's initial background is also applied via inline style
+// (see parseCSS above); clearing it would leave the button with no
+// background at all, falling back to the user-agent `<button>` color
+// (which is light in macOS dark mode and makes the text invisible).
+const variantInitialBackground: Record<ButtonVariant, string> = {
+  primary: 'var(--bg-invert)',
+  secondary: 'var(--bg-overlay-l1)',
+  ghost: 'transparent',
+  brand: 'var(--bg-brand)',
+  danger: 'var(--status-error-default)',
+  link: 'transparent',
+};
+
+// Hover background per variant — kept in one place so hover and
+// initial stay in sync.
+const variantHoverBackground: Record<ButtonVariant, string> = {
+  primary: 'var(--bg-invert-hover)',
+  secondary: 'var(--bg-overlay-l2)',
+  ghost: 'var(--bg-overlay-l1)',
+  brand: 'var(--bg-brand-hover)',
+  danger: 'var(--status-error-hover)',
+  link: 'transparent',
+};
+
+// Subtle elevation for "emphasis" variants (brand / primary / danger).
+// Secondary / ghost / link stay flat to preserve their quiet role.
+const variantShadow: Record<ButtonVariant, string> = {
+  primary: '0 1px 2px rgba(0, 0, 0, 0.08)',
+  secondary: 'none',
+  ghost: 'none',
+  brand: '0 1px 2px color-mix(in srgb, var(--bg-brand) 40%, transparent), 0 4px 12px color-mix(in srgb, var(--bg-brand) 24%, transparent)',
+  danger: '0 1px 2px rgba(0, 0, 0, 0.08)',
+  link: 'none',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
@@ -43,8 +99,8 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const isIconOnly = iconOnly || (!children && !!Icon);
+  const isBusy = loading && !disabled;
 
-  // Track original width to prevent text jump during loading
   const btnStyle: React.CSSProperties = {
     position: 'relative',
     display: 'inline-flex',
@@ -60,8 +116,9 @@ export const Button: React.FC<ButtonProps> = ({
     fontWeight: 'var(--font-weight-medium)',
     lineHeight: '1',
     transition:
-      'background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast), transform 160ms cubic-bezier(0.23, 1, 0.32, 1)',
+      'background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast), transform 160ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow var(--transition-fast), width 240ms cubic-bezier(0.23, 1, 0.32, 1)',
     opacity: disabled ? 0.5 : 1,
+    boxShadow: variantShadow[variant],
     ...(isIconOnly
       ? { width: size === 'sm' ? 24 : size === 'lg' ? 36 : 28, padding: 0, justifyContent: 'center' }
       : {}),
@@ -70,44 +127,82 @@ export const Button: React.FC<ButtonProps> = ({
     ...style,
   };
 
+  // Content renderer — the spinner / icon swap is wrapped in
+  // AnimatePresence so the cross-fade is smooth instead of a hard
+  // cut. The text label also fades opacity to signal loading state
+  // without jumping layout.
+  const renderLeading = () => {
+    if (isBusy) {
+      return (
+        <motion.span
+          key="spinner"
+          initial={{ opacity: 0, scale: 0.6 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.6 }}
+          transition={{ duration: 0.18 }}
+          style={{ display: 'inline-flex', alignItems: 'center' }}
+        >
+          <Loader2 size={iconSize[size]} className="animate-spin" />
+        </motion.span>
+      );
+    }
+    if (Icon) {
+      return (
+        <motion.span
+          key={`icon-${Icon.displayName ?? 'unknown'}`}
+          initial={{ opacity: 0, scale: 0.6 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.6 }}
+          transition={{ duration: 0.18 }}
+          style={{ display: 'inline-flex', alignItems: 'center' }}
+        >
+          <Icon size={iconSize[size]} />
+        </motion.span>
+      );
+    }
+    return null;
+  };
+
   return (
-    <button
+    <motion.button
       className="ds-btn"
+      // `disabled || loading` keeps click handlers from firing while
+      // in-flight, but we still render content (not the browser
+      // default disabled look) so the spinner + faded label remains
+      // visible.
       disabled={disabled || loading}
       style={btnStyle}
+      // Press-down feedback: scale to 0.97 on tap. Disabled / loading
+      // buttons don't get the press feedback (loading already has
+      // its own motion).
+      whileTap={disabled || isBusy ? undefined : { scale: 0.97 }}
+      whileHover={disabled || isBusy ? undefined : {}}
       onMouseEnter={(e) => {
         if (!disabled && !loading) {
-          if (variant === 'secondary') e.currentTarget.style.background = 'var(--bg-overlay-l2)';
-          else if (variant === 'ghost') e.currentTarget.style.background = 'var(--bg-overlay-l1)';
-          else if (variant === 'brand') e.currentTarget.style.background = 'var(--bg-brand-hover)';
-          else if (variant === 'primary') e.currentTarget.style.background = 'var(--bg-invert-hover)';
-          else if (variant === 'danger') e.currentTarget.style.background = 'var(--status-error-hover)';
+          e.currentTarget.style.background = variantHoverBackground[variant];
         }
       }}
       onMouseLeave={(e) => {
         if (!disabled && !loading) {
-          e.currentTarget.style.background = '';
+          e.currentTarget.style.background = variantInitialBackground[variant];
         }
       }}
       {...props}
     >
-      {loading ? (
-        <span
-          style={{
-            width: iconSize[size],
-            height: iconSize[size],
-            display: 'inline-block',
-            border: '2px solid currentColor',
-            borderTopColor: 'transparent',
-            borderRadius: '50%',
-            animation: 'spin 0.6s linear infinite',
-          }}
-        />
-      ) : Icon ? (
-        <Icon size={iconSize[size]} />
-      ) : null}
-      {!isIconOnly && children != null && <span style={{ opacity: loading ? 0.7 : 1 }}>{children}</span>}
-    </button>
+      <AnimatePresence mode="wait" initial={false}>
+        {renderLeading()}
+      </AnimatePresence>
+      {!isIconOnly && children != null && (
+        <motion.span
+          key="label"
+          animate={{ opacity: isBusy ? 0.7 : 1 }}
+          transition={{ duration: 0.18 }}
+          style={{ display: 'inline-flex', alignItems: 'center' }}
+        >
+          {children}
+        </motion.span>
+      )}
+    </motion.button>
   );
 };
 

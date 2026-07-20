@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { useSettingsStore } from '../../store/settingsStore';
 import {
   Button,
@@ -13,7 +14,37 @@ import {
 import type { SegmentOption } from '../../components/ui/SegmentedControl';
 import { desktopApi, onUpdateAvailable, type UpdateMetadata } from '../../lib/desktopApi';
 import { isValidHex, normalizeHex } from '../../lib/colorUtils';
-import { Sun, Moon, Monitor, RefreshCw, Copy, Eye, EyeOff, Check, Download, Loader2 } from 'lucide-react';
+import {
+  Sun,
+  Moon,
+  Monitor,
+  RefreshCw,
+  Copy,
+  Eye,
+  EyeOff,
+  Check,
+  Download,
+  HelpCircle,
+  Rss,
+  Globe,
+  MessageSquare,
+} from 'lucide-react';
+
+// Inline GitHub mark — lucide-react deliberately omits brand icons
+// (trademark policy), so we ship a simple 20px monochrome mark that
+// inherits currentColor, matching the surrounding icon style.
+const GithubMark: React.FC<{ size?: number }> = ({ size = 20 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.69-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.17 1.18.92-.26 1.9-.38 2.88-.39.98.01 1.96.13 2.88.39 2.2-1.49 3.17-1.18 3.17-1.18.62 1.59.23 2.76.11 3.05.73.81 1.18 1.84 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.78 1.05.78 2.12 0 1.53-.01 2.77-.01 3.14 0 .31.21.67.8.56C20.22 21.38 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z" />
+  </svg>
+);
 
 function generateAuthToken(): string {
   const bytes = new Uint8Array(32);
@@ -81,7 +112,7 @@ const errorMessage = (e: unknown, fallback: string) =>
   e instanceof Error ? e.message : e ? String(e) : fallback;
 
 interface SettingsGroupProps {
-  title: string;
+  title?: string;
   isNew?: boolean;
   children: React.ReactNode;
   style?: React.CSSProperties;
@@ -97,24 +128,26 @@ const SettingsGroup: React.FC<SettingsGroupProps> = ({ title, isNew, children, s
       ...style,
     }}
   >
-    <div
-      style={{
-        padding: '16px 20px',
-        fontSize: 16,
-        fontWeight: 600,
-        lineHeight: 1.4,
-        color: 'var(--text-default)',
-        borderBottom: '1px solid var(--border-neutral-l1)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-      }}
-    >
-      {title}
-      {isNew && (
-        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--bg-brand)' }}>New</span>
-      )}
-    </div>
+    {title && (
+      <div
+        style={{
+          padding: '16px 20px',
+          fontSize: 16,
+          fontWeight: 600,
+          lineHeight: 1.4,
+          color: 'var(--text-default)',
+          borderBottom: '1px solid var(--border-neutral-l1)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+        }}
+      >
+        {title}
+        {isNew && (
+          <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--bg-brand)' }}>New</span>
+        )}
+      </div>
+    )}
     {children}
   </Card>
 );
@@ -144,6 +177,47 @@ const SettingsRow: React.FC<SettingsRowProps> = ({ label, children, hint, isLast
       {hint && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{hint}</span>}
     </div>
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>{children}</div>
+  </div>
+);
+
+// Link-row for the "关于" links card: icon + label on the left,
+// ghost "查看"/"反馈" button on the right. Mirrors the Cherry Studio
+// pattern — flat, no border around the whole card, just a bottom
+// divider between rows.
+interface AboutLinkRowProps {
+  icon: React.ReactNode;
+  label: string;
+  actionLabel: string;
+  onClick: () => void;
+  isLast?: boolean;
+}
+
+const AboutLinkRow: React.FC<AboutLinkRowProps> = ({ icon, label, actionLabel, onClick, isLast }) => (
+  <div
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 'var(--spacer-12)',
+      padding: '13px 20px',
+      minHeight: 48,
+      boxSizing: 'border-box',
+      borderBottom: isLast ? 'none' : '1px solid var(--border-neutral-l1)',
+    }}
+  >
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'var(--text-secondary)',
+      }}
+    >
+      {icon}
+    </span>
+    <span style={{ fontSize: 15, color: 'var(--text-default)', flex: 1 }}>{label}</span>
+    <Button variant="secondary" size="sm" onClick={onClick}>
+      {actionLabel}
+    </Button>
   </div>
 );
 
@@ -622,34 +696,175 @@ export const SettingsForm: React.FC = () => {
       {/* ═══════════════════════════════════════════════════ 关于 */}
       {activeCategory === 'about' && (
         <AnimatedContent>
-          <SettingsGroup title="更新检查">
-            <SettingsRow label="启动时检查更新">
+          {/* ── About / Update card ────────────────────────── */}
+          <SettingsGroup>
+            {/* Header row: title + GitHub link */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '16px 20px',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 16,
+                  fontWeight: 600,
+                  lineHeight: 1.4,
+                  color: 'var(--text-default)',
+                }}
+              >
+                关于我们
+              </span>
+              <button
+                type="button"
+                onClick={() => openUrl('https://github.com/Lhy723/MelodyHub').catch(() => {})}
+                title="在浏览器中打开 GitHub 仓库"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 32,
+                  height: 32,
+                  padding: 0,
+                  border: 'none',
+                  borderRadius: 'var(--radius-8)',
+                  background: 'transparent',
+                  color: 'var(--text-tertiary)',
+                  cursor: 'pointer',
+                  transition: 'background var(--transition-fast), color var(--transition-fast)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+                  e.currentTarget.style.color = 'var(--text-default)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = 'var(--text-tertiary)';
+                }}
+              >
+                <GithubMark size={20} />
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div style={{ height: 1, background: 'var(--border-neutral-l1)' }} />
+
+            {/* Hero row: logo + name/slogan/version + check-update button */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--spacer-16)',
+                padding: 'var(--spacer-24) var(--spacer-20)',
+              }}
+            >
+              <img
+                src="/brand/app-icon-1024.png"
+                alt="Melody Hub"
+                width={72}
+                height={72}
+                style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 16,
+                  flexShrink: 0,
+                  userSelect: 'none',
+                }}
+                draggable={false}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 'var(--heading-md-font-size)',
+                    fontWeight: 'var(--heading-md-font-weight)',
+                    lineHeight: 'var(--heading-md-line-height)',
+                    color: 'var(--text-default)',
+                  }}
+                >
+                  Melody Hub
+                </div>
+                <div
+                  style={{
+                    fontSize: 'var(--body-base-font-size)',
+                    color: 'var(--text-tertiary)',
+                    marginTop: 2,
+                  }}
+                >
+                  一款面向开发者的本地 LLM 代理服务
+                </div>
+                <div style={{ marginTop: 8, display: 'inline-flex' }}>
+                  <span
+                    style={{
+                      fontSize: 'var(--body-sm-font-size)',
+                      fontWeight: 'var(--font-weight-medium)',
+                      color: 'var(--bg-brand)',
+                      padding: '2px 10px',
+                      border: '1px solid color-mix(in srgb, var(--bg-brand) 40%, transparent)',
+                      borderRadius: 'var(--radius-6)',
+                      background: 'color-mix(in srgb, var(--bg-brand) 10%, transparent)',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    v{pendingUpdate?.currentVersion ?? '0.1.1'}
+                  </span>
+                </div>
+              </div>
+              <Button
+                variant="secondary"
+                icon={RefreshCw}
+                loading={checking}
+                onClick={handleCheckUpdates}
+                disabled={installing}
+                size="md"
+              >
+                {checking ? '检查中...' : '检查更新'}
+              </Button>
+            </div>
+
+            {/* Divider */}
+            <div style={{ height: 1, background: 'var(--border-neutral-l1)' }} />
+
+            {/* Auto-update row */}
+            <SettingsRow label="自动更新" isLast>
               <Switch
                 checked={settings.checkUpdatesOnStart}
                 onChange={(v) => updateSettings({ checkUpdatesOnStart: v })}
               />
             </SettingsRow>
-            <SettingsRow label="手动检查" isLast>
-              <Button
-                variant="secondary"
-                onClick={handleCheckUpdates}
-                disabled={checking || installing}
-              >
-                {checking ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    检查中...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw size={14} />
-                    检查更新
-                  </>
-                )}
-              </Button>
-            </SettingsRow>
           </SettingsGroup>
 
+          {/* ── Links card ─────────────────────────────────── */}
+          <SettingsGroup>
+            <AboutLinkRow
+              icon={<HelpCircle size={20} />}
+              label="帮助文档"
+              actionLabel="查看"
+              onClick={() => openUrl('https://github.com/Lhy723/MelodyHub#readme').catch(() => {})}
+            />
+            <AboutLinkRow
+              icon={<Rss size={20} />}
+              label="更新日志"
+              actionLabel="查看"
+              onClick={() => openUrl('https://github.com/Lhy723/MelodyHub/releases').catch(() => {})}
+            />
+            <AboutLinkRow
+              icon={<Globe size={20} />}
+              label="官方网站"
+              actionLabel="查看"
+              onClick={() => openUrl('https://github.com/Lhy723/MelodyHub').catch(() => {})}
+            />
+            <AboutLinkRow
+              icon={<MessageSquare size={20} />}
+              label="意见反馈"
+              actionLabel="反馈"
+              onClick={() => openUrl('https://github.com/Lhy723/MelodyHub/issues').catch(() => {})}
+              isLast
+            />
+          </SettingsGroup>
+
+          {/* ── Data management (kept but de-emphasized) ─── */}
           <SettingsGroup title="数据管理">
             <SettingsRow label="" isLast>
               <Button onClick={() => toast('配置导出功能开发中', 'info')}>导出配置</Button>
@@ -778,31 +993,82 @@ export const SettingsForm: React.FC = () => {
                 <div style={{ marginBottom: 'var(--spacer-16)' }}>
                   <div
                     style={{
-                      height: 6,
+                      height: 8,
                       background: 'var(--bg-overlay-l1)',
                       borderRadius: 'var(--radius-full)',
                       overflow: 'hidden',
+                      position: 'relative',
                     }}
                   >
                     <motion.div
                       animate={{ width: `${Math.round(installProgress * 100)}%` }}
-                      transition={{ duration: 0.2 }}
+                      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                       style={{
                         height: '100%',
-                        background: 'var(--bg-brand)',
+                        background: 'linear-gradient(90deg, var(--bg-brand), var(--bg-brand-hover))',
                         borderRadius: 'var(--radius-full)',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        // Celebration pulse when the download completes:
+                        // the bar briefly radiates a brand-colored ring
+                        // before the installer takes over.
+                        animation:
+                          installProgress >= 1
+                            ? 'progressDonePulse 0.9s ease-out'
+                            : 'none',
                       }}
-                    />
+                    >
+                      {/* Shimmer overlay — a soft highlight that sweeps
+                          across the filled portion while the download
+                          is still in progress. Paused at 100% so the
+                          done-pulse animation owns the spotlight. */}
+                      {installProgress < 1 && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            background:
+                              'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.35) 50%, transparent 100%)',
+                            transform: 'translateX(-120%)',
+                            animation: 'progressShimmer 1.4s ease-in-out infinite',
+                            pointerEvents: 'none',
+                          }}
+                        />
+                      )}
+                    </motion.div>
                   </div>
                   <div
                     style={{
-                      marginTop: 'var(--spacer-8)',
-                      fontSize: 'var(--body-xs-font-size)',
-                      color: 'var(--text-tertiary)',
-                      textAlign: 'center',
+                      marginTop: 'var(--spacer-10)',
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      justifyContent: 'center',
+                      gap: 'var(--spacer-4)',
                     }}
                   >
-                    {installProgress >= 1 ? '正在安装...' : `${Math.round(installProgress * 100)}%`}
+                    <motion.span
+                      key={Math.round(installProgress * 100)}
+                      initial={{ opacity: 0.4, y: -2 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.18 }}
+                      style={{
+                        fontSize: 18,
+                        fontWeight: 'var(--font-weight-strong)',
+                        color: installProgress >= 1 ? 'var(--bg-brand)' : 'var(--text-default)',
+                        fontVariantNumeric: 'tabular-nums',
+                        fontFeatureSettings: '"tnum"',
+                      }}
+                    >
+                      {Math.round(installProgress * 100)}
+                    </motion.span>
+                    <span
+                      style={{
+                        fontSize: 'var(--body-xs-font-size)',
+                        color: 'var(--text-tertiary)',
+                      }}
+                    >
+                      {installProgress >= 1 ? '% · 正在安装...' : '%'}
+                    </span>
                   </div>
                 </div>
               )}
@@ -822,17 +1088,13 @@ export const SettingsForm: React.FC = () => {
                   稍后
                 </Button>
                 <Button
+                  variant="brand"
+                  icon={Download}
+                  loading={installing}
                   onClick={handleInstallUpdate}
-                  disabled={installing || checking}
+                  disabled={checking}
                 >
-                  {installing ? (
-                    <>
-                      <Loader2 size={14} className="animate-spin" />
-                      安装中...
-                    </>
-                  ) : (
-                    '下载并安装'
-                  )}
+                  {installing ? '安装中...' : '下载并安装'}
                 </Button>
               </div>
             </motion.div>
