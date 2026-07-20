@@ -92,7 +92,8 @@ jobs:
             |------|------|
             | macOS (Apple Silicon) | `*aarch64.dmg` |
             | macOS (Intel) | `*x64.dmg` |
-            | Windows | `*_x64-setup.exe` |
+            | Windows (安装包) | `*_x64-setup.exe` |
+            | Windows (便携版) | `*_x64-portable.zip` |
             | Linux | `*_amd64.deb` / `*.AppImage` |
 
             ---
@@ -101,6 +102,39 @@ jobs:
           releaseDraft: false
           prerelease: false
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.version) }}
-          uploadUpdaterJson: false
-          uploadUpdaterSignatures: false
+          # Generate latest.json for the updater plugin. Prefer NSIS on Windows
+          # so the updater downloads the .exe installer (not .msi).
+          updaterJsonPreferNsis: true
           args: ${{ matrix.args }}
+
+      # ── Windows portable build ──
+      # Tauri 2 doesn't ship a "portable" target. We take the built
+      # `melody-hub.exe` from `target/release/` (no --target was passed
+      # on Windows so it lands in the default host triple folder) and
+      # zip it into a portable archive. WebView2 is bundled with Win11
+      # and Win10 (recent builds), so the bare exe runs standalone.
+      - name: Package Windows portable zip
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $exe = "src-tauri/target/release/melody-hub.exe"
+          if (-not (Test-Path $exe)) {
+            Write-Host "::error::Portable exe not found at $exe"
+            exit 1
+          }
+          $version = "${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.version) }}"
+          $version = $version -replace '^v', ''
+          $zip = "melody-hub_${version}_x64-portable.zip"
+          Compress-Archive -Path $exe -DestinationPath $zip -Force
+          Write-Host "Created $zip"
+
+      - name: Upload portable zip to release
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.version) }}"
+          $version = $version -replace '^v', ''
+          $zip = "melody-hub_${version}_x64-portable.zip"
+          gh release upload "${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.version) }}" $zip --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

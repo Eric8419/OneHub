@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useSettingsStore } from '../../store/settingsStore';
 import {
   Button,
@@ -10,9 +11,9 @@ import {
   SegmentedControl,
 } from '../../components/ui';
 import type { SegmentOption } from '../../components/ui/SegmentedControl';
-import { desktopApi } from '../../lib/desktopApi';
+import { desktopApi, onUpdateAvailable, type UpdateMetadata } from '../../lib/desktopApi';
 import { isValidHex, normalizeHex } from '../../lib/colorUtils';
-import { Sun, Moon, Monitor, RefreshCw, Copy, Eye, EyeOff, Check } from 'lucide-react';
+import { Sun, Moon, Monitor, RefreshCw, Copy, Eye, EyeOff, Check, Download, Loader2 } from 'lucide-react';
 
 function generateAuthToken(): string {
   const bytes = new Uint8Array(32);
@@ -63,11 +64,6 @@ const retryOptions: SegmentOption[] = [
   { value: '1', label: '1次' },
   { value: '3', label: '3次' },
   { value: '5', label: '5次' },
-];
-
-const updateChannelOptions: SegmentOption[] = [
-  { value: 'stable', label: '稳定版' },
-  { value: 'beta', label: '测试版' },
 ];
 
 const COLOR_PRESETS = [
@@ -195,6 +191,16 @@ export const SettingsForm: React.FC = () => {
   const [showToken, setShowToken] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // ── Updater state ──
+  // `checking` = in-flight check; `pendingUpdate` = update metadata
+  // shown in the confirm dialog; `installing` = download+install in
+  // progress; `installProgress` = 0..1 download ratio.
+  const [checking, setChecking] = useState(false);
+  const [pendingUpdate, setPendingUpdate] = useState<UpdateMetadata | null>(null);
+  const [installing, setInstalling] = useState(false);
+  const [installProgress, setInstallProgress] = useState(0);
+  const installContentLengthRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (!loaded) loadSettings();
   }, [loaded, loadSettings]);
@@ -213,6 +219,85 @@ export const SettingsForm: React.FC = () => {
       /* Tauri command may not be available in browser */
     }
   }, []);
+
+  // Startup auto-check listener: when the backend's startup probe
+  // finds an update, surface a toast and pre-fill the confirm dialog
+  // state so a click on "查看" can open the About page with the
+  // metadata ready to install.
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    onUpdateAvailable((meta) => {
+      setPendingUpdate(meta);
+      toast(`发现新版本 v${meta.version}，请到「关于」页面查看`, 'info');
+    })
+      .then((fn) => {
+        unlisten = fn;
+      })
+      .catch(() => {
+        /* listener registration can fail when running outside Tauri */
+      });
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
+
+  const handleCheckUpdates = async () => {
+    setChecking(true);
+    try {
+      const meta = await desktopApi.checkForUpdates();
+      if (!meta) {
+        toast('当前已是最新版本', 'success');
+        setPendingUpdate(null);
+      } else {
+        setPendingUpdate(meta);
+      }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), 'error');
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    setInstalling(true);
+    setInstallProgress(0);
+    installContentLengthRef.current = null;
+    try {
+      await desktopApi.downloadAndInstallUpdate((event) => {
+        if (event.event === 'started') {
+          installContentLengthRef.current = event.data.contentLength ?? null;
+        } else if (event.event === 'progress') {
+          const total = installContentLengthRef.current;
+          if (total && total > 0) {
+            // Progress events only carry chunkLength, so we accumulate
+            // by tracking total in a ref. We can't read state here
+            // (stale closure), so recompute from the event stream.
+            setInstallProgress((prev) => {
+              const next = prev + event.data.chunkLength / total;
+              return Math.min(next, 1);
+            });
+          }
+        } else if (event.event === 'finished') {
+          setInstallProgress(1);
+        }
+      });
+      toast('更新已安装，应用即将重启', 'success');
+      // Give the toast a moment to render before the process restarts.
+      setTimeout(() => {
+        desktopApi.exitApp();
+      }, 800);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), 'error');
+      setInstalling(false);
+      setInstallProgress(0);
+    }
+  };
+
+  const handleDismissUpdate = () => {
+    if (installing) return;
+    setPendingUpdate(null);
+    setInstallProgress(0);
+  };
 
   const handleExportLogs = async () => {
     setExporting(true);
@@ -544,13 +629,24 @@ export const SettingsForm: React.FC = () => {
                 onChange={(v) => updateSettings({ checkUpdatesOnStart: v })}
               />
             </SettingsRow>
-            <SettingsRow label="更新通道" isLast>
-              <SegmentedControl
-                options={updateChannelOptions}
-                value={settings.updateChannel}
-                onChange={(v) => updateSettings({ updateChannel: v })}
-                size="sm"
-              />
+            <SettingsRow label="手动检查" isLast>
+              <Button
+                variant="secondary"
+                onClick={handleCheckUpdates}
+                disabled={checking || installing}
+              >
+                {checking ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    检查中...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw size={14} />
+                    检查更新
+                  </>
+                )}
+              </Button>
             </SettingsRow>
           </SettingsGroup>
 
@@ -574,6 +670,175 @@ export const SettingsForm: React.FC = () => {
           </SettingsGroup>
         </AnimatedContent>
       )}
+
+      {/* ── Update confirm / install dialog ──
+          Rendered as a portal-like overlay whenever `pendingUpdate`
+          is set. During install, shows a progress bar and disables
+          dismiss actions. */}
+      <AnimatePresence>
+        {pendingUpdate && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+            }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) handleDismissUpdate();
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 8 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 8 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              style={{
+                background: 'var(--bg-overlay-l2)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-12)',
+                padding: 'var(--spacer-24)',
+                width: 420,
+                maxWidth: '90vw',
+                boxShadow: 'var(--shadow-floating)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--spacer-12)',
+                  marginBottom: 'var(--spacer-16)',
+                }}
+              >
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 'var(--radius-10)',
+                    background: 'var(--bg-brand)',
+                    color: 'var(--text-onbrand)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Download size={18} />
+                </div>
+                <div>
+                  <div
+                    style={{
+                      fontSize: 'var(--heading-xs-font-size)',
+                      fontWeight: 'var(--font-weight-strong)',
+                      color: 'var(--text-default)',
+                    }}
+                  >
+                    发现新版本
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 'var(--body-xs-font-size)',
+                      color: 'var(--text-tertiary)',
+                    }}
+                  >
+                    v{pendingUpdate.currentVersion} → v{pendingUpdate.version}
+                  </div>
+                </div>
+              </div>
+
+              {pendingUpdate.body && (
+                <div
+                  style={{
+                    marginBottom: 'var(--spacer-16)',
+                    padding: 'var(--spacer-12)',
+                    background: 'var(--bg-overlay-l1)',
+                    borderRadius: 'var(--radius-8)',
+                    maxHeight: 160,
+                    overflowY: 'auto',
+                    fontSize: 'var(--body-sm-font-size)',
+                    color: 'var(--text-secondary)',
+                    whiteSpace: 'pre-wrap',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {pendingUpdate.body}
+                </div>
+              )}
+
+              {installing && (
+                <div style={{ marginBottom: 'var(--spacer-16)' }}>
+                  <div
+                    style={{
+                      height: 6,
+                      background: 'var(--bg-overlay-l1)',
+                      borderRadius: 'var(--radius-full)',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <motion.div
+                      animate={{ width: `${Math.round(installProgress * 100)}%` }}
+                      transition={{ duration: 0.2 }}
+                      style={{
+                        height: '100%',
+                        background: 'var(--bg-brand)',
+                        borderRadius: 'var(--radius-full)',
+                      }}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 'var(--spacer-8)',
+                      fontSize: 'var(--body-xs-font-size)',
+                      color: 'var(--text-tertiary)',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {installProgress >= 1 ? '正在安装...' : `${Math.round(installProgress * 100)}%`}
+                  </div>
+                </div>
+              )}
+
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 'var(--spacer-8)',
+                  justifyContent: 'flex-end',
+                }}
+              >
+                <Button
+                  variant="secondary"
+                  onClick={handleDismissUpdate}
+                  disabled={installing}
+                >
+                  稍后
+                </Button>
+                <Button
+                  onClick={handleInstallUpdate}
+                  disabled={installing || checking}
+                >
+                  {installing ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      安装中...
+                    </>
+                  ) : (
+                    '下载并安装'
+                  )}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

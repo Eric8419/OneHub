@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { Channel, invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { AppSettings } from '../types/settings';
 import type { Provider } from '../types/provider';
@@ -12,6 +12,20 @@ export interface ProviderHealthSnapshot {
   inFlight: number;
   consecutiveFailures: number;
 }
+
+/** Metadata returned by the `check_for_updates` command. */
+export interface UpdateMetadata {
+  version: string;
+  currentVersion: string;
+  date?: string;
+  body: string;
+}
+
+/** Progress events streamed from `download_and_install_update`. */
+export type DownloadEvent =
+  | { event: 'started'; data: { contentLength?: number } }
+  | { event: 'progress'; data: { chunkLength: number } }
+  | { event: 'finished' };
 
 export interface DesktopApi {
   loadSettings(): Promise<AppSettings>;
@@ -42,6 +56,10 @@ export interface DesktopApi {
     apiKey: string,
   ): Promise<{ success: boolean; modelCount?: number; error?: { kind: string; message: string }; message: string }>;
   getProviderHealth(): Promise<Record<string, ProviderHealthSnapshot>>;
+  /** Probe the updater endpoints. Returns `null` when up-to-date. */
+  checkForUpdates(): Promise<UpdateMetadata | null>;
+  /** Download + install the pending update, streaming progress to `onEvent`. */
+  downloadAndInstallUpdate(onEvent: (event: DownloadEvent) => void): Promise<void>;
 }
 
 export const desktopApi: DesktopApi = {
@@ -66,6 +84,15 @@ export const desktopApi: DesktopApi = {
   fetchProviderModels: (flavor, apiBase, apiKey) => invoke('fetch_provider_models', { flavor, apiBase, apiKey }),
   testProviderConnection: (flavor, apiBase, apiKey) => invoke('test_provider_connection', { flavor, apiBase, apiKey }),
   getProviderHealth: () => invoke<Record<string, ProviderHealthSnapshot>>('get_provider_health'),
+  checkForUpdates: () => invoke<UpdateMetadata | null>('check_for_updates'),
+  downloadAndInstallUpdate: (onEvent) => {
+    const channel = new Channel<DownloadEvent>();
+    channel.onmessage = (message) => {
+      // The Tauri Channel delivers the message payload directly.
+      onEvent(message);
+    };
+    return invoke('download_and_install_update', { onEvent: channel });
+  },
 };
 
 /**
@@ -75,6 +102,18 @@ export const desktopApi: DesktopApi = {
  */
 export function onRequestCompleted(callback: (record: RequestRecord) => void): Promise<UnlistenFn> {
   return listen<RequestRecord>('request-completed', (event) => {
+    callback(event.payload);
+  });
+}
+
+/**
+ * Subscribe to `update-available` events emitted by the Rust backend
+ * during startup (when `checkUpdatesOnStart` is enabled). The payload
+ * contains the new version metadata. Use this to surface a toast that
+ * routes the user to Settings → About to install.
+ */
+export function onUpdateAvailable(callback: (meta: UpdateMetadata) => void): Promise<UnlistenFn> {
+  return listen<UpdateMetadata>('update-available', (event) => {
     callback(event.payload);
   });
 }

@@ -4,7 +4,12 @@ import type { AppSettings } from '../types/settings';
 import type { Provider } from '../types/provider';
 import type { Aggregation } from '../types/aggregation';
 
-vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn(),
+  Channel: class {
+    onmessage: ((m: unknown) => void) | null = null;
+  },
+}));
 const { invoke } = await import('@tauri-apps/api/core');
 
 const settingsFixture: AppSettings = {

@@ -32,15 +32,19 @@
     "updater": {
       "active": true,
       "dialog": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZDMTk2RTNGRDNGODA5MTUKUldRVkNmalRQMjRaL0NObmZ6T2UralhnSktONnBSUzFtckdCcFZJdlFJdzIxYmdTV2JhWmpodVcK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg5OUM1MjQ2NjBBMDI5QUMKUldTc0thQmdSbEtjaVdkcVRWZ05lYmRwd2xLUXN1ZlpHajN5Q2JpdWIveGlrSlJOV0x3T3F1UEkK",
       "endpoints": [
-        "https://github.com/Lhy723/MelodyHub/releases/latest/download/{{target}}-{{arch}}-{{current_version}}"
-      ]
+        "https://github.com/Lhy723/MelodyHub/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "targets": ["dmg", "app", "nsis", "deb", "appimage", "rpm"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

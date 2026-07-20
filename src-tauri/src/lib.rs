@@ -23,8 +23,9 @@ mod storage;
 mod types;
 
 use commands::settings;
+use commands::updater::PendingUpdate;
 use proxy::SharedAppState;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -35,6 +36,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(app_state.clone())
+        .manage(PendingUpdate::default())
         .setup({
             let state = app_state.clone();
             move |app| {
@@ -97,6 +99,9 @@ pub fn run() {
             commands::logs::export_logs,
             commands::logs::open_log_dir,
             commands::logs::init_log_dir,
+            // Updater
+            commands::updater::check_for_updates,
+            commands::updater::download_and_install_update,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -173,7 +178,56 @@ fn bootstrap(app_handle: &tauri::AppHandle, state: &SharedAppState) {
                 let _ = w.set_focus();
             }
         }
+
+        // 8. Auto-check for updates (notification-only — never auto-installs).
+        // The frontend listens for the `update-available` event and shows
+        // a toast with a "查看" button that opens the About page where the
+        // user can confirm and install.
+        if s.check_updates_on_start {
+            let handle_for_update = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                check_update_on_startup(&handle_for_update).await;
+            });
+        }
     });
+}
+
+/// Background startup update check. On success and when an update is
+/// available, emits `update-available` to the frontend with the
+/// metadata payload. Errors are logged but never surfaced to the user
+/// (the user can still trigger a manual check from Settings → About).
+#[cfg(desktop)]
+async fn check_update_on_startup(handle: &tauri::AppHandle) {
+    use tauri_plugin_updater::UpdaterExt;
+    match handle.updater() {
+        Ok(updater) => match updater.check().await {
+            Ok(Some(update)) => {
+                use serde_json::json;
+                let payload = json!({
+                    "version": update.version,
+                    "currentVersion": update.current_version,
+                    "date": update.date.map(|d| format!("{}-{:02}-{:02}T{:02}:{:02}:{:02}Z", d.year(), d.month() as u8, d.day(), d.hour(), d.minute(), d.second())),
+                    "body": update.body.clone().unwrap_or_default(),
+                });
+                let _ = handle.emit("update-available", payload);
+                // Stash the pending update so the frontend's manual
+                // "install" button (which calls download_and_install_update)
+                // works without a redundant check.
+                if let Some(pending) = handle.try_state::<PendingUpdate>() {
+                    *pending.0.lock().unwrap() = Some(update);
+                }
+            }
+            Ok(None) => {
+                println!("[updater] App is up to date");
+            }
+            Err(e) => {
+                eprintln!("[updater] Startup check failed: {}", e);
+            }
+        },
+        Err(e) => {
+            eprintln!("[updater] Could not build updater: {}", e);
+        }
+    }
 }
 
 #[cfg(desktop)]
