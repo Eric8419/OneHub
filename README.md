@@ -203,9 +203,6 @@ pnpm format:check
 # 前端单元测试
 pnpm test
 
-# 端到端测试
-pnpm test:e2e
-
 # Rust 后端检查和测试
 cd src-tauri
 cargo check
@@ -226,7 +223,6 @@ MelodyHub/
 │   ├── src/commands/      # Tauri command
 │   ├── src/proxy/         # 本地代理、路由、指标和适配器
 │   └── tauri.conf.json    # Tauri 应用配置
-├── e2e/                   # Playwright 测试
 ├── docs/screenshots/      # README 截图、历史稿与调试截图
 ├── public/                # 静态资源
 ├── CHANGELOG.md           # 版本变更记录
