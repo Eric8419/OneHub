@@ -40,7 +40,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -98,7 +98,7 @@ jobs:
             ---
 
             See the assets below to download and install this version.
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.version) }}
           uploadUpdaterJson: false
