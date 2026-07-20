@@ -32,7 +32,7 @@
     "updater": {
       "active": true,
       "dialog": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg5OUM1MjQ2NjBBMDI5QUMKUldTc0thQmdSbEtjaVdkcVRWZ05lYmRwd2xLUXN1ZlpHajN5Q2JpdWIveGlrSlJOV0x3T3F1UEkK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU4QzQzRkREMkUxN0FDQkMKUldTOHJCY3UzVC9FV01oWXI0QTg2eFFRYlRpeTUwUTZmU2FLWkc2K1RvNWJ3SHNIUWtESXQxeTkK",
       "endpoints": [
         "https://github.com/Lhy723/MelodyHub/releases/latest/download/latest.json"
       ],
