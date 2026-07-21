@@ -252,19 +252,15 @@ fn init_tray(app: &tauri::AppHandle) {
             return;
         }
     };
-    let address_i = match MenuItem::with_id(
-        app,
-        "address",
-        "监听地址: --",
-        false,
-        None::<&str>,
-    ) {
-        Ok(i) => i,
-        Err(e) => {
-            eprintln!("[tray] Failed to create address menu item: {}", e);
-            return;
-        }
-    };
+    let address_i =
+        match MenuItem::with_id(app, "address", "监听地址: --", false, None::<&str>)
+        {
+            Ok(i) => i,
+            Err(e) => {
+                eprintln!("[tray] Failed to create address menu item: {}", e);
+                return;
+            }
+        };
     let sep1 = match PredefinedMenuItem::separator(app) {
         Ok(s) => s,
         Err(e) => {
@@ -272,14 +268,15 @@ fn init_tray(app: &tauri::AppHandle) {
             return;
         }
     };
-    let toggle_i = match MenuItem::with_id(app, "toggle_proxy", "启动代理", true, None::<&str>)
-    {
-        Ok(i) => i,
-        Err(e) => {
-            eprintln!("[tray] Failed to create toggle menu item: {}", e);
-            return;
-        }
-    };
+    let toggle_i =
+        match MenuItem::with_id(app, "toggle_proxy", "启动代理", true, None::<&str>)
+        {
+            Ok(i) => i,
+            Err(e) => {
+                eprintln!("[tray] Failed to create toggle menu item: {}", e);
+                return;
+            }
+        };
     let sep2 = match PredefinedMenuItem::separator(app) {
         Ok(s) => s,
         Err(e) => {
@@ -334,16 +331,8 @@ fn init_tray(app: &tauri::AppHandle) {
     let tray_menu = match Menu::with_items(
         app,
         &[
-            &status_i,
-            &address_i,
-            &sep1,
-            &toggle_i,
-            &sep2,
-            &show_i,
-            &hide_i,
-            &sep3,
-            &version_i,
-            &quit_i,
+            &status_i, &address_i, &sep1, &toggle_i, &sep2, &show_i, &hide_i, &sep3,
+            &version_i, &quit_i,
         ],
     ) {
         Ok(m) => m,
@@ -393,8 +382,11 @@ fn init_tray(app: &tauri::AppHandle) {
                         let _ = proxy::flush_metrics(&state).await;
                         let _ = proxy::stop().await;
                     } else {
-                        let settings = commands::settings::load_settings(app_clone).unwrap_or_default();
-                        let _ = proxy::start(state, settings.host.clone(), settings.port).await;
+                        let settings = commands::settings::load_settings(app_clone)
+                            .unwrap_or_default();
+                        let _ =
+                            proxy::start(state, settings.host.clone(), settings.port)
+                                .await;
                     }
                 });
             }
