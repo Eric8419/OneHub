@@ -232,9 +232,61 @@ async fn check_update_on_startup(handle: &tauri::AppHandle) {
 
 #[cfg(desktop)]
 fn init_tray(app: &tauri::AppHandle) {
+    use std::sync::Arc;
+    use std::time::Duration;
     use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
     use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
+    let version = env!("CARGO_PKG_VERSION");
+
+    let status_i = match MenuItem::with_id(
+        app,
+        "status",
+        "代理状态: 检查中...",
+        false,
+        None::<&str>,
+    ) {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("[tray] Failed to create status menu item: {}", e);
+            return;
+        }
+    };
+    let address_i = match MenuItem::with_id(
+        app,
+        "address",
+        "监听地址: --",
+        false,
+        None::<&str>,
+    ) {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("[tray] Failed to create address menu item: {}", e);
+            return;
+        }
+    };
+    let sep1 = match PredefinedMenuItem::separator(app) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[tray] Failed to create separator 1: {}", e);
+            return;
+        }
+    };
+    let toggle_i = match MenuItem::with_id(app, "toggle_proxy", "启动代理", true, None::<&str>)
+    {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("[tray] Failed to create toggle menu item: {}", e);
+            return;
+        }
+    };
+    let sep2 = match PredefinedMenuItem::separator(app) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[tray] Failed to create separator 2: {}", e);
+            return;
+        }
+    };
     let show_i = match MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)
     {
         Ok(i) => i,
@@ -251,10 +303,23 @@ fn init_tray(app: &tauri::AppHandle) {
             return;
         }
     };
-    let sep = match PredefinedMenuItem::separator(app) {
+    let sep3 = match PredefinedMenuItem::separator(app) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("[tray] Failed to create separator: {}", e);
+            eprintln!("[tray] Failed to create separator 3: {}", e);
+            return;
+        }
+    };
+    let version_i = match MenuItem::with_id(
+        app,
+        "version",
+        format!("Melody Hub v{}", version),
+        false,
+        None::<&str>,
+    ) {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("[tray] Failed to create version menu item: {}", e);
             return;
         }
     };
@@ -266,7 +331,21 @@ fn init_tray(app: &tauri::AppHandle) {
                 return;
             }
         };
-    let tray_menu = match Menu::with_items(app, &[&show_i, &hide_i, &sep, &quit_i]) {
+    let tray_menu = match Menu::with_items(
+        app,
+        &[
+            &status_i,
+            &address_i,
+            &sep1,
+            &toggle_i,
+            &sep2,
+            &show_i,
+            &hide_i,
+            &sep3,
+            &version_i,
+            &quit_i,
+        ],
+    ) {
         Ok(m) => m,
         Err(e) => {
             eprintln!("[tray] Failed to build tray menu: {}", e);
@@ -292,20 +371,41 @@ fn init_tray(app: &tauri::AppHandle) {
     let rgba = &tray_icon_data[8..];
     let icon = tauri::image::Image::new_owned(rgba.to_vec(), width, height);
 
-    let _tray = TrayIconBuilder::new()
-        .icon(icon)
+    let tray = match TrayIconBuilder::new()
+        .icon(icon.clone())
         .icon_as_template(true)
         .tooltip("Melody Hub")
         .menu(&tray_menu)
         .show_menu_on_left_click(false)
-        .on_menu_event(|app, event| match event.id.as_ref() {
+        .on_menu_event(move |app, event| match event.id.as_ref() {
             "show" => show_main_window(app),
             "hide" => {
                 if let Some(w) = app.get_webview_window("main") {
                     let _ = w.hide();
                 }
             }
-            "quit" => app.exit(0),
+            "toggle_proxy" => {
+                let state = app.state::<SharedAppState>().inner().clone();
+                let app_clone = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    let status = proxy::status();
+                    if status.running {
+                        let _ = proxy::flush_metrics(&state).await;
+                        let _ = proxy::stop().await;
+                    } else {
+                        let settings = commands::settings::load_settings(app_clone).unwrap_or_default();
+                        let _ = proxy::start(state, settings.host.clone(), settings.port).await;
+                    }
+                });
+            }
+            "quit" => {
+                let state = app.state::<SharedAppState>().inner().clone();
+                tauri::async_runtime::block_on(async move {
+                    let _ = proxy::flush_metrics(&state).await;
+                    let _ = proxy::stop().await;
+                });
+                app.exit(0);
+            }
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
@@ -325,7 +425,66 @@ fn init_tray(app: &tauri::AppHandle) {
                 }
             }
         })
-        .build(app);
+        .build(app)
+    {
+        Ok(t) => Arc::new(t),
+        Err(e) => {
+            eprintln!("[tray] Failed to build tray icon: {}", e);
+            return;
+        }
+    };
+
+    let status_item = status_i.clone();
+    let address_item = address_i.clone();
+    let toggle_item = toggle_i.clone();
+
+    tauri::async_runtime::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(2));
+        loop {
+            interval.tick().await;
+            let status = proxy::status();
+            let _ = status_item.set_text(if status.running {
+                let uptime = format_uptime(status.uptime_secs);
+                format!("代理状态: 运行中 ({})", uptime)
+            } else {
+                "代理状态: 已停止".to_string()
+            });
+            let _ = address_item.set_text(if status.running {
+                format!("监听地址: {}:{}", status.host, status.port)
+            } else {
+                "监听地址: --".to_string()
+            });
+            let _ = toggle_item.set_text(if status.running {
+                "停止代理"
+            } else {
+                "启动代理"
+            });
+            let _ = tray.set_tooltip(Some(if status.running {
+                format!(
+                    "Melody Hub v{}\n代理运行中\n{}:{} ({})",
+                    version,
+                    status.host,
+                    status.port,
+                    format_uptime(status.uptime_secs)
+                )
+            } else {
+                format!("Melody Hub v{}\n代理已停止", version)
+            }));
+        }
+    });
+}
+
+#[cfg(desktop)]
+fn format_uptime(secs: u64) -> String {
+    if secs < 60 {
+        format!("{}秒", secs)
+    } else if secs < 3600 {
+        format!("{}分{}秒", secs / 60, secs % 60)
+    } else {
+        let hours = secs / 3600;
+        let mins = (secs % 3600) / 60;
+        format!("{}时{}分", hours, mins)
+    }
 }
 
 #[cfg(desktop)]
