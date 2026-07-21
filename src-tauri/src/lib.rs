@@ -26,12 +26,14 @@ use commands::settings;
 use commands::updater::PendingUpdate;
 use proxy::SharedAppState;
 use tauri::{Emitter, Manager};
+use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_state: SharedAppState = proxy::AppState::new();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -61,6 +63,7 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main" {
                     api.prevent_close();
+                    let _ = window.app_handle().save_window_state(StateFlags::all());
                     let _ = window.hide();
                 }
             }
@@ -106,11 +109,8 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-            // Flush pending metrics records on exit so the dashboard
-            // history survives restarts. Without this, any records
-            // accumulated since the last periodic flush (every 5
-            // records) would be lost when the window is closed.
             if let tauri::RunEvent::Exit = event {
+                let _ = app_handle.save_window_state(StateFlags::all());
                 let state = app_handle.state::<SharedAppState>();
                 tauri::async_runtime::block_on(async move {
                     let flushed = proxy::flush_metrics(state.inner()).await;
