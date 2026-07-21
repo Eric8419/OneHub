@@ -5,7 +5,7 @@
 <h1 align="center">Melody Hub</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-0.1.2-blue?style=flat-square" alt="version" />
   <img src="https://github.com/Lhy723/MelodyHub/actions/workflows/ci.yml/badge.svg" alt="ci" />
   <img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square" alt="tauri" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square" alt="react" />

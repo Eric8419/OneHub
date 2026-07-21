@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getVersion } from '@tauri-apps/api/app';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { useSettingsStore } from '../../store/settingsStore';
 import {
@@ -273,10 +274,12 @@ export const SettingsForm: React.FC = () => {
   const [pendingUpdate, setPendingUpdate] = useState<UpdateMetadata | null>(null);
   const [installing, setInstalling] = useState(false);
   const [installProgress, setInstallProgress] = useState(0);
+  const [appVersion, setAppVersion] = useState('0.0.0');
   const installContentLengthRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!loaded) loadSettings();
+    getVersion().then(setAppVersion).catch(() => {});
   }, [loaded, loadSettings]);
 
   useEffect(() => {
@@ -807,7 +810,7 @@ export const SettingsForm: React.FC = () => {
                       fontVariantNumeric: 'tabular-nums',
                     }}
                   >
-                    v{pendingUpdate?.currentVersion ?? '0.1.1'}
+                    v{pendingUpdate?.currentVersion ?? appVersion}
                   </span>
                 </div>
               </div>
