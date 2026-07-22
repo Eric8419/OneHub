@@ -1,11 +1,14 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProviderStore } from '../../store/providerStore';
 import { useAggregationStore } from '../../store/aggregationStore';
 import { strategyLabel } from '../../types/aggregation';
 import type { Aggregation } from '../../types/aggregation';
-import type { Model } from '../../types/provider';
+import type { Model, Provider } from '../../types/provider';
 import { Card, AnimatedContent } from '../../components/ui';
+import { toast } from '../../components/ui/Toast';
+import { ModelBulkEditPanel, type BulkEditValues } from './ModelBulkEditPanel';
+import { ModelSourcesTable, type SourceRow, type PendingEdits, type ModelPatch } from './ModelSourcesTable';
 import {
   ArrowLeft,
   Bot,
@@ -20,8 +23,6 @@ import {
   Wrench,
   Braces,
 } from 'lucide-react';
-
-// ── Types (mirrors ModelInventory) ─────────────────────────
 
 interface DirectMapping {
   kind: 'direct' | 'alias';
@@ -44,18 +45,17 @@ interface AggMapping {
 
 type MappingSource = DirectMapping | AggMapping;
 
-// ── Component ──────────────────────────────────────────────
-
 export const ModelDetailPage: React.FC = () => {
   const { modelName } = useParams<{ modelName: string }>();
   const navigate = useNavigate();
-  const providers = useProviderStore(s => s.providers);
+  const { providers, updateProvider } = useProviderStore();
   const aggregations = useAggregationStore(s => s.aggregations);
 
-  // Decode URL-encoded model name
   const decodedName = decodeURIComponent(modelName || '');
 
-  // Build sources for this specific model
+  const [pendingEdits, setPendingEdits] = useState<PendingEdits>(new Map());
+  const [saving, setSaving] = useState(false);
+
   const sources = useMemo<MappingSource[]>(() => {
     const result: MappingSource[] = [];
 
@@ -113,20 +113,188 @@ export const ModelDetailPage: React.FC = () => {
     return result;
   }, [decodedName, providers, aggregations]);
 
-  // Aggregate capability info from direct/alias sources
   const paramSources = sources.filter(
     (s): s is DirectMapping => s.kind === 'direct' || s.kind === 'alias',
   );
-  const allVision = paramSources.length > 0 && paramSources.every(s => s.model.supportsVision);
-  const allReasoning = paramSources.length > 0 && paramSources.every(s => s.model.supportsReasoning);
-  const anyEffort = paramSources.some(s => s.model.supportsReasoningEffort);
-  const allToolCalls = paramSources.length > 0 && paramSources.every(s => s.model.supportsToolCalls);
-  const allJsonMode = paramSources.length > 0 && paramSources.every(s => s.model.supportsJsonMode);
-  const maxCtx = Math.max(0, ...paramSources.map(s => s.model.contextWindow || 0));
-  const maxOutput = Math.max(0, ...paramSources.map(s => s.model.maxOutputTokens || 0));
+
+  const getEffectiveModel = useCallback((source: DirectMapping): Model => {
+    const patch = pendingEdits.get(source.providerId);
+    return patch ? { ...source.model, ...patch } : source.model;
+  }, [pendingEdits]);
+
+  const allVision = paramSources.length > 0 && paramSources.every(s => getEffectiveModel(s).supportsVision);
+  const allReasoning = paramSources.length > 0 && paramSources.every(s => getEffectiveModel(s).supportsReasoning);
+  const anyEffort = paramSources.some(s => getEffectiveModel(s).supportsReasoningEffort);
+  const allToolCalls = paramSources.length > 0 && paramSources.every(s => getEffectiveModel(s).supportsToolCalls);
+  const allJsonMode = paramSources.length > 0 && paramSources.every(s => getEffectiveModel(s).supportsJsonMode);
+  const maxCtx = Math.max(0, ...paramSources.map(s => getEffectiveModel(s).contextWindow || 0));
+  const maxOutput = Math.max(0, ...paramSources.map(s => getEffectiveModel(s).maxOutputTokens || 0));
   const hasDirect = sources.some(s => s.kind === 'direct');
   const hasAlias = sources.some(s => s.kind === 'alias');
   const hasAgg = sources.some(s => s.kind === 'aggregation');
+
+  const directSources: SourceRow[] = useMemo(() => {
+    const rows: SourceRow[] = [];
+    const seenProviderIds = new Set<string>();
+    for (const p of providers) {
+      for (const m of p.models) {
+        if (m.name === decodedName || m.alias === decodedName) {
+          if (!seenProviderIds.has(p.id)) {
+            rows.push({ providerId: p.id, provider: p, model: m, isAggregation: false });
+            seenProviderIds.add(p.id);
+          }
+          break;
+        }
+      }
+    }
+    return rows;
+  }, [providers, decodedName]);
+
+  const aggSources: SourceRow[] = useMemo(() => {
+    const rows: SourceRow[] = [];
+    for (const agg of aggregations) {
+      if (!agg.enabled) continue;
+      if (agg.name !== decodedName) continue;
+      const fakeProvider: Provider = {
+        id: `agg_${agg.id}`,
+        name: agg.name,
+        apiBase: '',
+        apiKey: '',
+        status: 'disabled' as const,
+        models: [],
+      };
+      rows.push({
+        providerId: fakeProvider.id,
+        provider: fakeProvider,
+        model: { id: agg.id, name: decodedName } as Model,
+        isAggregation: true,
+      });
+    }
+    return rows;
+  }, [aggregations, decodedName]);
+
+  const allRows = useMemo(() => [...directSources, ...aggSources], [directSources, aggSources]);
+
+  const bulkInitialValues: BulkEditValues = useMemo(() => {
+    const ms = directSources.map(r => r.model);
+    const allSame = <K extends keyof Model>(key: K): boolean => ms.length > 0 && ms.every(m => m[key] === ms[0][key]);
+    const allSameBool = (key: 'supportsVision'|'supportsReasoning'|'supportsReasoningEffort'|'supportsToolCalls'|'supportsJsonMode'): boolean | null => {
+      if (ms.length === 0) return null;
+      if (allSame(key)) return ms[0][key] as boolean | null ?? null;
+      return null;
+    };
+    const allSameNum = (key: 'contextWindow'|'maxOutputTokens'): number | null => {
+      if (ms.length === 0) return null;
+      if (allSame(key)) return ms[0][key] as number | null ?? null;
+      return null;
+    };
+    const allSameEffort = (): 'low'|'medium'|'high'|null => {
+      if (ms.length === 0) return null;
+      if (allSame('defaultReasoningEffort')) return ms[0].defaultReasoningEffort ?? null;
+      return null;
+    };
+    return {
+      supportsVision: allSameBool('supportsVision'),
+      supportsReasoning: allSameBool('supportsReasoning'),
+      supportsReasoningEffort: allSameBool('supportsReasoningEffort'),
+      supportsToolCalls: allSameBool('supportsToolCalls'),
+      supportsJsonMode: allSameBool('supportsJsonMode'),
+      contextWindow: allSameNum('contextWindow'),
+      maxOutputTokens: allSameNum('maxOutputTokens'),
+      defaultReasoningEffort: allSameEffort(),
+    };
+  }, [directSources]);
+
+  const handleBulkApply = useCallback((values: BulkEditValues) => {
+    setPendingEdits(prev => {
+      const next = new Map(prev);
+      directSources.forEach(row => {
+        const existing = next.get(row.providerId) ?? {};
+        const patch: ModelPatch = { ...existing };
+        if (values.supportsVision !== null) patch.supportsVision = values.supportsVision;
+        if (values.supportsReasoning !== null) patch.supportsReasoning = values.supportsReasoning;
+        if (values.supportsReasoningEffort !== null) patch.supportsReasoningEffort = values.supportsReasoningEffort;
+        if (values.supportsToolCalls !== null) patch.supportsToolCalls = values.supportsToolCalls;
+        if (values.supportsJsonMode !== null) patch.supportsJsonMode = values.supportsJsonMode;
+        if (values.contextWindow !== null) patch.contextWindow = values.contextWindow;
+        if (values.maxOutputTokens !== null) patch.maxOutputTokens = values.maxOutputTokens;
+        if (values.defaultReasoningEffort !== null) patch.defaultReasoningEffort = values.defaultReasoningEffort;
+        if (values.supportsReasoning === false) {
+          patch.supportsReasoningEffort = false;
+          patch.defaultReasoningEffort = undefined;
+        }
+        next.set(row.providerId, patch);
+      });
+      return next;
+    });
+    toast('已应用批量设置，请点击保存确认', 'info');
+  }, [directSources]);
+
+  const handleSourceChange = useCallback((providerId: string, patch: ModelPatch) => {
+    setPendingEdits(prev => {
+      const next = new Map(prev);
+      const existing = next.get(providerId) ?? {};
+      const merged = { ...existing, ...patch };
+      if (patch.supportsReasoning === false) {
+        merged.supportsReasoningEffort = false;
+        merged.defaultReasoningEffort = undefined;
+      }
+      next.set(providerId, merged);
+      return next;
+    });
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setPendingEdits(new Map());
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    try {
+      for (const [pid, patch] of pendingEdits) {
+        const provider = providers.find(p => p.id === pid);
+        if (!provider) continue;
+        const updatedModels = provider.models.map(m => {
+          if (m.name !== decodedName && m.alias !== decodedName) return m;
+          const merged: Model = { ...m };
+          if (patch.alias !== undefined) merged.alias = patch.alias;
+          if (patch.supportsVision !== undefined) merged.supportsVision = patch.supportsVision;
+          if (patch.supportsReasoning !== undefined) merged.supportsReasoning = patch.supportsReasoning;
+          if (patch.supportsReasoningEffort !== undefined) merged.supportsReasoningEffort = patch.supportsReasoningEffort;
+          if (patch.supportsToolCalls !== undefined) merged.supportsToolCalls = patch.supportsToolCalls;
+          if (patch.supportsJsonMode !== undefined) merged.supportsJsonMode = patch.supportsJsonMode;
+          if (patch.contextWindow !== undefined) merged.contextWindow = patch.contextWindow;
+          if (patch.maxOutputTokens !== undefined) merged.maxOutputTokens = patch.maxOutputTokens;
+          if (patch.defaultReasoningEffort !== undefined) merged.defaultReasoningEffort = patch.defaultReasoningEffort;
+          if (merged.supportsReasoning === false) {
+            merged.supportsReasoningEffort = false;
+            merged.defaultReasoningEffort = undefined;
+          }
+          return merged;
+        });
+        await updateProvider(pid, { models: updatedModels });
+      }
+      setPendingEdits(new Map());
+      toast('模型参数已更新', 'success');
+    } catch (e) {
+      toast(`保存失败: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    } finally {
+      setSaving(false);
+    }
+  }, [pendingEdits, providers, decodedName, updateProvider]);
+
+  const handleRemoveModel = useCallback(async (providerId: string) => {
+    const provider = providers.find(p => p.id === providerId);
+    if (!provider) return;
+    const updatedModels = provider.models.filter(m => m.name !== decodedName && m.alias !== decodedName);
+    await updateProvider(providerId, { models: updatedModels });
+    setPendingEdits(prev => { const n = new Map(prev); n.delete(providerId); return n; });
+    toast('已从该供应商移除模型', 'success');
+  }, [providers, decodedName, updateProvider]);
+
+  useEffect(() => {
+    setPendingEdits(new Map());
+  }, [decodedName]);
 
   if (sources.length === 0) {
     return (
@@ -158,7 +326,6 @@ export const ModelDetailPage: React.FC = () => {
 
   return (
     <div>
-      {/* ── Back button ── */}
       <button
         onClick={() => navigate('/models')}
         style={{
@@ -181,7 +348,6 @@ export const ModelDetailPage: React.FC = () => {
         <ArrowLeft size={16} /> 模型配置
       </button>
 
-      {/* ── Header ── */}
       <AnimatedContent>
         <div style={{ marginBottom: 'var(--spacer-32)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-12)', marginBottom: 'var(--spacer-8)' }}>
@@ -222,7 +388,6 @@ export const ModelDetailPage: React.FC = () => {
         </div>
       </AnimatedContent>
 
-      {/* ── Capability summary ── */}
       <AnimatedContent delay={60}>
         <Card style={{ marginBottom: 'var(--spacer-24)' }}>
           <h2
@@ -279,7 +444,32 @@ export const ModelDetailPage: React.FC = () => {
         </Card>
       </AnimatedContent>
 
-      {/* ── Source mappings ── */}
+      {directSources.length > 0 && (
+        <>
+          <div style={{ marginBottom: 'var(--spacer-16)' }}>
+            <ModelBulkEditPanel
+              initialValues={bulkInitialValues}
+              onApply={handleBulkApply}
+            />
+          </div>
+
+          <AnimatedContent delay={90}>
+            <div style={{ marginBottom: 'var(--spacer-24)' }}>
+              <ModelSourcesTable
+                rows={allRows}
+                pendingEdits={pendingEdits}
+                onChange={handleSourceChange}
+                onReset={handleReset}
+                onSave={handleSave}
+                onRemoveModel={handleRemoveModel}
+                saving={saving}
+                hasEdits={pendingEdits.size > 0}
+              />
+            </div>
+          </AnimatedContent>
+        </>
+      )}
+
       <AnimatedContent delay={120}>
         <Card>
           <h2
@@ -292,14 +482,14 @@ export const ModelDetailPage: React.FC = () => {
               borderBottom: '1px solid var(--border-neutral-l1)',
             }}
           >
-            来源映射
+            来源映射详情
           </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-12)' }}>
             {sources.map((source, idx) => {
               if (source.kind === 'aggregation') {
                 return <AggregationDetailRow key={`agg-${idx}`} source={source} />;
               }
-              return <DirectDetailRow key={`dir-${idx}`} source={source} />;
+              return <DirectDetailRow key={`dir-${idx}`} source={source} pendingPatch={pendingEdits.get(source.providerId)} />;
             })}
           </div>
         </Card>
@@ -307,8 +497,6 @@ export const ModelDetailPage: React.FC = () => {
     </div>
   );
 };
-
-// ── Sub-components ─────────────────────────────────────────
 
 const CapabilityItem: React.FC<{ icon: React.ReactNode; label: string; enabled: boolean }> = ({
   icon,
@@ -373,13 +561,14 @@ const SpecItem: React.FC<{ icon: React.ReactNode; label: string; value: string }
   </div>
 );
 
-const DirectDetailRow: React.FC<{ source: DirectMapping }> = ({ source }) => {
+const DirectDetailRow: React.FC<{ source: DirectMapping; pendingPatch?: ModelPatch }> = ({ source, pendingPatch }) => {
+  const effectiveModel = pendingPatch ? { ...source.model, ...pendingPatch } : source.model;
   const tags: string[] = [];
-  if (source.model.supportsVision) tags.push('视觉');
-  if (source.model.supportsReasoning) tags.push('思考');
-  if (source.model.supportsReasoningEffort) tags.push('强度');
-  if (source.model.supportsToolCalls) tags.push('工具');
-  if (source.model.supportsJsonMode) tags.push('JSON');
+  if (effectiveModel.supportsVision) tags.push('视觉');
+  if (effectiveModel.supportsReasoning) tags.push('思考');
+  if (effectiveModel.supportsReasoningEffort) tags.push('强度');
+  if (effectiveModel.supportsToolCalls) tags.push('工具');
+  if (effectiveModel.supportsJsonMode) tags.push('JSON');
 
   return (
     <div
@@ -390,10 +579,9 @@ const DirectDetailRow: React.FC<{ source: DirectMapping }> = ({ source }) => {
         padding: 'var(--spacer-16)',
         borderRadius: 'var(--radius-10)',
         border: '1px solid var(--border-neutral-l1)',
-        background: 'var(--bg-base-default)',
+        background: pendingPatch ? 'rgba(245,158,11,0.06)' : 'var(--bg-base-default)',
       }}
     >
-      {/* Provider header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-8)' }}>
         <div
           style={{
@@ -433,9 +621,11 @@ const DirectDetailRow: React.FC<{ source: DirectMapping }> = ({ source }) => {
         >
           {source.matchedBy === 'alias' ? '别名映射' : '直接映射'}
         </span>
+        {pendingPatch && (
+          <span style={{ width: 3, height: 16, borderRadius: 2, background: 'var(--bg-brand)', marginLeft: 4 }} />
+        )}
       </div>
 
-      {/* Alias arrow */}
       {source.matchedBy === 'alias' && (
         <div
           style={{
@@ -447,13 +637,12 @@ const DirectDetailRow: React.FC<{ source: DirectMapping }> = ({ source }) => {
             paddingLeft: 36,
           }}
         >
-          <span style={{ fontFamily: 'var(--font-family-mono)' }}>{source.model.alias}</span>
+          <span style={{ fontFamily: 'var(--font-family-mono)' }}>{effectiveModel.alias}</span>
           <ArrowRight size={12} />
           <span style={{ fontFamily: 'var(--font-family-mono)' }}>{source.modelName}</span>
         </div>
       )}
 
-      {/* Specs grid */}
       <div
         style={{
           display: 'grid',
@@ -462,14 +651,14 @@ const DirectDetailRow: React.FC<{ source: DirectMapping }> = ({ source }) => {
           paddingLeft: 36,
         }}
       >
-        {source.model.contextWindow ? (
-          <Spec label="上下文窗口" value={source.model.contextWindow.toLocaleString()} />
+        {effectiveModel.contextWindow ? (
+          <Spec label="上下文窗口" value={effectiveModel.contextWindow.toLocaleString()} />
         ) : null}
-        {source.model.maxOutputTokens ? (
-          <Spec label="最大输出" value={source.model.maxOutputTokens.toLocaleString()} />
+        {effectiveModel.maxOutputTokens ? (
+          <Spec label="最大输出" value={effectiveModel.maxOutputTokens.toLocaleString()} />
         ) : null}
-        {source.model.defaultReasoningEffort && (
-          <Spec label="默认思考强度" value={source.model.defaultReasoningEffort} />
+        {effectiveModel.defaultReasoningEffort && (
+          <Spec label="默认思考强度" value={effectiveModel.defaultReasoningEffort} />
         )}
         {tags.length > 0 && (
           <div style={{ display: 'flex', gap: 'var(--spacer-8)', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -512,7 +701,6 @@ const AggregationDetailRow: React.FC<{ source: AggMapping }> = ({ source }) => {
         background: 'var(--bg-base-default)',
       }}
     >
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-8)' }}>
         <div
           style={{
@@ -557,7 +745,6 @@ const AggregationDetailRow: React.FC<{ source: AggMapping }> = ({ source }) => {
         </span>
       </div>
 
-      {/* Resolved models list */}
       {resolvedModels.length > 0 && (
         <div
           style={{

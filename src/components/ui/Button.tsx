@@ -33,7 +33,7 @@ interface ButtonProps extends StripMotionHandlers<React.ButtonHTMLAttributes<HTM
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'background: var(--bg-invert); color: var(--text-white); border-color: var(--bg-invert);',
+  primary: 'background: var(--bg-brand); color: #fff; border-color: var(--bg-brand);',
   secondary: 'background: var(--bg-overlay-l1); color: var(--text-default); border-color: var(--border-neutral-l1);',
   ghost: 'background: transparent; color: var(--text-default); border-color: transparent;',
   brand: 'background: var(--bg-brand); color: var(--text-onbrand); border-color: var(--bg-brand);',
@@ -49,7 +49,7 @@ const variantClasses: Record<ButtonVariant, string> = {
 // background at all, falling back to the user-agent `<button>` color
 // (which is light in macOS dark mode and makes the text invisible).
 const variantInitialBackground: Record<ButtonVariant, string> = {
-  primary: 'var(--bg-invert)',
+  primary: 'var(--bg-brand)',
   secondary: 'var(--bg-overlay-l1)',
   ghost: 'transparent',
   brand: 'var(--bg-brand)',
@@ -60,7 +60,7 @@ const variantInitialBackground: Record<ButtonVariant, string> = {
 // Hover background per variant — kept in one place so hover and
 // initial stay in sync.
 const variantHoverBackground: Record<ButtonVariant, string> = {
-  primary: 'var(--bg-invert-hover)',
+  primary: 'var(--bg-brand-hover)',
   secondary: 'var(--bg-overlay-l2)',
   ghost: 'var(--bg-overlay-l1)',
   brand: 'var(--bg-brand-hover)',
@@ -71,7 +71,7 @@ const variantHoverBackground: Record<ButtonVariant, string> = {
 // Subtle elevation for "emphasis" variants (brand / primary / danger).
 // Secondary / ghost / link stay flat to preserve their quiet role.
 const variantShadow: Record<ButtonVariant, string> = {
-  primary: '0 1px 2px rgba(0, 0, 0, 0.08)',
+  primary: '0 1px 2px color-mix(in srgb, var(--bg-brand) 40%, transparent), 0 4px 12px color-mix(in srgb, var(--bg-brand) 24%, transparent)',
   secondary: 'none',
   ghost: 'none',
   brand: '0 1px 2px color-mix(in srgb, var(--bg-brand) 40%, transparent), 0 4px 12px color-mix(in srgb, var(--bg-brand) 24%, transparent)',
