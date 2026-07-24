@@ -12,13 +12,13 @@ const modelTagStyle: Record<string, { variant: 'brand' | 'green' | 'danger'; cus
 };
 
 export const RecentRequests: React.FC = () => {
-  const recentRequests = useStatsStore(s => s.recentRequests);
-  const loading = useStatsStore(s => s.requestsLoading);
-  const error = useStatsStore(s => s.requestsError);
-  const fetchRequests = useStatsStore(s => s.fetchRequests);
-  const page = useStatsStore(s => s.page);
-  const pageSize = useSettingsStore(s => s.settings.pageSize);
-  const setPage = useStatsStore(s => s.setPage);
+  const recentRequests = useStatsStore((s) => s.recentRequests);
+  const loading = useStatsStore((s) => s.requestsLoading);
+  const error = useStatsStore((s) => s.requestsError);
+  const fetchRequests = useStatsStore((s) => s.fetchRequests);
+  const page = useStatsStore((s) => s.page);
+  const pageSize = useSettingsStore((s) => s.settings.pageSize);
+  const setPage = useStatsStore((s) => s.setPage);
   const prevLength = useRef(recentRequests.length);
 
   // Track new rows for animation
@@ -26,8 +26,8 @@ export const RecentRequests: React.FC = () => {
   useEffect(() => {
     if (recentRequests.length > prevLength.current) {
       // New rows added — mark them
-      const newIds = recentRequests.slice(0, recentRequests.length - prevLength.current).map(r => r.id);
-      newIds.forEach(id => newRowIds.current.add(id));
+      const newIds = recentRequests.slice(0, recentRequests.length - prevLength.current).map((r) => r.id);
+      newIds.forEach((id) => newRowIds.current.add(id));
       const timer = setTimeout(() => newRowIds.current.clear(), 600);
       prevLength.current = recentRequests.length;
       return () => clearTimeout(timer);
@@ -68,20 +68,28 @@ export const RecentRequests: React.FC = () => {
     return (
       <Card padding="var(--spacer-16) var(--spacer-20)" style={{ marginBottom: 'var(--spacer-24)' }}>
         <FlexBetween style={{ marginBottom: 'var(--spacer-16)' }}>
-          <span style={{ fontSize: 'var(--heading-xs-font-size)', fontWeight: 'var(--heading-xs-font-weight)', color: 'var(--text-default)' }}>
+          <span
+            style={{
+              fontSize: 'var(--heading-xs-font-size)',
+              fontWeight: 'var(--heading-xs-font-weight)',
+              color: 'var(--text-default)',
+            }}
+          >
             近期调用记录
           </span>
         </FlexBetween>
         <div style={{ padding: 'var(--spacer-32) 0', textAlign: 'center', color: 'var(--text-tertiary)' }}>
-          <span style={{ color: 'var(--status-error-default)', fontSize: 'var(--body-base-font-size)' }}>
-            加载失败
-          </span>
+          <span style={{ color: 'var(--status-error-default)', fontSize: 'var(--body-base-font-size)' }}>加载失败</span>
           <div style={{ marginTop: 'var(--spacer-8)' }}>
             <button
               onClick={fetchRequests}
               style={{
-                cursor: 'pointer', border: 'none', background: 'transparent',
-                color: 'var(--text-brand)', fontSize: 'var(--body-sm-font-size)', fontFamily: 'inherit',
+                cursor: 'pointer',
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--text-brand)',
+                fontSize: 'var(--body-sm-font-size)',
+                fontFamily: 'inherit',
               }}
             >
               <RefreshCw size={12} style={{ marginRight: 4, display: 'inline' }} />
@@ -96,13 +104,24 @@ export const RecentRequests: React.FC = () => {
   return (
     <Card padding="var(--spacer-16) var(--spacer-20)" style={{ marginBottom: 'var(--spacer-24)' }}>
       <FlexBetween style={{ marginBottom: 'var(--spacer-16)' }}>
-        <div style={{
-          fontSize: 'var(--heading-xs-font-size)', fontWeight: 'var(--heading-xs-font-weight)',
-          color: 'var(--text-default)', lineHeight: 'var(--heading-xs-line-height)',
-        }}>
+        <div
+          style={{
+            fontSize: 'var(--heading-xs-font-size)',
+            fontWeight: 'var(--heading-xs-font-weight)',
+            color: 'var(--text-default)',
+            lineHeight: 'var(--heading-xs-line-height)',
+          }}
+        >
           近期调用记录
           {recentRequests.length > 0 && (
-            <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)', marginLeft: 'var(--spacer-8)', fontWeight: 400 }}>
+            <span
+              style={{
+                fontSize: 'var(--body-sm-font-size)',
+                color: 'var(--text-tertiary)',
+                marginLeft: 'var(--spacer-8)',
+                fontWeight: 400,
+              }}
+            >
               ({recentRequests.length} 条)
             </span>
           )}
@@ -110,7 +129,14 @@ export const RecentRequests: React.FC = () => {
       </FlexBetween>
 
       {recentRequests.length === 0 ? (
-        <div style={{ padding: 'var(--spacer-32) 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 'var(--body-base-font-size)' }}>
+        <div
+          style={{
+            padding: 'var(--spacer-32) 0',
+            textAlign: 'center',
+            color: 'var(--text-tertiary)',
+            fontSize: 'var(--body-base-font-size)',
+          }}
+        >
           暂无调用记录。启动代理并发送请求后将在此显示。
         </div>
       ) : (
@@ -119,13 +145,104 @@ export const RecentRequests: React.FC = () => {
             <table className="ds-table" style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  <th style={{ padding: 'var(--spacer-16) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'left', fontSize: 'var(--body-md-font-size)', color: 'var(--text-tertiary)', fontWeight: 'var(--font-weight-medium)', textTransform: 'uppercase', letterSpacing: 'var(--body-md-letter-spacing)' }}>时间</th>
-                  <th style={{ padding: 'var(--spacer-16) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'left', fontSize: 'var(--body-md-font-size)', color: 'var(--text-tertiary)', fontWeight: 'var(--font-weight-medium)', textTransform: 'uppercase', letterSpacing: 'var(--body-md-letter-spacing)' }}>模型</th>
-                  <th style={{ padding: 'var(--spacer-16) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'left', fontSize: 'var(--body-md-font-size)', color: 'var(--text-tertiary)', fontWeight: 'var(--font-weight-medium)', textTransform: 'uppercase', letterSpacing: 'var(--body-md-letter-spacing)' }}>提供商</th>
-                  <th style={{ padding: 'var(--spacer-16) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'left', fontSize: 'var(--body-md-font-size)', color: 'var(--text-tertiary)', fontWeight: 'var(--font-weight-medium)', textTransform: 'uppercase', letterSpacing: 'var(--body-md-letter-spacing)' }}>请求类型</th>
-                  <th style={{ padding: 'var(--spacer-16) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'right', fontSize: 'var(--body-md-font-size)', color: 'var(--text-tertiary)', fontWeight: 'var(--font-weight-medium)', textTransform: 'uppercase', letterSpacing: 'var(--body-md-letter-spacing)' }}>Token用量</th>
-                  <th style={{ padding: 'var(--spacer-16) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'left', fontSize: 'var(--body-md-font-size)', color: 'var(--text-tertiary)', fontWeight: 'var(--font-weight-medium)', textTransform: 'uppercase', letterSpacing: 'var(--body-md-letter-spacing)' }}>状态</th>
-                  <th style={{ padding: 'var(--spacer-16) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'right', fontSize: 'var(--body-md-font-size)', color: 'var(--text-tertiary)', fontWeight: 'var(--font-weight-medium)', textTransform: 'uppercase', letterSpacing: 'var(--body-md-letter-spacing)' }}>延迟</th>
+                  <th
+                    style={{
+                      padding: 'var(--spacer-16) var(--spacer-8)',
+                      borderBottom: '1px solid var(--border-neutral-l1)',
+                      textAlign: 'left',
+                      fontSize: 'var(--body-md-font-size)',
+                      color: 'var(--text-tertiary)',
+                      fontWeight: 'var(--font-weight-medium)',
+                      textTransform: 'uppercase',
+                      letterSpacing: 'var(--body-md-letter-spacing)',
+                    }}
+                  >
+                    时间
+                  </th>
+                  <th
+                    style={{
+                      padding: 'var(--spacer-16) var(--spacer-8)',
+                      borderBottom: '1px solid var(--border-neutral-l1)',
+                      textAlign: 'left',
+                      fontSize: 'var(--body-md-font-size)',
+                      color: 'var(--text-tertiary)',
+                      fontWeight: 'var(--font-weight-medium)',
+                      textTransform: 'uppercase',
+                      letterSpacing: 'var(--body-md-letter-spacing)',
+                    }}
+                  >
+                    模型
+                  </th>
+                  <th
+                    style={{
+                      padding: 'var(--spacer-16) var(--spacer-8)',
+                      borderBottom: '1px solid var(--border-neutral-l1)',
+                      textAlign: 'left',
+                      fontSize: 'var(--body-md-font-size)',
+                      color: 'var(--text-tertiary)',
+                      fontWeight: 'var(--font-weight-medium)',
+                      textTransform: 'uppercase',
+                      letterSpacing: 'var(--body-md-letter-spacing)',
+                    }}
+                  >
+                    提供商
+                  </th>
+                  <th
+                    style={{
+                      padding: 'var(--spacer-16) var(--spacer-8)',
+                      borderBottom: '1px solid var(--border-neutral-l1)',
+                      textAlign: 'left',
+                      fontSize: 'var(--body-md-font-size)',
+                      color: 'var(--text-tertiary)',
+                      fontWeight: 'var(--font-weight-medium)',
+                      textTransform: 'uppercase',
+                      letterSpacing: 'var(--body-md-letter-spacing)',
+                    }}
+                  >
+                    请求类型
+                  </th>
+                  <th
+                    style={{
+                      padding: 'var(--spacer-16) var(--spacer-8)',
+                      borderBottom: '1px solid var(--border-neutral-l1)',
+                      textAlign: 'right',
+                      fontSize: 'var(--body-md-font-size)',
+                      color: 'var(--text-tertiary)',
+                      fontWeight: 'var(--font-weight-medium)',
+                      textTransform: 'uppercase',
+                      letterSpacing: 'var(--body-md-letter-spacing)',
+                    }}
+                  >
+                    Token用量
+                  </th>
+                  <th
+                    style={{
+                      padding: 'var(--spacer-16) var(--spacer-8)',
+                      borderBottom: '1px solid var(--border-neutral-l1)',
+                      textAlign: 'left',
+                      fontSize: 'var(--body-md-font-size)',
+                      color: 'var(--text-tertiary)',
+                      fontWeight: 'var(--font-weight-medium)',
+                      textTransform: 'uppercase',
+                      letterSpacing: 'var(--body-md-letter-spacing)',
+                    }}
+                  >
+                    状态
+                  </th>
+                  <th
+                    style={{
+                      padding: 'var(--spacer-16) var(--spacer-8)',
+                      borderBottom: '1px solid var(--border-neutral-l1)',
+                      textAlign: 'right',
+                      fontSize: 'var(--body-md-font-size)',
+                      color: 'var(--text-tertiary)',
+                      fontWeight: 'var(--font-weight-medium)',
+                      textTransform: 'uppercase',
+                      letterSpacing: 'var(--body-md-letter-spacing)',
+                    }}
+                  >
+                    延迟
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -141,24 +258,105 @@ export const RecentRequests: React.FC = () => {
                         animation: isNewRow ? 'slideInUp 0.25s ease-out both' : 'none',
                         animationDelay: isNewRow ? `${idx * 30}ms` : '0ms',
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                      }}
                     >
-                      <td style={{ padding: 'var(--spacer-12) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', fontFamily: 'var(--code-terminal-font-family)', fontSize: 'var(--body-md-font-size)', color: 'var(--text-default)' }}>{formatTimestamp(req.timestamp)}</td>
-                      <td style={{ padding: 'var(--spacer-12) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)' }}>
-                        <Tag variant={ts?.variant ?? 'brand'} style={ts?.customColor ? { background: 'var(--bg-overlay-l1)', color: ts.customColor, border: 'none' } : { border: 'none' }}>{req.model}</Tag>
+                      <td
+                        style={{
+                          padding: 'var(--spacer-12) var(--spacer-8)',
+                          borderBottom: '1px solid var(--border-neutral-l1)',
+                          fontFamily: 'var(--code-terminal-font-family)',
+                          fontSize: 'var(--body-md-font-size)',
+                          color: 'var(--text-default)',
+                        }}
+                      >
+                        {formatTimestamp(req.timestamp)}
                       </td>
-                      <td style={{ padding: 'var(--spacer-12) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', color: 'var(--text-secondary)' }}>
-                        <span>{req.provider || req.type}</span>
+                      <td
+                        style={{
+                          padding: 'var(--spacer-12) var(--spacer-8)',
+                          borderBottom: '1px solid var(--border-neutral-l1)',
+                        }}
+                      >
+                        <Tag
+                          variant={ts?.variant ?? 'brand'}
+                          style={
+                            ts?.customColor
+                              ? { background: 'var(--bg-overlay-l1)', color: ts.customColor, border: 'none' }
+                              : { border: 'none' }
+                          }
+                        >
+                          {req.model}
+                        </Tag>
+                      </td>
+                      <td
+                        style={{
+                          padding: 'var(--spacer-12) var(--spacer-8)',
+                          borderBottom: '1px solid var(--border-neutral-l1)',
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        <span>{req.provider}</span>
                         {req.failoverCount && req.failoverCount > 0 && (
-                          <Tag variant="orange" style={{ marginLeft: 'var(--spacer-4)', border: 'none', fontSize: 'var(--body-xs-font-size)' }}>切换×{req.failoverCount}</Tag>
+                          <Tag
+                            variant="orange"
+                            style={{
+                              marginLeft: 'var(--spacer-4)',
+                              border: 'none',
+                              fontSize: 'var(--body-xs-font-size)',
+                            }}
+                          >
+                            切换×{req.failoverCount}
+                          </Tag>
                         )}
                       </td>
-                      <td style={{ padding: 'var(--spacer-12) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'right', fontFamily: 'var(--font-family-metric)', color: 'var(--text-default)' }}>{req.tokens.toLocaleString()}</td>
-                      <td style={{ padding: 'var(--spacer-12) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)' }}>
-                        <Tag variant={req.status === 'success' || req.status === 'streaming' ? 'success' : 'danger'} style={{ border: 'none' }}>{req.status === 'success' || req.status === 'streaming' ? '成功' : '失败'}</Tag>
+                      <td
+                        style={{
+                          padding: 'var(--spacer-12) var(--spacer-8)',
+                          borderBottom: '1px solid var(--border-neutral-l1)',
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        {req.type}
                       </td>
-                      <td style={{ padding: 'var(--spacer-12) var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'right', fontFamily: 'var(--font-family-metric)' }}>{(req.latencyMs / 1000).toFixed(2)}s</td>
+                      <td
+                        style={{
+                          padding: 'var(--spacer-12) var(--spacer-8)',
+                          borderBottom: '1px solid var(--border-neutral-l1)',
+                          textAlign: 'right',
+                          fontFamily: 'var(--font-family-metric)',
+                          color: 'var(--text-default)',
+                        }}
+                      >
+                        {req.tokens.toLocaleString()}
+                      </td>
+                      <td
+                        style={{
+                          padding: 'var(--spacer-12) var(--spacer-8)',
+                          borderBottom: '1px solid var(--border-neutral-l1)',
+                        }}
+                      >
+                        <Tag
+                          variant={req.status === 'success' || req.status === 'streaming' ? 'success' : 'danger'}
+                          style={{ border: 'none' }}
+                        >
+                          {req.status === 'success' || req.status === 'streaming' ? '成功' : '失败'}
+                        </Tag>
+                      </td>
+                      <td
+                        style={{
+                          padding: 'var(--spacer-12) var(--spacer-8)',
+                          borderBottom: '1px solid var(--border-neutral-l1)',
+                          textAlign: 'right',
+                          fontFamily: 'var(--font-family-metric)',
+                        }}
+                      >
+                        {(req.latencyMs / 1000).toFixed(2)}s
+                      </td>
                     </tr>
                   );
                 })}
@@ -168,19 +366,40 @@ export const RecentRequests: React.FC = () => {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="ds-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--spacer-4)', marginTop: 'var(--spacer-16)' }}>
+            <div
+              className="ds-pagination"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 'var(--spacer-4)',
+                marginTop: 'var(--spacer-16)',
+              }}
+            >
               <button
                 disabled={safePage === 0}
                 onClick={() => setPage(safePage - 1)}
                 style={{
-                  minWidth: 32, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'transparent', color: safePage === 0 ? 'var(--text-disabled)' : 'var(--text-secondary)',
-                  border: '1px solid var(--border-neutral-l1)', borderRadius: 'var(--radius-8)',
-                  font: 'inherit', fontSize: 'var(--body-base-font-size)', cursor: safePage === 0 ? 'not-allowed' : 'pointer',
+                  minWidth: 32,
+                  height: 32,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'transparent',
+                  color: safePage === 0 ? 'var(--text-disabled)' : 'var(--text-secondary)',
+                  border: '1px solid var(--border-neutral-l1)',
+                  borderRadius: 'var(--radius-8)',
+                  font: 'inherit',
+                  fontSize: 'var(--body-base-font-size)',
+                  cursor: safePage === 0 ? 'not-allowed' : 'pointer',
                   transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease)',
                 }}
-                onMouseEnter={e => { if (safePage !== 0) e.currentTarget.style.background = 'var(--bg-overlay-l2)'; }}
-                onMouseLeave={e => { if (safePage !== 0) e.currentTarget.style.background = 'transparent'; }}
+                onMouseEnter={(e) => {
+                  if (safePage !== 0) e.currentTarget.style.background = 'var(--bg-overlay-l2)';
+                }}
+                onMouseLeave={(e) => {
+                  if (safePage !== 0) e.currentTarget.style.background = 'transparent';
+                }}
               >
                 <ChevronLeft size={16} />
               </button>
@@ -189,15 +408,26 @@ export const RecentRequests: React.FC = () => {
                   key={i}
                   onClick={() => setPage(i)}
                   style={{
-                    minWidth: 32, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    minWidth: 32,
+                    height: 32,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     background: i === safePage ? 'var(--bg-overlay-l3)' : 'transparent',
                     color: i === safePage ? 'var(--text-default)' : 'var(--text-secondary)',
-                    border: '1px solid var(--border-neutral-l1)', borderRadius: 'var(--radius-8)',
-                    font: 'inherit', fontSize: 'var(--body-base-font-size)', cursor: 'pointer',
+                    border: '1px solid var(--border-neutral-l1)',
+                    borderRadius: 'var(--radius-8)',
+                    font: 'inherit',
+                    fontSize: 'var(--body-base-font-size)',
+                    cursor: 'pointer',
                     transition: 'background var(--transition-fast, 0.12s ease)',
                   }}
-                  onMouseEnter={e => { if (i !== safePage) e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
-                  onMouseLeave={e => { if (i !== safePage) e.currentTarget.style.background = 'transparent'; }}
+                  onMouseEnter={(e) => {
+                    if (i !== safePage) e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (i !== safePage) e.currentTarget.style.background = 'transparent';
+                  }}
                 >
                   {i + 1}
                 </button>
@@ -206,14 +436,26 @@ export const RecentRequests: React.FC = () => {
                 disabled={safePage >= totalPages - 1}
                 onClick={() => setPage(safePage + 1)}
                 style={{
-                  minWidth: 32, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'transparent', color: safePage >= totalPages - 1 ? 'var(--text-disabled)' : 'var(--text-secondary)',
-                  border: '1px solid var(--border-neutral-l1)', borderRadius: 'var(--radius-8)',
-                  font: 'inherit', fontSize: 'var(--body-base-font-size)', cursor: safePage >= totalPages - 1 ? 'not-allowed' : 'pointer',
+                  minWidth: 32,
+                  height: 32,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'transparent',
+                  color: safePage >= totalPages - 1 ? 'var(--text-disabled)' : 'var(--text-secondary)',
+                  border: '1px solid var(--border-neutral-l1)',
+                  borderRadius: 'var(--radius-8)',
+                  font: 'inherit',
+                  fontSize: 'var(--body-base-font-size)',
+                  cursor: safePage >= totalPages - 1 ? 'not-allowed' : 'pointer',
                   transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease)',
                 }}
-                onMouseEnter={e => { if (safePage < totalPages - 1) e.currentTarget.style.background = 'var(--bg-overlay-l2)'; }}
-                onMouseLeave={e => { if (safePage < totalPages - 1) e.currentTarget.style.background = 'transparent'; }}
+                onMouseEnter={(e) => {
+                  if (safePage < totalPages - 1) e.currentTarget.style.background = 'var(--bg-overlay-l2)';
+                }}
+                onMouseLeave={(e) => {
+                  if (safePage < totalPages - 1) e.currentTarget.style.background = 'transparent';
+                }}
               >
                 <ChevronRight size={16} />
               </button>

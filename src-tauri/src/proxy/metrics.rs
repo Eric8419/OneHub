@@ -196,18 +196,6 @@ impl MetricsStore {
         self.records.read().await.clone()
     }
 
-    /// Most recent `limit` records (newest last).
-    pub async fn recent(&self, limit: usize) -> Vec<RequestRecord> {
-        let records = self.records.read().await;
-        let mut recent = if records.len() > limit {
-            records[records.len() - limit..].to_vec()
-        } else {
-            records.clone()
-        };
-        recent.reverse();
-        recent
-    }
-
     /// Clear the in-memory dashboard window. Persisted JSONL logs
     /// remain on disk for export/history.
     pub async fn clear(&self) {

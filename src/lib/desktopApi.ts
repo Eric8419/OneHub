@@ -38,7 +38,7 @@ export interface DesktopApi {
   stopProxy(): Promise<void>;
   getProxyStatus(): Promise<{ running: boolean; host: string; port: number; uptimeSecs: number }>;
   getStats(timeRange: string): Promise<UsageStats>;
-  getRecentRequests(limit: number): Promise<RequestRecord[]>;
+  getRecentRequests(limit: number, timeRange?: string): Promise<RequestRecord[]>;
   getDailyUsage(): Promise<DailyUsage[]>;
   resetStats(): Promise<void>;
   exitApp(): Promise<void>;
@@ -74,7 +74,8 @@ export const desktopApi: DesktopApi = {
   getProxyStatus: () =>
     invoke<{ running: boolean; host: string; port: number; uptimeSecs: number }>('get_proxy_status'),
   getStats: (timeRange) => invoke<UsageStats>('get_stats', { timeRange }),
-  getRecentRequests: (limit) => invoke<RequestRecord[]>('get_recent_requests', { limit }),
+  getRecentRequests: (limit, timeRange) =>
+    invoke<RequestRecord[]>('get_recent_requests', { limit, timeRange }),
   getDailyUsage: () => invoke<DailyUsage[]>('get_daily_usage'),
   resetStats: () => invoke('reset_stats'),
   exitApp: () => invoke('exit_app'),

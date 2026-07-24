@@ -26,9 +26,14 @@ pub async fn get_stats(
 #[tauri::command]
 pub async fn get_recent_requests(
     limit: u32,
+    time_range: Option<String>,
     state: tauri::State<'_, SharedAppState>,
 ) -> Result<Vec<RequestRecord>, String> {
-    Ok(state.metrics.recent(limit as usize).await)
+    let records = state.metrics.snapshot().await;
+    let filtered = filter_records_by_range(&records, time_range.as_deref());
+    // Return the most recent `limit` records within the range.
+    let start = filtered.len().saturating_sub(limit as usize);
+    Ok(filtered[start..].to_vec())
 }
 
 /// Daily usage for the heatmap, aggregated from all records
@@ -108,6 +113,26 @@ fn compute_stats_for_range(
         response_time_change: response_delta,
         response_time_trend: if response_delta <= 0.0 { "up" } else { "down" }.into(),
     })
+}
+
+/// Filter records to those falling within the given time range
+/// (e.g. "7d", "30d", "90d"). Returns all records when `time_range`
+/// is `None`.
+fn filter_records_by_range(
+    records: &[RequestRecord],
+    time_range: Option<&str>,
+) -> Vec<RequestRecord> {
+    let Some(range) = time_range else {
+        return records.to_vec();
+    };
+    let days = range_days(range);
+    let today = Utc::now().date_naive();
+    let start = today - Duration::days(days - 1);
+    records
+        .iter()
+        .filter(|r| record_date(r).is_some_and(|d| d >= start && d <= today))
+        .cloned()
+        .collect()
 }
 
 #[derive(Default)]

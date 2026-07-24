@@ -147,7 +147,8 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
     set({ requestsLoading: true, requestsError: null });
     try {
       // Wire format is already camelCase; no manual remapping.
-      const reqs = await desktopApi.getRecentRequests(100);
+      const timeRange = get().timeRange;
+      const reqs = await desktopApi.getRecentRequests(1000, timeRange);
       set({
         recentRequests: reqs,
         modelBreakdown: computeModelBreakdown(reqs),
