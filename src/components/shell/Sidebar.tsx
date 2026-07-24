@@ -41,14 +41,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
     const check = () => {
       setProxyStatus('checking');
       try {
-        invoke<ProxyStatusPayload>('get_proxy_status').then(status => {
-          const running = status?.running ?? false;
-          setProxyHost(status?.host ?? '');
-          setProxyPort(status?.port ?? 0);
-          setProxyStatus(running ? 'running' : 'stopped');
-        }).catch(() => {
-          setProxyStatus('stopped');
-        });
+        invoke<ProxyStatusPayload>('get_proxy_status')
+          .then((status) => {
+            const running = status?.running ?? false;
+            setProxyHost(status?.host ?? '');
+            setProxyPort(status?.port ?? 0);
+            setProxyStatus(running ? 'running' : 'stopped');
+          })
+          .catch(() => {
+            setProxyStatus('stopped');
+          });
       } catch {
         setProxyStatus('stopped');
       }
@@ -141,7 +143,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
           padding: 'var(--spacer-12) var(--spacer-10)',
         }}
       >
-        {navItems.map(item => {
+        {navItems.map((item) => {
           const isActive = item.key === activeKey;
           return (
             <button
@@ -167,24 +169,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
                 width: '100%',
                 textAlign: 'left',
                 fontFamily: 'inherit',
-                transition: 'background 0.18s cubic-bezier(0.22,1,0.36,1), color 0.18s cubic-bezier(0.22,1,0.36,1), box-shadow 0.18s cubic-bezier(0.22,1,0.36,1)',
+                transition:
+                  'background 0.18s cubic-bezier(0.22,1,0.36,1), color 0.18s cubic-bezier(0.22,1,0.36,1), box-shadow 0.18s cubic-bezier(0.22,1,0.36,1)',
               }}
-              onMouseEnter={e => {
+              onMouseEnter={(e) => {
                 if (!isActive) {
                   e.currentTarget.style.background = 'var(--bg-overlay-l1)';
                   e.currentTarget.style.color = 'var(--text-default)';
                 }
               }}
-              onMouseLeave={e => {
+              onMouseLeave={(e) => {
                 if (!isActive) {
                   e.currentTarget.style.background = 'transparent';
                   e.currentTarget.style.color = 'var(--text-secondary)';
                 }
               }}
-              onMouseDown={e => {
+              onMouseDown={(e) => {
                 e.currentTarget.style.background = isActive ? 'var(--brand-200)' : 'var(--bg-overlay-l2)';
               }}
-              onMouseUp={e => {
+              onMouseUp={(e) => {
                 e.currentTarget.style.background = isActive ? 'var(--brand-100)' : 'var(--bg-overlay-l1)';
               }}
             >
@@ -247,7 +250,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
           borderTop: '1px solid var(--border-neutral-l1)',
         }}
       >
-        <div className="ds-shell__status-indicator" style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-6)' }}>
+        <div
+          className="ds-shell__status-indicator"
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-6)' }}
+        >
           <span
             className={`ds-shell__status-dot ${statusInfo.dotClass}`}
             style={{
@@ -255,7 +261,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
               height: 8,
               borderRadius: 'var(--radius-full)',
               display: 'inline-block',
-              transition: 'background var(--transition-normal, 0.2s ease), box-shadow var(--transition-normal, 0.2s ease)',
+              transition:
+                'background var(--transition-normal, 0.2s ease), box-shadow var(--transition-normal, 0.2s ease)',
             }}
           />
           <span

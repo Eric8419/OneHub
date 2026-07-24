@@ -129,10 +129,15 @@ export const ProviderBasicTab: React.FC<ProviderBasicTabProps> = ({
               right: 8,
               top: '50%',
               transform: 'translateY(-50%)',
-              width: 28, height: 28,
-              display: 'grid', placeItems: 'center',
-              background: 'none', border: 'none', borderRadius: 6,
-              cursor: 'pointer', color: 'var(--text-tertiary)',
+              width: 28,
+              height: 28,
+              display: 'grid',
+              placeItems: 'center',
+              background: 'none',
+              border: 'none',
+              borderRadius: 6,
+              cursor: 'pointer',
+              color: 'var(--text-tertiary)',
             }}
           >
             {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -155,25 +160,44 @@ export const ProviderBasicTab: React.FC<ProviderBasicTabProps> = ({
           size="sm"
         />
         <div style={helpStyle}>
-          {apiFlavor === 'anthropic' ? '使用 Anthropic Messages API 格式' :
-           apiFlavor === 'responses' ? '使用 OpenAI Responses API 格式' :
-           '兼容 OpenAI Chat Completions 格式的接口'}
+          {apiFlavor === 'anthropic'
+            ? '使用 Anthropic Messages API 格式'
+            : apiFlavor === 'responses'
+              ? '使用 OpenAI Responses API 格式'
+              : '兼容 OpenAI Chat Completions 格式的接口'}
         </div>
       </div>
 
-      <div style={{
-        padding: 16,
-        borderRadius: 10,
-        background: 'var(--bg-overlay-l1)',
-        border: '1px solid var(--border-neutral-l1)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-      }}>
+      <div
+        style={{
+          padding: 16,
+          borderRadius: 10,
+          background: 'var(--bg-overlay-l1)',
+          border: '1px solid var(--border-neutral-l1)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
         <span style={{ fontSize: 'var(--body-sm-font-size)', color: statusColor, fontWeight: 500 }}>{statusText}</span>
-        {testTime && <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>{testTime}</span>}
+        {testTime && (
+          <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>{testTime}</span>
+        )}
         {testMessage && testStatus === 'error' && (
-          <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--status-error-default, #ef4444)', marginLeft: 'auto', marginRight: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>{testMessage}</span>
+          <span
+            style={{
+              fontSize: 'var(--body-sm-font-size)',
+              color: 'var(--status-error-default, #ef4444)',
+              marginLeft: 'auto',
+              marginRight: 8,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              maxWidth: 200,
+            }}
+          >
+            {testMessage}
+          </span>
         )}
         <Button
           variant="secondary"

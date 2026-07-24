@@ -20,7 +20,7 @@ function formatDateLocal(d: Date): string {
 }
 
 export const UsageHeatmap: React.FC = () => {
-  const dailyUsage = useStatsStore(s => s.dailyUsage);
+  const dailyUsage = useStatsStore((s) => s.dailyUsage);
   const themeVersion = useThemeVersion();
 
   // Date → real request count lookup for the tooltip and coloring.
@@ -32,10 +32,7 @@ export const UsageHeatmap: React.FC = () => {
 
   // Max count across the dataset, used to scale the visualMap so low-volume
   // days still get a non-zero color bucket. Falls back to 1 to avoid /0.
-  const maxCount = useMemo(
-    () => Math.max(...dailyUsage.map(d => d.count), 1),
-    [dailyUsage],
-  );
+  const maxCount = useMemo(() => Math.max(...dailyUsage.map((d) => d.count), 1), [dailyUsage]);
 
   // Resolve the calendar date for a given [col, row] cell:
   //   col WEEKS-1 = current week, col 0 = oldest
@@ -122,14 +119,7 @@ export const UsageHeatmap: React.FC = () => {
         textStyle: { color: tertiaryText, fontSize: 9 },
         // Smooth gradient from empty-cell color → brand color.
         inRange: {
-          color: [
-            heatColors[0],
-            heatColors[1],
-            heatColors[2],
-            heatColors[3],
-            heatColors[4],
-            heatColors[5],
-          ],
+          color: [heatColors[0], heatColors[1], heatColors[2], heatColors[3], heatColors[4], heatColors[5]],
         },
         // Show "多"/"少" at the ends instead of raw numbers.
         formatter: (v: unknown) => {
@@ -195,7 +185,16 @@ export const UsageHeatmap: React.FC = () => {
           <EChart option={option} />
         </div>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 140, color: 'var(--text-tertiary)', fontSize: 'var(--body-sm-font-size)' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: 140,
+            color: 'var(--text-tertiary)',
+            fontSize: 'var(--body-sm-font-size)',
+          }}
+        >
           暂无数据
         </div>
       )}

@@ -14,12 +14,7 @@ type ButtonSize = 'sm' | 'md' | 'lg';
 // `DragEventHandler` isn't assignable to motion's `(event, info) => void`.
 type StripMotionHandlers<T> = {
   [K in keyof T]: K extends
-    | 'onDrag'
-    | 'onDragStart'
-    | 'onDragEnd'
-    | 'onAnimationStart'
-    | 'onAnimationEnd'
-    | 'onAnimationIteration'
+    'onDrag' | 'onDragStart' | 'onDragEnd' | 'onAnimationStart' | 'onAnimationEnd' | 'onAnimationIteration'
     ? never
     : T[K];
 };
@@ -71,10 +66,12 @@ const variantHoverBackground: Record<ButtonVariant, string> = {
 // Subtle elevation for "emphasis" variants (brand / primary / danger).
 // Secondary / ghost / link stay flat to preserve their quiet role.
 const variantShadow: Record<ButtonVariant, string> = {
-  primary: '0 1px 2px color-mix(in srgb, var(--bg-brand) 40%, transparent), 0 4px 12px color-mix(in srgb, var(--bg-brand) 24%, transparent)',
+  primary:
+    '0 1px 2px color-mix(in srgb, var(--bg-brand) 40%, transparent), 0 4px 12px color-mix(in srgb, var(--bg-brand) 24%, transparent)',
   secondary: 'none',
   ghost: 'none',
-  brand: '0 1px 2px color-mix(in srgb, var(--bg-brand) 40%, transparent), 0 4px 12px color-mix(in srgb, var(--bg-brand) 24%, transparent)',
+  brand:
+    '0 1px 2px color-mix(in srgb, var(--bg-brand) 40%, transparent), 0 4px 12px color-mix(in srgb, var(--bg-brand) 24%, transparent)',
   danger: '0 1px 2px rgba(0, 0, 0, 0.08)',
   link: 'none',
 };
@@ -219,11 +216,10 @@ function parseCSS(css: string): React.CSSProperties {
     else if (k === 'borderRadius') style.borderRadius = v;
     else if (k === 'fontSize') style.fontSize = v;
     else if (k === 'borderColor') style.borderColor = v;
-    else if (k === 'background') (style as any).background = v;
+    else if (k === 'background') style.background = v;
     else if (k === 'color') style.color = v;
     else if (k === 'opacity') style.opacity = parseFloat(v);
     else if (k === 'width') style.width = v;
-    else if (k in style) (style as any)[k] = v;
   });
   return style;
 }

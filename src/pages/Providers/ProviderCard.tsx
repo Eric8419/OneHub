@@ -18,22 +18,28 @@ const describeModelCapabilities = (model: Model) => {
   return tags;
 };
 
-const STATUS_CONFIG: Record<string, { tagVariant: 'green' | 'orange' | 'danger' | 'neutral'; label: string; cardStatus: string }> = {
-  connected:    { tagVariant: 'green',   label: '已连接',     cardStatus: 'normal' },
-  configuring: { tagVariant: 'orange',  label: '配置中',     cardStatus: 'unconfigured' },
-  error:       { tagVariant: 'danger',  label: '连接失败',   cardStatus: 'failed' },
-  disabled:    { tagVariant: 'neutral', label: '已禁用',     cardStatus: 'disabled' },
-  testing:     { tagVariant: 'orange',  label: '测试中',     cardStatus: 'testing' },
+const STATUS_CONFIG: Record<
+  string,
+  { tagVariant: 'green' | 'orange' | 'danger' | 'neutral'; label: string; cardStatus: string }
+> = {
+  connected: { tagVariant: 'green', label: '已连接', cardStatus: 'normal' },
+  configuring: { tagVariant: 'orange', label: '配置中', cardStatus: 'unconfigured' },
+  error: { tagVariant: 'danger', label: '连接失败', cardStatus: 'failed' },
+  disabled: { tagVariant: 'neutral', label: '已禁用', cardStatus: 'disabled' },
+  testing: { tagVariant: 'orange', label: '测试中', cardStatus: 'testing' },
   // Health-driven states (override provider.status Tag when not healthy)
-  rate_limited: { tagVariant: 'orange', label: '限流中',     cardStatus: 'testing' },
-  unhealthy:    { tagVariant: 'danger', label: '熔断中',     cardStatus: 'failed' },
-  auth_error:   { tagVariant: 'danger', label: '认证失败',   cardStatus: 'failed' },
+  rate_limited: { tagVariant: 'orange', label: '限流中', cardStatus: 'testing' },
+  unhealthy: { tagVariant: 'danger', label: '熔断中', cardStatus: 'failed' },
+  auth_error: { tagVariant: 'danger', label: '认证失败', cardStatus: 'failed' },
 };
 
-export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealthSnapshot }> = ({ providerId, health }) => {
+export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealthSnapshot }> = ({
+  providerId,
+  health,
+}) => {
   const navigate = useNavigate();
-  const provider = useProviderStore(s => s.providers.find(p => p.id === providerId));
-  const updateProvider = useProviderStore(s => s.updateProvider);
+  const provider = useProviderStore((s) => s.providers.find((p) => p.id === providerId));
+  const updateProvider = useProviderStore((s) => s.updateProvider);
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -47,11 +53,14 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
 
   const handleCopyKey = () => {
     if (provider.apiKey) {
-      navigator.clipboard.writeText(provider.apiKey).then(() => {
-        toast('API Key 已复制', 'success');
-      }).catch(() => {
-        toast('复制失败', 'error');
-      });
+      navigator.clipboard
+        .writeText(provider.apiKey)
+        .then(() => {
+          toast('API Key 已复制', 'success');
+        })
+        .catch(() => {
+          toast('复制失败', 'error');
+        });
     }
   };
 
@@ -122,7 +131,18 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
             {provider.name}
           </span>
           {provider.status === 'testing' ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--spacer-4)', padding: '0 var(--spacer-8)', borderRadius: 'var(--radius-4)', fontSize: 'var(--body-xs-font-size)', background: 'var(--status-primary-surface-l1)', color: 'var(--status-primary-default)' }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 'var(--spacer-4)',
+                padding: '0 var(--spacer-8)',
+                borderRadius: 'var(--radius-4)',
+                fontSize: 'var(--body-xs-font-size)',
+                background: 'var(--status-primary-surface-l1)',
+                color: 'var(--status-primary-default)',
+              }}
+            >
               <Loader2 size={10} style={{ animation: 'spin 0.6s linear infinite' }} />
               测试中
             </span>
@@ -142,15 +162,23 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 28, height: 28,
-              borderRadius: 'var(--radius-6)', border: 'none',
+              width: 28,
+              height: 28,
+              borderRadius: 'var(--radius-6)',
+              border: 'none',
               background: 'transparent',
               color: isDisabled ? 'var(--status-success-default)' : 'var(--icon-tertiary)',
               cursor: 'pointer',
               transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease)',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; e.currentTarget.style.color = isDisabled ? 'var(--status-success-hover)' : 'var(--status-error-default)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = isDisabled ? 'var(--status-success-default)' : 'var(--icon-tertiary)'; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+              e.currentTarget.style.color = isDisabled ? 'var(--status-success-hover)' : 'var(--status-error-default)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.color = isDisabled ? 'var(--status-success-default)' : 'var(--icon-tertiary)';
+            }}
           >
             {isDisabled ? <PowerOff size={14} /> : <Power size={14} />}
           </button>
@@ -163,15 +191,23 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 28, height: 28,
-              borderRadius: 'var(--radius-6)', border: 'none',
+              width: 28,
+              height: 28,
+              borderRadius: 'var(--radius-6)',
+              border: 'none',
               background: 'transparent',
               color: 'var(--icon-tertiary)',
               cursor: 'pointer',
               transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease)',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; e.currentTarget.style.color = 'var(--icon-default)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--icon-tertiary)'; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+              e.currentTarget.style.color = 'var(--icon-default)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.color = 'var(--icon-tertiary)';
+            }}
           >
             <ChevronRight size={14} />
           </button>
@@ -184,15 +220,23 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 28, height: 28,
-              borderRadius: 'var(--radius-6)', border: 'none',
+              width: 28,
+              height: 28,
+              borderRadius: 'var(--radius-6)',
+              border: 'none',
               background: 'transparent',
               color: 'var(--icon-tertiary)',
               cursor: 'pointer',
               transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease)',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; e.currentTarget.style.color = 'var(--icon-default)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--icon-tertiary)'; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+              e.currentTarget.style.color = 'var(--icon-default)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.color = 'var(--icon-tertiary)';
+            }}
           >
             <Pencil size={14} />
           </button>
@@ -205,15 +249,23 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 28, height: 28,
-              borderRadius: 'var(--radius-6)', border: 'none',
+              width: 28,
+              height: 28,
+              borderRadius: 'var(--radius-6)',
+              border: 'none',
               background: 'transparent',
               color: 'var(--icon-tertiary)',
               cursor: 'pointer',
               transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease)',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--status-error-surface-l1)'; e.currentTarget.style.color = 'var(--status-error-default)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--icon-tertiary)'; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--status-error-surface-l1)';
+              e.currentTarget.style.color = 'var(--status-error-default)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.color = 'var(--icon-tertiary)';
+            }}
           >
             <Trash2 size={14} />
           </button>
@@ -231,7 +283,9 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)', flexShrink: 0 }}>API Base</span>
+          <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)', flexShrink: 0 }}>
+            API Base
+          </span>
           <span
             style={{
               fontSize: 'var(--body-xs-font-size)',
@@ -248,7 +302,9 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)', flexShrink: 0 }}>API Key</span>
+          <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)', flexShrink: 0 }}>
+            API Key
+          </span>
           {provider.apiKey ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-4)' }}>
               <span
@@ -265,14 +321,25 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
                 title="复制 API Key"
                 onClick={handleCopyKey}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 20, height: 20, border: 'none', background: 'transparent',
-                  color: 'var(--icon-tertiary)', cursor: 'pointer', borderRadius: 'var(--radius-4)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 20,
+                  height: 20,
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--icon-tertiary)',
+                  cursor: 'pointer',
+                  borderRadius: 'var(--radius-4)',
                   padding: 0,
                   transition: 'color var(--transition-fast, 0.12s ease)',
                 }}
-                onMouseEnter={e => { e.currentTarget.style.color = 'var(--icon-brand)'; }}
-                onMouseLeave={e => { e.currentTarget.style.color = 'var(--icon-tertiary)'; }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--icon-brand)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--icon-tertiary)';
+                }}
               >
                 <Copy size={12} />
               </button>
@@ -294,8 +361,12 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)', flexShrink: 0 }}>模型数量</span>
-          <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)' }}>{provider.models.length}</span>
+          <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)', flexShrink: 0 }}>
+            模型数量
+          </span>
+          <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)' }}>
+            {provider.models.length}
+          </span>
         </div>
 
         {/* Error summary for failed status */}
@@ -353,8 +424,14 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
           lineHeight: 'var(--body-xs-line-height)',
           transition: 'color var(--transition-fast, 0.12s ease), background var(--transition-fast, 0.12s ease)',
         }}
-        onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
-        onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-tertiary)'; e.currentTarget.style.background = 'transparent'; }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = 'var(--text-secondary)';
+          e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = 'var(--text-tertiary)';
+          e.currentTarget.style.background = 'transparent';
+        }}
       >
         <span
           className="mc-provider-card__chevron"
@@ -385,42 +462,42 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
           background: 'var(--bg-white)',
         }}
       >
-        {provider.models.map(model => {
+        {provider.models.map((model) => {
           const capabilityTags = describeModelCapabilities(model);
           return (
-          <div
-            key={model.id}
-            className="mc-model-item"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--spacer-8)',
-              flexWrap: 'wrap',
-              fontSize: 'var(--body-sm-font-size)',
-              lineHeight: 'var(--body-sm-line-height)',
-              color: isDisabled ? 'var(--text-disabled)' : 'var(--text-secondary)',
-            }}
-          >
-            <Bot size={14} style={{ color: isDisabled ? 'var(--icon-disabled)' : 'var(--icon-tertiary)' }} />
-            <span>{model.name}</span>
-            {capabilityTags.map(tag => (
-              <span
-                key={tag}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  height: 20,
-                  padding: '0 var(--spacer-6)',
-                  borderRadius: 'var(--radius-6)',
-                  background: 'var(--bg-overlay-l1)',
-                  color: isDisabled ? 'var(--text-disabled)' : 'var(--text-tertiary)',
-                  fontSize: 'var(--body-xs-font-size)',
-                }}
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
+            <div
+              key={model.id}
+              className="mc-model-item"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--spacer-8)',
+                flexWrap: 'wrap',
+                fontSize: 'var(--body-sm-font-size)',
+                lineHeight: 'var(--body-sm-line-height)',
+                color: isDisabled ? 'var(--text-disabled)' : 'var(--text-secondary)',
+              }}
+            >
+              <Bot size={14} style={{ color: isDisabled ? 'var(--icon-disabled)' : 'var(--icon-tertiary)' }} />
+              <span>{model.name}</span>
+              {capabilityTags.map((tag) => (
+                <span
+                  key={tag}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    height: 20,
+                    padding: '0 var(--spacer-6)',
+                    borderRadius: 'var(--radius-6)',
+                    background: 'var(--bg-overlay-l1)',
+                    color: isDisabled ? 'var(--text-disabled)' : 'var(--text-tertiary)',
+                    fontSize: 'var(--body-xs-font-size)',
+                  }}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
           );
         })}
       </div>

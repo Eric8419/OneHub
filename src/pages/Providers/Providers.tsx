@@ -8,9 +8,9 @@ import { Plus, Cpu } from 'lucide-react';
 
 export const Providers: React.FC = () => {
   const navigate = useNavigate();
-  const providers = useProviderStore(s => s.providers);
-  const loadProviders = useProviderStore(s => s.loadProviders);
-  const loaded = useProviderStore(s => s.loaded);
+  const providers = useProviderStore((s) => s.providers);
+  const loadProviders = useProviderStore((s) => s.loadProviders);
+  const loaded = useProviderStore((s) => s.loaded);
   const [healthMap, setHealthMap] = useState<Record<string, ProviderHealthSnapshot>>({});
 
   useEffect(() => {
@@ -90,9 +90,20 @@ export const Providers: React.FC = () => {
       {providers.length === 0 ? (
         <AnimatedContent delay={80}>
           <Card padding="var(--spacer-48) var(--spacer-24)">
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'var(--spacer-12)', color: 'var(--text-tertiary)' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 'var(--spacer-12)',
+                color: 'var(--text-tertiary)',
+              }}
+            >
               <Cpu size={40} style={{ opacity: 0.3 }} />
-              <span style={{ fontSize: 'var(--body-base-font-size)', color: 'var(--text-secondary)' }}>暂无 API 提供商</span>
+              <span style={{ fontSize: 'var(--body-base-font-size)', color: 'var(--text-secondary)' }}>
+                暂无 API 提供商
+              </span>
               <span style={{ fontSize: 'var(--body-sm-font-size)' }}>点击右上角「添加提供商」开始配置</span>
             </div>
           </Card>

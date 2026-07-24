@@ -15,11 +15,7 @@ export const Switch: React.FC<SwitchProps> = (props) => {
 
   const isActive = !indeterminate && checked;
   const thumbLeft = indeterminate ? 9 : isActive ? 16 : 2;
-  const bgColor = indeterminate
-    ? 'var(--bg-overlay-l3)'
-    : isActive
-      ? 'var(--bg-brand)'
-      : 'var(--bg-overlay-l2)';
+  const bgColor = indeterminate ? 'var(--bg-overlay-l3)' : isActive ? 'var(--bg-brand)' : 'var(--bg-overlay-l2)';
 
   const toggle = useCallback(() => {
     if (!disabled) onChange?.(!checked);
@@ -32,7 +28,7 @@ export const Switch: React.FC<SwitchProps> = (props) => {
         toggle();
       }
     },
-    [toggle]
+    [toggle],
   );
 
   return (
@@ -91,8 +87,7 @@ export const Switch: React.FC<SwitchProps> = (props) => {
           height: 18,
           borderRadius: '50%',
           background: '#fff',
-          boxShadow:
-            '0 2px 4px rgba(0,0,0,0.15), 0 1px 1px rgba(0,0,0,0.06)',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.15), 0 1px 1px rgba(0,0,0,0.06)',
           transition: 'left .28s cubic-bezier(0.22,1,0.36,1), width .2s ease',
           pointerEvents: 'none',
         }}

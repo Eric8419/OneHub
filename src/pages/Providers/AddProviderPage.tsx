@@ -6,7 +6,22 @@ import type { DropdownOption } from '../../components/ui';
 import type { Model } from '../../types/provider';
 import { buildModelFromName } from '../../lib/modelPresets';
 import { invoke } from '@tauri-apps/api/core';
-import { ArrowLeft, Check, Loader2, RefreshCw, Download, Plus, Trash2, Eye, Brain, SlidersHorizontal, Wrench, Braces, ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  Loader2,
+  RefreshCw,
+  Download,
+  Plus,
+  Trash2,
+  Eye,
+  Brain,
+  SlidersHorizontal,
+  Wrench,
+  Braces,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -50,7 +65,12 @@ const FALLBACK_PROFILES: ProviderProfileEntry[] = [
   { id: 'groq', label: 'Groq', baseUrl: 'https://api.groq.com/openai/v1', flavor: 'openai-compatible' },
   { id: 'xai', label: 'xAI (Grok)', baseUrl: 'https://api.x.ai/v1', flavor: 'openai-compatible' },
   { id: 'togetherai', label: 'Together AI', baseUrl: 'https://api.together.xyz/v1', flavor: 'openai-compatible' },
-  { id: 'fireworks', label: 'Fireworks AI', baseUrl: 'https://api.fireworks.ai/inference/v1', flavor: 'openai-compatible' },
+  {
+    id: 'fireworks',
+    label: 'Fireworks AI',
+    baseUrl: 'https://api.fireworks.ai/inference/v1',
+    flavor: 'openai-compatible',
+  },
   { id: 'cerebras', label: 'Cerebras', baseUrl: 'https://api.cerebras.ai/v1', flavor: 'openai-compatible' },
   { id: 'deepinfra', label: 'Deep Infra', baseUrl: 'https://api.deepinfra.com/v1/openai', flavor: 'openai-compatible' },
   { id: 'baseten', label: 'Baseten', baseUrl: 'https://inference.baseten.co/v1', flavor: 'openai-compatible' },
@@ -58,18 +78,38 @@ const FALLBACK_PROFILES: ProviderProfileEntry[] = [
   { id: 'cohere', label: 'Cohere', baseUrl: 'https://api.cohere.ai/v1', flavor: 'openai-compatible' },
   { id: 'perplexity', label: 'Perplexity', baseUrl: 'https://api.perplexity.ai', flavor: 'openai-compatible' },
   { id: 'nvidia', label: 'NVIDIA NIM', baseUrl: 'https://integrate.api.nvidia.com/v1', flavor: 'openai-compatible' },
-  { id: 'alibaba', label: 'Alibaba (DashScope)', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', flavor: 'openai-compatible' },
+  {
+    id: 'alibaba',
+    label: 'Alibaba (DashScope)',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    flavor: 'openai-compatible',
+  },
   { id: 'venice', label: 'Venice AI', baseUrl: 'https://api.venice.ai/api/v1', flavor: 'openai-compatible' },
   { id: '302ai', label: '302.AI', baseUrl: 'https://api.302.ai/v1', flavor: 'openai-compatible' },
   { id: 'moonshot', label: 'Moonshot AI (Kimi)', baseUrl: 'https://api.moonshot.cn/v1', flavor: 'openai-compatible' },
   { id: 'minimax', label: 'MiniMax', baseUrl: 'https://api.minimax.chat/v1', flavor: 'openai-compatible' },
-  { id: 'huggingface', label: 'Hugging Face', baseUrl: 'https://api-inference.huggingface.co/v1', flavor: 'openai-compatible' },
+  {
+    id: 'huggingface',
+    label: 'Hugging Face',
+    baseUrl: 'https://api-inference.huggingface.co/v1',
+    flavor: 'openai-compatible',
+  },
   { id: 'zai', label: 'Z.AI', baseUrl: 'https://api.z.ai/api/paas/v4', flavor: 'openai-compatible' },
   { id: 'ionet', label: 'IO.NET', baseUrl: 'https://api.intelligence.io.solutions/v1', flavor: 'openai-compatible' },
-  { id: 'nebius', label: 'Nebius Token Factory', baseUrl: 'https://api.studio.nebius.ai/v1', flavor: 'openai-compatible' },
+  {
+    id: 'nebius',
+    label: 'Nebius Token Factory',
+    baseUrl: 'https://api.studio.nebius.ai/v1',
+    flavor: 'openai-compatible',
+  },
   { id: 'cortecs', label: 'Cortecs', baseUrl: 'https://api.cortecs.ai/v1', flavor: 'openai-compatible' },
   { id: 'stackit', label: 'STACKIT', baseUrl: 'https://api.openai.stackit.tech/v1', flavor: 'openai-compatible' },
-  { id: 'ovhcloud', label: 'OVHcloud AI Endpoints', baseUrl: 'https://endpoints.ai.eu.ovhcloud.com/v1', flavor: 'openai-compatible' },
+  {
+    id: 'ovhcloud',
+    label: 'OVHcloud AI Endpoints',
+    baseUrl: 'https://endpoints.ai.eu.ovhcloud.com/v1',
+    flavor: 'openai-compatible',
+  },
   { id: 'scaleway', label: 'Scaleway', baseUrl: 'https://api.scaleway.ai/ai-apis/v1', flavor: 'openai-compatible' },
   { id: 'helicone', label: 'Helicone', baseUrl: 'https://ai-gateway.helicone.ai', flavor: 'openai-compatible' },
   { id: 'frogbot', label: 'FrogBot', baseUrl: 'https://api.frogbot.ai/v1', flavor: 'openai-compatible' },
@@ -79,15 +119,55 @@ const FALLBACK_PROFILES: ProviderProfileEntry[] = [
   { id: 'llamacpp', label: 'llama.cpp (local)', baseUrl: 'http://127.0.0.1:8080/v1', flavor: 'openai-compatible' },
   { id: 'vllm', label: 'vLLM (local)', baseUrl: 'http://127.0.0.1:8000/v1', flavor: 'openai-compatible' },
   { id: 'atomic-chat', label: 'Atomic Chat (local)', baseUrl: 'http://127.0.0.1:1337/v1', flavor: 'openai-compatible' },
-  { id: 'amazon-bedrock', label: 'Amazon Bedrock', baseUrl: 'https://bedrock-runtime.us-east-1.amazonaws.com', flavor: 'openai-compatible' },
-  { id: 'azure-openai', label: 'Azure OpenAI', baseUrl: 'https://RESOURCE_NAME.openai.azure.com', flavor: 'openai-compatible' },
-  { id: 'azure-cognitive-services', label: 'Azure Cognitive Services', baseUrl: 'https://RESOURCE_NAME.cognitiveservices.azure.com', flavor: 'openai-compatible' },
-  { id: 'google-vertex', label: 'Google Vertex AI', baseUrl: 'https://us-central1-aiplatform.googleapis.com/v1', flavor: 'openai-compatible' },
-  { id: 'github-copilot', label: 'GitHub Copilot', baseUrl: 'https://api.githubcopilot.com', flavor: 'openai-compatible' },
+  {
+    id: 'amazon-bedrock',
+    label: 'Amazon Bedrock',
+    baseUrl: 'https://bedrock-runtime.us-east-1.amazonaws.com',
+    flavor: 'openai-compatible',
+  },
+  {
+    id: 'azure-openai',
+    label: 'Azure OpenAI',
+    baseUrl: 'https://RESOURCE_NAME.openai.azure.com',
+    flavor: 'openai-compatible',
+  },
+  {
+    id: 'azure-cognitive-services',
+    label: 'Azure Cognitive Services',
+    baseUrl: 'https://RESOURCE_NAME.cognitiveservices.azure.com',
+    flavor: 'openai-compatible',
+  },
+  {
+    id: 'google-vertex',
+    label: 'Google Vertex AI',
+    baseUrl: 'https://us-central1-aiplatform.googleapis.com/v1',
+    flavor: 'openai-compatible',
+  },
+  {
+    id: 'github-copilot',
+    label: 'GitHub Copilot',
+    baseUrl: 'https://api.githubcopilot.com',
+    flavor: 'openai-compatible',
+  },
   { id: 'gitlab-duo', label: 'GitLab Duo', baseUrl: 'https://cloud.gitlab.com/ai/v1', flavor: 'openai-compatible' },
-  { id: 'sap-ai-core', label: 'SAP AI Core', baseUrl: 'https://api.ai.prod.eu-central-1.aws.ml.hana.ondemand.com/v2', flavor: 'openai-compatible' },
-  { id: 'cloudflare-ai-gateway', label: 'Cloudflare AI Gateway', baseUrl: 'https://gateway.ai.cloudflare.com/v1/ACCOUNT_ID/GATEWAY_ID', flavor: 'openai-compatible' },
-  { id: 'vercel-ai-gateway', label: 'Vercel AI Gateway', baseUrl: 'https://ai-gateway.vercel.sh/v1', flavor: 'openai-compatible' },
+  {
+    id: 'sap-ai-core',
+    label: 'SAP AI Core',
+    baseUrl: 'https://api.ai.prod.eu-central-1.aws.ml.hana.ondemand.com/v2',
+    flavor: 'openai-compatible',
+  },
+  {
+    id: 'cloudflare-ai-gateway',
+    label: 'Cloudflare AI Gateway',
+    baseUrl: 'https://gateway.ai.cloudflare.com/v1/ACCOUNT_ID/GATEWAY_ID',
+    flavor: 'openai-compatible',
+  },
+  {
+    id: 'vercel-ai-gateway',
+    label: 'Vercel AI Gateway',
+    baseUrl: 'https://ai-gateway.vercel.sh/v1',
+    flavor: 'openai-compatible',
+  },
   { id: 'zenmux', label: 'ZenMux', baseUrl: 'https://api.zenmux.ai/v1', flavor: 'openai-compatible' },
   { id: 'opencode-zen', label: 'OpenCode Zen', baseUrl: 'https://zen.opencode.ai/v1', flavor: 'openai-compatible' },
 ];
@@ -95,8 +175,13 @@ const FALLBACK_PROFILES: ProviderProfileEntry[] = [
 const errorMessage = (e: unknown, fallback: string) => (e instanceof Error ? e.message : e ? String(e) : fallback);
 
 const modelIdFromName = (value: string) =>
-  value.trim().toLowerCase().replace(/[^a-z0-9._:/-]+/g, '-').replace(/^-+|-+$/g, '') ||
-  crypto.randomUUID?.() || Date.now().toString(36);
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._:/-]+/g, '-')
+    .replace(/^-+|-+$/g, '') ||
+  crypto.randomUUID?.() ||
+  Date.now().toString(36);
 
 // `makeModel` wraps buildModelFromName to apply preset auto-fill
 // based on the model name (regex match in modelPresets.ts).
@@ -170,7 +255,9 @@ export const AddProviderPage: React.FC = () => {
   useEffect(() => {
     invoke<ProviderProfileEntry[]>('list_provider_profiles')
       .then(setProfiles)
-      .catch(() => { /* keep FALLBACK_PROFILES */ });
+      .catch(() => {
+        /* keep FALLBACK_PROFILES */
+      });
   }, []);
 
   useEffect(() => {
@@ -195,7 +282,22 @@ export const AddProviderPage: React.FC = () => {
     const groupOf = (id: string): string => {
       if (id === 'openai' || id === 'anthropic') return '原生协议';
       if (['ollama', 'ollama-cloud', 'lmstudio', 'llamacpp', 'vllm', 'atomic-chat'].includes(id)) return '本地运行时';
-      if (['amazon-bedrock', 'azure-openai', 'azure-cognitive-services', 'google-vertex', 'github-copilot', 'gitlab-duo', 'sap-ai-core', 'cloudflare-ai-gateway', 'vercel-ai-gateway', 'zenmux', 'opencode-zen'].includes(id)) return '云平台';
+      if (
+        [
+          'amazon-bedrock',
+          'azure-openai',
+          'azure-cognitive-services',
+          'google-vertex',
+          'github-copilot',
+          'gitlab-duo',
+          'sap-ai-core',
+          'cloudflare-ai-gateway',
+          'vercel-ai-gateway',
+          'zenmux',
+          'opencode-zen',
+        ].includes(id)
+      )
+        return '云平台';
       return 'OpenAI 兼容';
     };
     const opts: DropdownOption[] = profiles.map((p) => ({
@@ -223,18 +325,20 @@ export const AddProviderPage: React.FC = () => {
   }, []);
 
   const updateModel = (index: number, patch: Partial<Model>) => {
-    setModels((prev) => prev.map((model, i) => {
-      if (i !== index) return model;
-      const next = { ...model, ...patch };
-      if (patch.supportsReasoning === false) {
-        next.supportsReasoningEffort = false;
-        next.defaultReasoningEffort = undefined;
-      }
-      if (patch.supportsReasoningEffort === false) {
-        next.defaultReasoningEffort = undefined;
-      }
-      return next;
-    }));
+    setModels((prev) =>
+      prev.map((model, i) => {
+        if (i !== index) return model;
+        const next = { ...model, ...patch };
+        if (patch.supportsReasoning === false) {
+          next.supportsReasoningEffort = false;
+          next.defaultReasoningEffort = undefined;
+        }
+        if (patch.supportsReasoningEffort === false) {
+          next.defaultReasoningEffort = undefined;
+        }
+        return next;
+      }),
+    );
   };
 
   const removeModel = (index: number) => {
@@ -294,7 +398,12 @@ export const AddProviderPage: React.FC = () => {
     setTestResult('idle');
     setTestMessage('');
     try {
-      const result = await invoke<{ success: boolean; modelCount?: number; error?: { kind: string; message: string }; message: string }>('test_provider_connection', {
+      const result = await invoke<{
+        success: boolean;
+        modelCount?: number;
+        error?: { kind: string; message: string };
+        message: string;
+      }>('test_provider_connection', {
         flavor: apiFlavor,
         apiBase,
         apiKey,
@@ -371,11 +480,16 @@ export const AddProviderPage: React.FC = () => {
 
   const canProceed = useMemo(() => {
     switch (currentStep) {
-      case 1: return name.trim().length > 0;
-      case 2: return apiBase.trim().length > 0 && apiKey.trim().length > 0;
-      case 3: return true;
-      case 4: return testResult === 'success';
-      default: return true;
+      case 1:
+        return name.trim().length > 0;
+      case 2:
+        return apiBase.trim().length > 0 && apiKey.trim().length > 0;
+      case 3:
+        return true;
+      case 4:
+        return testResult === 'success';
+      default:
+        return true;
     }
   }, [currentStep, name, apiBase, apiKey, testResult]);
 
@@ -407,8 +521,12 @@ export const AddProviderPage: React.FC = () => {
             cursor: 'pointer',
             transition: 'background var(--transition-fast, 0.12s ease)',
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-base-default)'; }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'var(--bg-base-default)';
+          }}
         >
           <ArrowLeft size={16} />
         </button>
@@ -425,7 +543,13 @@ export const AddProviderPage: React.FC = () => {
           >
             添加提供商
           </h2>
-          <p style={{ fontSize: 'var(--body-base-font-size)', color: 'var(--text-tertiary)', margin: 'var(--spacer-4) 0 0 0' }}>
+          <p
+            style={{
+              fontSize: 'var(--body-base-font-size)',
+              color: 'var(--text-tertiary)',
+              margin: 'var(--spacer-4) 0 0 0',
+            }}
+          >
             按步骤配置 API 提供商
           </p>
         </div>
@@ -454,7 +578,14 @@ export const AddProviderPage: React.FC = () => {
         >
           {/* ── Step 1: Choose Type ──────────────────────── */}
           <Step>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-16)', padding: 'var(--spacer-8) 0' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--spacer-16)',
+                padding: 'var(--spacer-8) 0',
+              }}
+            >
               <div style={fieldStyle}>
                 <label style={labelStyle}>快速选择</label>
                 <Dropdown
@@ -465,9 +596,7 @@ export const AddProviderPage: React.FC = () => {
                   searchable
                   maxItems={8}
                   renderOption={(opt) =>
-                    opt.value !== 'custom' ? (
-                      <ProviderLogo providerId={opt.value} name={opt.label} size={16} />
-                    ) : null
+                    opt.value !== 'custom' ? <ProviderLogo providerId={opt.value} name={opt.label} size={16} /> : null
                   }
                   renderTriggerLeading={(opt) =>
                     opt && opt.value !== 'custom' ? (
@@ -511,7 +640,14 @@ export const AddProviderPage: React.FC = () => {
 
           {/* ── Step 2: Credentials ──────────────────────── */}
           <Step>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-16)', padding: 'var(--spacer-8) 0' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--spacer-16)',
+                padding: 'var(--spacer-8) 0',
+              }}
+            >
               <div style={fieldStyle}>
                 <label style={labelStyle}>
                   API Base URL <span style={{ color: 'var(--status-error-default)' }}>*</span>
@@ -573,7 +709,14 @@ export const AddProviderPage: React.FC = () => {
 
               {/* Proxy config */}
               <div style={fieldStyle}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--spacer-12)' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 'var(--spacer-12)',
+                  }}
+                >
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-2)' }}>
                     <label style={labelStyle}>使用独立代理</label>
                     <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
@@ -597,7 +740,14 @@ export const AddProviderPage: React.FC = () => {
 
           {/* ── Step 3: Models (with alias mapping) ─────── */}
           <Step>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-12)', padding: 'var(--spacer-8) 0' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--spacer-12)',
+                padding: 'var(--spacer-8) 0',
+              }}
+            >
               {/* Fetch models bar */}
               <div
                 style={{
@@ -613,7 +763,13 @@ export const AddProviderPage: React.FC = () => {
                 }}
               >
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-2)' }}>
-                  <span style={{ fontSize: 'var(--body-sm-font-size)', fontWeight: 'var(--font-weight-medium)', color: 'var(--text-default)' }}>
+                  <span
+                    style={{
+                      fontSize: 'var(--body-sm-font-size)',
+                      fontWeight: 'var(--font-weight-medium)',
+                      color: 'var(--text-default)',
+                    }}
+                  >
                     从接口拉取模型
                   </span>
                   <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
@@ -640,9 +796,13 @@ export const AddProviderPage: React.FC = () => {
                   }}
                 >
                   {fetchingModels ? (
-                    <><Loader2 size={14} style={{ animation: 'spin 0.6s linear infinite' }} /> 拉取中</>
+                    <>
+                      <Loader2 size={14} style={{ animation: 'spin 0.6s linear infinite' }} /> 拉取中
+                    </>
                   ) : (
-                    <><Download size={14} /> 拉取模型</>
+                    <>
+                      <Download size={14} /> 拉取模型
+                    </>
                   )}
                 </button>
               </div>
@@ -652,7 +812,8 @@ export const AddProviderPage: React.FC = () => {
                   style={{
                     padding: 'var(--spacer-8) var(--spacer-12)',
                     borderRadius: 'var(--radius-6)',
-                    background: remoteModels.length > 0 ? 'var(--status-success-surface-l1)' : 'var(--status-alert-surface-l1)',
+                    background:
+                      remoteModels.length > 0 ? 'var(--status-success-surface-l1)' : 'var(--status-alert-surface-l1)',
                     color: remoteModels.length > 0 ? 'var(--status-success-default)' : 'var(--status-alert-default)',
                     fontSize: 'var(--body-sm-font-size)',
                   }}
@@ -670,14 +831,30 @@ export const AddProviderPage: React.FC = () => {
                     </span>
                     <button
                       type="button"
-                      onClick={() => remoteModels.forEach((remote) => addModel(makeModel(remote.name || remote.id, remote.id)))}
-                      style={{ border: 'none', background: 'transparent', color: 'var(--text-brand)', cursor: 'pointer', fontSize: 'var(--body-sm-font-size)', fontFamily: 'inherit' }}
+                      onClick={() =>
+                        remoteModels.forEach((remote) => addModel(makeModel(remote.name || remote.id, remote.id)))
+                      }
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--text-brand)',
+                        cursor: 'pointer',
+                        fontSize: 'var(--body-sm-font-size)',
+                        fontFamily: 'inherit',
+                      }}
                     >
                       全部加入
                     </button>
                   </div>
                   <div
-                    style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacer-6)', maxHeight: 92, overflowY: 'auto', paddingRight: 'var(--spacer-4)' }}
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 'var(--spacer-6)',
+                      maxHeight: 92,
+                      overflowY: 'auto',
+                      paddingRight: 'var(--spacer-4)',
+                    }}
                   >
                     {remoteModels.map((remote) => {
                       const displayName = remote.name || remote.id;
@@ -714,7 +891,14 @@ export const AddProviderPage: React.FC = () => {
               )}
 
               {/* Manual add row */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 'var(--spacer-8)', alignItems: 'end' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(0, 1fr) auto',
+                  gap: 'var(--spacer-8)',
+                  alignItems: 'end',
+                }}
+              >
                 <div style={fieldStyle}>
                   <label style={labelStyle}>手动添加模型</label>
                   <input
@@ -782,7 +966,14 @@ export const AddProviderPage: React.FC = () => {
                 ) : (
                   <div
                     className="ds-scroll"
-                    style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-8)', maxHeight: 400, overflowY: 'auto', paddingRight: 'var(--spacer-4)' }}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 'var(--spacer-8)',
+                      maxHeight: 400,
+                      overflowY: 'auto',
+                      paddingRight: 'var(--spacer-4)',
+                    }}
                   >
                     {models.map((model, index) => (
                       <div
@@ -800,7 +991,9 @@ export const AddProviderPage: React.FC = () => {
                       >
                         {/* Model name */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-2)' }}>
-                          <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>模型名称</span>
+                          <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
+                            模型名称
+                          </span>
                           <input
                             value={model.name}
                             onChange={(e) => updateModel(index, { name: e.target.value })}
@@ -864,7 +1057,15 @@ export const AddProviderPage: React.FC = () => {
                             gap: 'var(--spacer-8)',
                           }}
                         >
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-6)', fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)' }}>
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'var(--spacer-6)',
+                              fontSize: 'var(--body-sm-font-size)',
+                              color: 'var(--text-secondary)',
+                            }}
+                          >
                             <Eye size={14} style={{ color: 'var(--icon-tertiary)' }} />
                             <span>视觉</span>
                             <input
@@ -874,7 +1075,15 @@ export const AddProviderPage: React.FC = () => {
                               style={{ accentColor: 'var(--bg-brand)', width: 16, height: 16, cursor: 'pointer' }}
                             />
                           </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-6)', fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)' }}>
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'var(--spacer-6)',
+                              fontSize: 'var(--body-sm-font-size)',
+                              color: 'var(--text-secondary)',
+                            }}
+                          >
                             <Brain size={14} style={{ color: 'var(--icon-tertiary)' }} />
                             <span>思考</span>
                             <input
@@ -884,25 +1093,53 @@ export const AddProviderPage: React.FC = () => {
                               style={{ accentColor: 'var(--bg-brand)', width: 16, height: 16, cursor: 'pointer' }}
                             />
                           </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-6)', fontSize: 'var(--body-sm-font-size)', color: model.supportsReasoning ? 'var(--text-secondary)' : 'var(--text-disabled)' }}>
-                            <SlidersHorizontal size={14} style={{ color: model.supportsReasoning ? 'var(--icon-tertiary)' : 'var(--icon-disabled)' }} />
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'var(--spacer-6)',
+                              fontSize: 'var(--body-sm-font-size)',
+                              color: model.supportsReasoning ? 'var(--text-secondary)' : 'var(--text-disabled)',
+                            }}
+                          >
+                            <SlidersHorizontal
+                              size={14}
+                              style={{
+                                color: model.supportsReasoning ? 'var(--icon-tertiary)' : 'var(--icon-disabled)',
+                              }}
+                            />
                             <span>思考强度</span>
                             <input
                               type="checkbox"
                               checked={Boolean(model.supportsReasoningEffort)}
                               disabled={!model.supportsReasoning}
-                              onChange={(e) => updateModel(index, { supportsReasoningEffort: e.target.checked, defaultReasoningEffort: e.target.checked ? 'medium' : undefined })}
+                              onChange={(e) =>
+                                updateModel(index, {
+                                  supportsReasoningEffort: e.target.checked,
+                                  defaultReasoningEffort: e.target.checked ? 'medium' : undefined,
+                                })
+                              }
                               style={{ accentColor: 'var(--bg-brand)', width: 16, height: 16, cursor: 'pointer' }}
                             />
                           </label>
                           <Dropdown
                             options={REASONING_EFFORT_OPTIONS}
                             value={model.defaultReasoningEffort ?? 'medium'}
-                            onChange={(v) => updateModel(index, { defaultReasoningEffort: v as Model['defaultReasoningEffort'] })}
+                            onChange={(v) =>
+                              updateModel(index, { defaultReasoningEffort: v as Model['defaultReasoningEffort'] })
+                            }
                             disabled={!model.supportsReasoningEffort}
                             size="sm"
                           />
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-6)', fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)' }}>
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'var(--spacer-6)',
+                              fontSize: 'var(--body-sm-font-size)',
+                              color: 'var(--text-secondary)',
+                            }}
+                          >
                             <Wrench size={14} style={{ color: 'var(--icon-tertiary)' }} />
                             <span>工具调用</span>
                             <input
@@ -912,7 +1149,15 @@ export const AddProviderPage: React.FC = () => {
                               style={{ accentColor: 'var(--bg-brand)', width: 16, height: 16, cursor: 'pointer' }}
                             />
                           </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-6)', fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)' }}>
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'var(--spacer-6)',
+                              fontSize: 'var(--body-sm-font-size)',
+                              color: 'var(--text-secondary)',
+                            }}
+                          >
                             <Braces size={14} style={{ color: 'var(--icon-tertiary)' }} />
                             <span>JSON 模式</span>
                             <input
@@ -941,7 +1186,11 @@ export const AddProviderPage: React.FC = () => {
                               type="number"
                               min={0}
                               value={model.contextWindow ?? ''}
-                              onChange={(e) => updateModel(index, { contextWindow: e.target.value ? Number(e.target.value) : undefined })}
+                              onChange={(e) =>
+                                updateModel(index, {
+                                  contextWindow: e.target.value ? Number(e.target.value) : undefined,
+                                })
+                              }
                               placeholder="如 128000"
                               style={{
                                 ...inputBaseStyle,
@@ -959,7 +1208,11 @@ export const AddProviderPage: React.FC = () => {
                               type="number"
                               min={0}
                               value={model.maxOutputTokens ?? ''}
-                              onChange={(e) => updateModel(index, { maxOutputTokens: e.target.value ? Number(e.target.value) : undefined })}
+                              onChange={(e) =>
+                                updateModel(index, {
+                                  maxOutputTokens: e.target.value ? Number(e.target.value) : undefined,
+                                })
+                              }
                               placeholder="如 8192"
                               style={{
                                 ...inputBaseStyle,
@@ -1002,7 +1255,14 @@ export const AddProviderPage: React.FC = () => {
                     color: 'var(--text-default)',
                   }}
                 >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-2)', alignItems: 'flex-start' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 'var(--spacer-2)',
+                      alignItems: 'flex-start',
+                    }}
+                  >
                     <span style={{ fontWeight: 'var(--font-weight-medium)' }}>模型映射</span>
                     <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
                       将客户端请求的模型名映射到上游实际模型名（支持通配符 *）
@@ -1056,7 +1316,9 @@ export const AddProviderPage: React.FC = () => {
                               fontSize: 'var(--body-sm-font-size)',
                             }}
                           />
-                          <span style={{ color: 'var(--text-tertiary)', fontSize: 'var(--body-sm-font-size)' }}>-&gt;</span>
+                          <span style={{ color: 'var(--text-tertiary)', fontSize: 'var(--body-sm-font-size)' }}>
+                            -&gt;
+                          </span>
                           <input
                             type="text"
                             placeholder="上游模型名，如 gpt-4o-2024-08-06"
@@ -1121,7 +1383,14 @@ export const AddProviderPage: React.FC = () => {
 
           {/* ── Step 4: Test Connection ──────────────────── */}
           <Step>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-16)', padding: 'var(--spacer-8) 0' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--spacer-16)',
+                padding: 'var(--spacer-8) 0',
+              }}
+            >
               <div
                 style={{
                   padding: 'var(--spacer-16)',
@@ -1130,18 +1399,41 @@ export const AddProviderPage: React.FC = () => {
                   border: '1px solid var(--border-neutral-l1)',
                 }}
               >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-4)', marginBottom: 'var(--spacer-12)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--body-sm-font-size)' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 'var(--spacer-4)',
+                    marginBottom: 'var(--spacer-12)',
+                  }}
+                >
+                  <div
+                    style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--body-sm-font-size)' }}
+                  >
                     <span style={{ color: 'var(--text-tertiary)' }}>提供商</span>
                     <span style={{ color: 'var(--text-default)' }}>{name}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--body-sm-font-size)' }}>
+                  <div
+                    style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--body-sm-font-size)' }}
+                  >
                     <span style={{ color: 'var(--text-tertiary)' }}>API Base</span>
-                    <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-family-mono)', fontSize: 'var(--body-xs-font-size)' }}>{apiBase}</span>
+                    <span
+                      style={{
+                        color: 'var(--text-secondary)',
+                        fontFamily: 'var(--font-family-mono)',
+                        fontSize: 'var(--body-xs-font-size)',
+                      }}
+                    >
+                      {apiBase}
+                    </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--body-sm-font-size)' }}>
+                  <div
+                    style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--body-sm-font-size)' }}
+                  >
                     <span style={{ color: 'var(--text-tertiary)' }}>协议</span>
-                    <span style={{ color: 'var(--text-secondary)' }}>{API_FLAVOR_OPTIONS.find((o) => o.value === apiFlavor)?.label}</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>
+                      {API_FLAVOR_OPTIONS.find((o) => o.value === apiFlavor)?.label}
+                    </span>
                   </div>
                 </div>
 
@@ -1167,11 +1459,17 @@ export const AddProviderPage: React.FC = () => {
                   }}
                 >
                   {testing ? (
-                    <><Loader2 size={16} style={{ animation: 'spin 0.6s linear infinite' }} /> 测试中...</>
+                    <>
+                      <Loader2 size={16} style={{ animation: 'spin 0.6s linear infinite' }} /> 测试中...
+                    </>
                   ) : testResult === 'success' ? (
-                    <><Check size={16} /> 连接成功</>
+                    <>
+                      <Check size={16} /> 连接成功
+                    </>
                   ) : testResult === 'fail' ? (
-                    <><RefreshCw size={16} /> 重新测试</>
+                    <>
+                      <RefreshCw size={16} /> 重新测试
+                    </>
                   ) : (
                     <>测试连接</>
                   )}
@@ -1212,7 +1510,9 @@ export const AddProviderPage: React.FC = () => {
                 )}
               </div>
 
-              <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)', textAlign: 'center' }}>
+              <span
+                style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)', textAlign: 'center' }}
+              >
                 测试连接将通过选定的 API Base 发送一个轻量请求以验证配置
               </span>
             </div>
@@ -1220,7 +1520,15 @@ export const AddProviderPage: React.FC = () => {
 
           {/* ── Step 5: Complete ─────────────────────────── */}
           <Step>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-16)', alignItems: 'center', padding: 'var(--spacer-16) 0' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--spacer-16)',
+                alignItems: 'center',
+                padding: 'var(--spacer-16) 0',
+              }}
+            >
               <div
                 style={{
                   width: 56,
@@ -1239,13 +1547,17 @@ export const AddProviderPage: React.FC = () => {
                 )}
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 'var(--heading-sm-font-size)', fontWeight: 'var(--font-weight-strong)', marginBottom: 'var(--spacer-4)' }}>
+                <div
+                  style={{
+                    fontSize: 'var(--heading-sm-font-size)',
+                    fontWeight: 'var(--font-weight-strong)',
+                    marginBottom: 'var(--spacer-4)',
+                  }}
+                >
                   {finishError ? '添加失败' : '连接已验证'}
                 </div>
                 <div style={{ fontSize: 'var(--body-base-font-size)', color: 'var(--text-tertiary)' }}>
-                  {finishError
-                    ? '请检查配置后重试'
-                    : `提供商「${name}」已通过连接测试，点击下方按钮完成添加`}
+                  {finishError ? '请检查配置后重试' : `提供商「${name}」已通过连接测试，点击下方按钮完成添加`}
                 </div>
               </div>
 
@@ -1284,7 +1596,15 @@ export const AddProviderPage: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-tertiary)' }}>API Base</span>
-                  <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-family-mono)', fontSize: 'var(--body-xs-font-size)' }}>{apiBase}</span>
+                  <span
+                    style={{
+                      color: 'var(--text-secondary)',
+                      fontFamily: 'var(--font-family-mono)',
+                      fontSize: 'var(--body-xs-font-size)',
+                    }}
+                  >
+                    {apiBase}
+                  </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-tertiary)' }}>模型数量</span>
@@ -1292,7 +1612,11 @@ export const AddProviderPage: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-tertiary)' }}>连接状态</span>
-                  <span style={{ color: testResult === 'success' ? 'var(--status-success-default)' : 'var(--status-alert-default)' }}>
+                  <span
+                    style={{
+                      color: testResult === 'success' ? 'var(--status-success-default)' : 'var(--status-alert-default)',
+                    }}
+                  >
                     {testResult === 'success' ? '已连接' : '未测试'}
                   </span>
                 </div>

@@ -217,11 +217,4 @@ mod tests {
 
         assert_eq!(String::from_utf8(decrypted).unwrap(), plaintext);
     }
-
-    #[test]
-    fn test_empty_string_returns_empty() {
-        // The actual encrypt/decrypt functions need an AppHandle,
-        // so we just test the underlying logic: empty in → empty out.
-        assert!(true);
-    }
 }

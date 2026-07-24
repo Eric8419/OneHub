@@ -7,36 +7,40 @@ export function isValidHex(hex: string): boolean {
 export function normalizeHex(hex: string): string {
   let h = hex.trim().replace(/^#/, '');
   if (h.length === 3) {
-    h = h.split('').map(c => c + c).join('');
+    h = h
+      .split('')
+      .map((c) => c + c)
+      .join('');
   }
   return '#' + h.toUpperCase();
 }
 
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace(/^#/, '');
-  const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
-  return [
-    parseInt(full.slice(0, 2), 16),
-    parseInt(full.slice(2, 4), 16),
-    parseInt(full.slice(4, 6), 16),
-  ];
+  const full =
+    h.length === 3
+      ? h
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : h;
+  return [parseInt(full.slice(0, 2), 16), parseInt(full.slice(2, 4), 16), parseInt(full.slice(4, 6), 16)];
 }
 
 function rgbToHex(r: number, g: number, b: number): string {
   const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
-  return '#' + [clamp(r), clamp(g), clamp(b)]
-    .map(v => v.toString(16).padStart(2, '0'))
-    .join('')
-    .toUpperCase();
+  return (
+    '#' +
+    [clamp(r), clamp(g), clamp(b)]
+      .map((v) => v.toString(16).padStart(2, '0'))
+      .join('')
+      .toUpperCase()
+  );
 }
 
 function mix(hex: string, target: [number, number, number], ratio: number): string {
   const [r, g, b] = hexToRgb(hex);
-  return rgbToHex(
-    r + (target[0] - r) * ratio,
-    g + (target[1] - g) * ratio,
-    b + (target[2] - b) * ratio,
-  );
+  return rgbToHex(r + (target[0] - r) * ratio, g + (target[1] - g) * ratio, b + (target[2] - b) * ratio);
 }
 
 function lighten(hex: string, amount: number): string {

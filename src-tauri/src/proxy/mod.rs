@@ -14,7 +14,9 @@
 // ═══════════════════════════════════════════════════════════════
 
 pub mod adapter;
+pub mod canonical;
 pub mod metrics;
+pub mod protocols;
 pub mod routing;
 pub mod server;
 pub mod state;

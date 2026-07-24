@@ -136,9 +136,7 @@ export const ProxyControl: React.FC = () => {
     }
   };
 
-  const totalUptime = showUptime
-    ? status!.uptimeSecs + Math.max(0, Math.floor((now - statusAtRef.current) / 1000))
-    : 0;
+  const totalUptime = showUptime ? status!.uptimeSecs + Math.max(0, Math.floor((now - statusAtRef.current) / 1000)) : 0;
   const uptimeParts = formatUptime(totalUptime);
   const counterProps = {
     fontSize: 11,
@@ -255,12 +253,8 @@ export const ProxyControl: React.FC = () => {
                 <motion.div
                   initial={false}
                   animate={{
-                    background: running
-                      ? 'rgba(74,222,128,0.14)'
-                      : 'rgba(255,255,255,0.10)',
-                    borderColor: running
-                      ? 'rgba(74,222,128,0.25)'
-                      : 'rgba(255,255,255,0.14)',
+                    background: running ? 'rgba(74,222,128,0.14)' : 'rgba(255,255,255,0.10)',
+                    borderColor: running ? 'rgba(74,222,128,0.25)' : 'rgba(255,255,255,0.14)',
                   }}
                   transition={DURATION_FAST}
                   style={{
@@ -306,12 +300,8 @@ export const ProxyControl: React.FC = () => {
                       layout
                       initial={false}
                       animate={{
-                        background: running
-                          ? 'rgba(74,222,128,0.16)'
-                          : 'rgba(255,255,255,0.10)',
-                        borderColor: running
-                          ? 'rgba(74,222,128,0.25)'
-                          : 'rgba(255,255,255,0.14)',
+                        background: running ? 'rgba(74,222,128,0.16)' : 'rgba(255,255,255,0.10)',
+                        borderColor: running ? 'rgba(74,222,128,0.25)' : 'rgba(255,255,255,0.14)',
                         color: running ? 'var(--status-success-default)' : 'var(--text-tertiary)',
                       }}
                       transition={SPRING}
@@ -331,27 +321,31 @@ export const ProxyControl: React.FC = () => {
                     >
                       <motion.span
                         initial={false}
-                        animate={running
-                          ? {
-                              scale: [1, 1.5, 1],
-                              opacity: [1, 0.5, 1],
-                              background: 'var(--status-success-default)',
-                              boxShadow: '0 0 0 0 rgba(74,222,128,0.5)',
-                            }
-                          : {
-                              scale: 1,
-                              opacity: 1,
-                              background: 'var(--text-disabled)',
-                              boxShadow: '0 0 0 0 rgba(255,255,255,0)',
-                            }}
-                        transition={running
-                          ? {
-                              scale: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
-                              opacity: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
-                              background: { duration: 0.4 },
-                              boxShadow: { duration: 0.4 },
-                            }
-                          : { duration: 0.3 }}
+                        animate={
+                          running
+                            ? {
+                                scale: [1, 1.5, 1],
+                                opacity: [1, 0.5, 1],
+                                background: 'var(--status-success-default)',
+                                boxShadow: '0 0 0 0 rgba(74,222,128,0.5)',
+                              }
+                            : {
+                                scale: 1,
+                                opacity: 1,
+                                background: 'var(--text-disabled)',
+                                boxShadow: '0 0 0 0 rgba(255,255,255,0)',
+                              }
+                        }
+                        transition={
+                          running
+                            ? {
+                                scale: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
+                                opacity: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
+                                background: { duration: 0.4 },
+                                boxShadow: { duration: 0.4 },
+                              }
+                            : { duration: 0.3 }
+                        }
                         style={{
                           width: 6,
                           height: 6,
@@ -436,17 +430,17 @@ export const ProxyControl: React.FC = () => {
                   : toggling
                     ? 'rgba(255,255,255,0.12)'
                     : 'rgba(74,222,128,0.30)',
-                borderColor: running
-                  ? 'rgba(248,113,113,0.30)'
-                  : 'rgba(74,222,128,0.30)',
+                borderColor: running ? 'rgba(248,113,113,0.30)' : 'rgba(74,222,128,0.30)',
                 scale: toggling ? 0.96 : 1,
               }}
-              whileHover={toggling ? {} : {
-                background: running
-                  ? 'rgba(248,113,113,0.42)'
-                  : 'rgba(74,222,128,0.42)',
-                scale: 1.03,
-              }}
+              whileHover={
+                toggling
+                  ? {}
+                  : {
+                      background: running ? 'rgba(248,113,113,0.42)' : 'rgba(74,222,128,0.42)',
+                      scale: 1.03,
+                    }
+              }
               whileTap={toggling ? {} : { scale: 0.97 }}
               transition={SPRING}
               style={{
@@ -537,12 +531,8 @@ export const ProxyControl: React.FC = () => {
                 key={item.key}
                 initial={false}
                 animate={{
-                  background: running
-                    ? 'rgba(255,255,255,0.10)'
-                    : 'rgba(255,255,255,0.06)',
-                  borderColor: running
-                    ? 'rgba(255,255,255,0.16)'
-                    : 'rgba(255,255,255,0.10)',
+                  background: running ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.06)',
+                  borderColor: running ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.10)',
                 }}
                 transition={DURATION_FAST}
                 style={{
@@ -604,9 +594,7 @@ export const ProxyControl: React.FC = () => {
                         background: 'rgba(255,255,255,0.08)',
                         backdropFilter: 'blur(10px) saturate(140%)',
                         WebkitBackdropFilter: 'blur(10px) saturate(140%)',
-                        color: item.copied
-                          ? 'var(--status-success-default)'
-                          : 'var(--icon-tertiary)',
+                        color: item.copied ? 'var(--status-success-default)' : 'var(--icon-tertiary)',
                         cursor: 'pointer',
                         flexShrink: 0,
                         transition:

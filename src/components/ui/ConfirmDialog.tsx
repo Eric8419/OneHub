@@ -26,7 +26,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     <ModalOverlay
       className="ds-confirm-overlay"
       isOpen={open}
-      onOpenChange={(isOpen) => { if (!isOpen) onCancel(); }}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onCancel();
+      }}
       isDismissable
       style={{
         position: 'fixed',

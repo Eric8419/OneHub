@@ -69,16 +69,15 @@ export const Dropdown: React.FC<DropdownProps> = ({
   const listRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
 
-  const selected = options.find(o => o.value === value);
+  const selected = options.find((o) => o.value === value);
 
   // Filter options by query (matches label or group).
   const filtered = useMemo(() => {
     if (!query.trim()) return options;
     const normalizedQuery = query.toLowerCase();
     return options.filter(
-      o =>
-        o.label.toLowerCase().includes(normalizedQuery) ||
-        (o.group && o.group.toLowerCase().includes(normalizedQuery)),
+      (o) =>
+        o.label.toLowerCase().includes(normalizedQuery) || (o.group && o.group.toLowerCase().includes(normalizedQuery)),
     );
   }, [options, query]);
 
@@ -144,7 +143,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
   // Reset active index when opening / when filter changes.
   useEffect(() => {
     if (open) {
-      const idx = options.findIndex(o => o.value === value);
+      const idx = options.findIndex((o) => o.value === value);
       setActiveIndex(idx >= 0 ? idx : 0);
       setQuery('');
     }
@@ -169,11 +168,11 @@ export const Dropdown: React.FC<DropdownProps> = ({
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
-          setActiveIndex(i => Math.min(i + 1, flatSelectable.length - 1));
+          setActiveIndex((i) => Math.min(i + 1, flatSelectable.length - 1));
           break;
         case 'ArrowUp':
           e.preventDefault();
-          setActiveIndex(i => Math.max(i - 1, 0));
+          setActiveIndex((i) => Math.max(i - 1, 0));
           break;
         case 'Home':
           e.preventDefault();
@@ -248,21 +247,24 @@ export const Dropdown: React.FC<DropdownProps> = ({
             fontSize: 'var(--body-base-font-size)',
             lineHeight: 'var(--body-base-line-height)',
             color: isSelected ? 'var(--text-brand)' : 'var(--text-default)',
-            background: isActive
-              ? 'var(--bg-overlay-l1)'
-              : isSelected
-                ? 'var(--bg-brand-popup)'
-                : 'transparent',
+            background: isActive ? 'var(--bg-overlay-l1)' : isSelected ? 'var(--bg-brand-popup)' : 'transparent',
             cursor: 'pointer',
             transition: 'background var(--transition-fast)',
             userSelect: 'none',
           }}
         >
-          <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-8)', overflow: 'hidden', flex: 1, minWidth: 0 }}>
+          <span
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--spacer-8)',
+              overflow: 'hidden',
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
             {renderOption ? renderOption(opt) : null}
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {opt.label}
-            </span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</span>
           </span>
           {isSelected && <Check size={14} style={{ color: 'var(--text-brand)', flexShrink: 0 }} />}
         </div>,
@@ -317,7 +319,16 @@ export const Dropdown: React.FC<DropdownProps> = ({
           transition: 'border-color var(--transition-fast), outline var(--transition-fast)',
         }}
       >
-        <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-8)', overflow: 'hidden', flex: 1, minWidth: 0 }}>
+        <span
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--spacer-8)',
+            overflow: 'hidden',
+            flex: 1,
+            minWidth: 0,
+          }}
+        >
           {renderTriggerLeading ? renderTriggerLeading(selected) : null}
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
             {displayLabel}
@@ -336,101 +347,102 @@ export const Dropdown: React.FC<DropdownProps> = ({
       </button>
 
       {/* Popup via portal (avoids parent scrollbar issues) */}
-      {renderPopup && popupRect && createPortal(
-        <div
-          className="ds-dropdown__popup"
-          data-open={open}
-          data-motion={motionEnabled}
-          ref={popupRef}
-          role="listbox"
-          id={listboxId}
-          aria-activedescendant={activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined}
-          onTransitionEnd={(event) => {
-            if (event.target !== event.currentTarget || event.propertyName !== 'opacity' || open) return;
-            setRenderPopup(false);
-            setPopupRect(null);
-          }}
-          style={{
-            position: 'fixed',
-            top: popupRect.top,
-            left: popupRect.left,
-            width: popupRect.width,
-            zIndex: 99999,
-            maxHeight: maxH,
-            display: 'flex',
-            flexDirection: 'column',
-            borderRadius: 'var(--radius-8)',
-            border: '1px solid var(--border-neutral-l1)',
-            background: 'var(--bg-base-default)',
-            boxShadow:
-              '0 12px 32px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.06)',
-            overflow: 'hidden',
-          }}
-        >
-          {/* Search */}
-          {searchable && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--spacer-6)',
-                padding: 'var(--spacer-8) var(--spacer-12)',
-                borderBottom: '1px solid var(--border-neutral-l1)',
-                flexShrink: 0,
-              }}
-            >
-              <Search size={14} style={{ color: 'var(--icon-tertiary)', flexShrink: 0 }} />
-              <input
-                autoFocus
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="搜索提供商…"
-                style={{
-                  flex: 1,
-                  border: 'none',
-                  outline: 'none',
-                  background: 'transparent',
-                  color: 'var(--text-default)',
-                  fontSize: 'var(--body-base-font-size)',
-                  fontFamily: 'inherit',
-                }}
-              />
-            </div>
-          )}
-
-          {/* Options (scrollable) */}
+      {renderPopup &&
+        popupRect &&
+        createPortal(
           <div
-            ref={listRef}
-            className="ds-scroll"
+            className="ds-dropdown__popup"
+            data-open={open}
+            data-motion={motionEnabled}
+            ref={popupRef}
+            role="listbox"
+            id={listboxId}
+            aria-activedescendant={activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined}
+            onTransitionEnd={(event) => {
+              if (event.target !== event.currentTarget || event.propertyName !== 'opacity' || open) return;
+              setRenderPopup(false);
+              setPopupRect(null);
+            }}
             style={{
-              overflowY: 'auto',
-              overflowX: 'hidden',
-              padding: 'var(--spacer-4)',
+              position: 'fixed',
+              top: popupRect.top,
+              left: popupRect.left,
+              width: popupRect.width,
+              zIndex: 99999,
+              maxHeight: maxH,
               display: 'flex',
               flexDirection: 'column',
-              gap: 'var(--spacer-2)',
-              flex: 1,
-              minHeight: 0,
+              borderRadius: 'var(--radius-8)',
+              border: '1px solid var(--border-neutral-l1)',
+              background: 'var(--bg-base-default)',
+              boxShadow: '0 12px 32px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.06)',
+              overflow: 'hidden',
             }}
           >
-            {filtered.length === 0 ? (
+            {/* Search */}
+            {searchable && (
               <div
                 style={{
-                  padding: 'var(--spacer-16) var(--spacer-12)',
-                  textAlign: 'center',
-                  color: 'var(--text-tertiary)',
-                  fontSize: 'var(--body-sm-font-size)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--spacer-6)',
+                  padding: 'var(--spacer-8) var(--spacer-12)',
+                  borderBottom: '1px solid var(--border-neutral-l1)',
+                  flexShrink: 0,
                 }}
               >
-                无匹配结果
+                <Search size={14} style={{ color: 'var(--icon-tertiary)', flexShrink: 0 }} />
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="搜索提供商…"
+                  style={{
+                    flex: 1,
+                    border: 'none',
+                    outline: 'none',
+                    background: 'transparent',
+                    color: 'var(--text-default)',
+                    fontSize: 'var(--body-base-font-size)',
+                    fontFamily: 'inherit',
+                  }}
+                />
               </div>
-            ) : (
-              renderList()
             )}
-          </div>
-        </div>,
-        document.body
-      )}
+
+            {/* Options (scrollable) */}
+            <div
+              ref={listRef}
+              className="ds-scroll"
+              style={{
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                padding: 'var(--spacer-4)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--spacer-2)',
+                flex: 1,
+                minHeight: 0,
+              }}
+            >
+              {filtered.length === 0 ? (
+                <div
+                  style={{
+                    padding: 'var(--spacer-16) var(--spacer-12)',
+                    textAlign: 'center',
+                    color: 'var(--text-tertiary)',
+                    fontSize: 'var(--body-sm-font-size)',
+                  }}
+                >
+                  无匹配结果
+                </div>
+              ) : (
+                renderList()
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 };

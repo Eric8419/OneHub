@@ -13,9 +13,25 @@ use std::path::Path;
 use crate::crypto;
 use crate::paths;
 use crate::types::{Aggregation, Provider};
+use serde::{Deserialize, Serialize};
 
 const PROVIDERS_FILE: &str = "providers.json";
 const AGGREGATIONS_FILE: &str = "aggregations.json";
+const AGGREGATIONS_SCHEMA_VERSION: u32 = 2;
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AggregationConfigFile {
+    version: u32,
+    aggregations: Vec<Aggregation>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum StoredAggregations {
+    Versioned(AggregationConfigFile),
+    Legacy(Vec<Aggregation>),
+}
 
 // ── Low-level JSON helpers ─────────────────────────────────
 
@@ -148,7 +164,13 @@ pub fn save_aggregations(
     aggregations: &[Aggregation],
 ) -> Result<(), String> {
     let path = paths::config_file(app_handle, AGGREGATIONS_FILE);
-    write_json_atomic(&path, aggregations)?;
+    write_json_atomic(
+        &path,
+        &AggregationConfigFile {
+            version: AGGREGATIONS_SCHEMA_VERSION,
+            aggregations: aggregations.to_vec(),
+        },
+    )?;
     println!(
         "[storage] Saved {} aggregations to {:?}",
         aggregations.len(),
@@ -161,6 +183,48 @@ pub fn load_aggregations(
     app_handle: &tauri::AppHandle,
 ) -> Result<Vec<Aggregation>, String> {
     let path = paths::config_file(app_handle, AGGREGATIONS_FILE);
-    let stored: Option<Vec<Aggregation>> = read_json(&path)?;
-    Ok(stored.unwrap_or_default())
+    let stored: Option<StoredAggregations> = read_json(&path)?;
+    match stored {
+        None => Ok(Vec::new()),
+        Some(StoredAggregations::Legacy(aggregations)) => Ok(aggregations),
+        Some(StoredAggregations::Versioned(config))
+            if config.version <= AGGREGATIONS_SCHEMA_VERSION =>
+        {
+            Ok(config.aggregations)
+        }
+        Some(StoredAggregations::Versioned(config)) => Err(format!(
+            "Unsupported aggregations schema version {} (this build supports up to {})",
+            config.version, AGGREGATIONS_SCHEMA_VERSION
+        )),
+    }
+}
+
+#[cfg(test)]
+mod aggregation_migration_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_aggregation_array_defaults_targets_to_empty() {
+        let stored: StoredAggregations = serde_json::from_str(
+            r#"[{"id":"a1","name":"legacy","models":"gpt-4","strategy":"round-robin","priority":"P0","enabled":true}]"#,
+        )
+        .unwrap();
+        let StoredAggregations::Legacy(aggregations) = stored else {
+            panic!("expected legacy format");
+        };
+        assert_eq!(aggregations.len(), 1);
+        assert!(aggregations[0].targets.is_empty());
+    }
+
+    #[test]
+    fn versioned_aggregation_config_round_trips_targets() {
+        let stored: StoredAggregations = serde_json::from_str(
+            r#"{"version":2,"aggregations":[{"id":"a1","name":"unified","models":"","targets":[{"id":"t1","providerId":"p1","model":"gpt-4","protocol":"openai-chat","priority":1,"weight":2,"enabled":true}],"strategy":"round-robin","priority":"P0","enabled":true}]}"#,
+        )
+        .unwrap();
+        let StoredAggregations::Versioned(config) = stored else {
+            panic!("expected versioned format");
+        };
+        assert_eq!(config.aggregations[0].targets[0].provider_id, "p1");
+    }
 }

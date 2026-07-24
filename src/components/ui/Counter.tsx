@@ -175,14 +175,8 @@ export const Counter: React.FC<CounterProps> = ({
         ))}
       </span>
       <span className="gradient-container">
-        <span
-          className="top-gradient"
-          style={topGradientStyle ?? defaultTopGradientStyle}
-        />
-        <span
-          className="bottom-gradient"
-          style={bottomGradientStyle ?? defaultBottomGradientStyle}
-        />
+        <span className="top-gradient" style={topGradientStyle ?? defaultTopGradientStyle} />
+        <span className="bottom-gradient" style={bottomGradientStyle ?? defaultBottomGradientStyle} />
       </span>
     </span>
   );

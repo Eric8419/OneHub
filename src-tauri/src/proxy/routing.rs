@@ -60,6 +60,12 @@ pub struct RouteResult {
     /// `model` when a mapping rule matched.
     pub upstream_model: String,
     pub aggregation_name: Option<String>,
+    /// Wire protocol expected by the selected target.
+    pub outbound_flavor: String,
+    /// Explicit target id, or `None` for legacy/direct routing.
+    pub target_id: Option<String>,
+    pub timeout_secs: Option<u64>,
+    pub max_retries: Option<u32>,
 }
 
 /// Runtime health state for a single provider. Used for circuit
@@ -339,10 +345,14 @@ pub async fn route_request(
         let (provider, model) = direct_hits[idx % direct_hits.len()].clone();
         let upstream_model = resolve_model_mapping(&provider, &model);
         return Ok(RouteResult {
+            outbound_flavor: provider.api_flavor.clone(),
             provider,
             model,
             upstream_model,
             aggregation_name: None,
+            target_id: None,
+            timeout_secs: None,
+            max_retries: None,
         });
     }
 
@@ -355,6 +365,115 @@ pub async fn route_request(
 
     match agg {
         Some(aggregation) => {
+            if !aggregation.targets.is_empty() {
+                let mut candidates = Vec::new();
+                for target in aggregation
+                    .targets
+                    .iter()
+                    .filter(|target| target.enabled && target.weight > 0)
+                {
+                    let Some(provider) = cfg
+                        .providers
+                        .iter()
+                        .find(|provider| provider.id == target.provider_id)
+                    else {
+                        continue;
+                    };
+                    if !is_provider_available(&cfg, &provider.id, excluded_providers) {
+                        continue;
+                    }
+                    let Some(model) = provider.models.iter().find(|model| {
+                        model.name == target.model
+                            || model.alias.as_deref() == Some(target.model.as_str())
+                    }) else {
+                        continue;
+                    };
+                    if !capabilities.is_satisfied_by(model) {
+                        continue;
+                    }
+                    let outbound_flavor = target
+                        .protocol
+                        .clone()
+                        .unwrap_or_else(|| provider.api_flavor.clone());
+                    if !crate::proxy::adapter::is_protocol_compatible(
+                        inbound_flavor,
+                        &outbound_flavor,
+                    ) {
+                        continue;
+                    }
+                    candidates.push((
+                        target.clone(),
+                        provider.clone(),
+                        model.clone(),
+                        outbound_flavor,
+                    ));
+                }
+
+                let Some(highest_priority) = candidates
+                    .iter()
+                    .map(|(target, _, _, _)| target.priority)
+                    .max()
+                else {
+                    return Err(format!(
+                        "No available target for aggregation '{}'",
+                        aggregation.name
+                    ));
+                };
+                candidates
+                    .retain(|(target, _, _, _)| target.priority == highest_priority);
+
+                let weighted_indices: Vec<usize> = candidates
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(index, (target, _, _, _))| {
+                        std::iter::repeat_n(index, target.weight as usize)
+                    })
+                    .collect();
+                let picked_index = match aggregation.strategy_enum() {
+                    RoutingStrategy::Random => {
+                        let nanos = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .subsec_nanos() as usize;
+                        weighted_indices[nanos % weighted_indices.len()]
+                    }
+                    RoutingStrategy::LowestLatency => candidates
+                        .iter()
+                        .enumerate()
+                        .min_by(|(_, (_, _, left, _)), (_, (_, _, right, _))| {
+                            average_latency(&cfg, &left.name)
+                                .total_cmp(&average_latency(&cfg, &right.name))
+                        })
+                        .map(|(index, _)| index)
+                        .unwrap_or(0),
+                    RoutingStrategy::Sequential => 0,
+                    RoutingStrategy::RoundRobin => {
+                        let cursor = cfg
+                            .round_robin_index
+                            .get(&aggregation.name)
+                            .copied()
+                            .unwrap_or(0);
+                        weighted_indices[cursor % weighted_indices.len()]
+                    }
+                };
+                let (target, provider, model, outbound_flavor) =
+                    candidates.swap_remove(picked_index);
+                let upstream_model = target
+                    .upstream_model
+                    .clone()
+                    .unwrap_or_else(|| resolve_model_mapping(&provider, &model.name));
+                return Ok(RouteResult {
+                    provider,
+                    model: model.name,
+                    upstream_model,
+                    aggregation_name: Some(aggregation.name),
+                    outbound_flavor,
+                    target_id: Some(target.id),
+                    timeout_secs: target.timeout_secs,
+                    max_retries: target.max_retries,
+                });
+            }
+
             let model_names = parse_agg_models(&aggregation.models);
             if model_names.is_empty() {
                 return Err("Aggregation has no models".into());
@@ -390,10 +509,14 @@ pub async fn route_request(
                         let upstream_model =
                             resolve_model_mapping(provider, &model.name);
                         return Ok(RouteResult {
+                            outbound_flavor: provider.api_flavor.clone(),
                             provider: provider.clone(),
                             model: model.name.clone(),
                             upstream_model,
                             aggregation_name: Some(aggregation.name.clone()),
+                            target_id: None,
+                            timeout_secs: None,
+                            max_retries: None,
                         });
                     }
                 }
@@ -405,6 +528,14 @@ pub async fn route_request(
         }
         None => Err(format!("Unknown model or aggregation: '{}'", model_or_agg)),
     }
+}
+
+fn average_latency(cfg: &RoutingState, model: &str) -> f64 {
+    cfg.latency_history
+        .get(model)
+        .filter(|samples| !samples.is_empty())
+        .map(|samples| samples.iter().sum::<f64>() / samples.len() as f64)
+        .unwrap_or(f64::MAX)
 }
 
 /// Pick a model from `model_names` according to `strategy`.
@@ -462,10 +593,31 @@ pub async fn record_routing_side_effects(
     if let Some(agg_name) = aggregation_name {
         // Aggregation: advance its dedicated cursor.
         if let Some(agg) = cfg.aggregations.iter().find(|a| a.name == *agg_name) {
-            let model_names = parse_agg_models(&agg.models);
-            if !model_names.is_empty() {
+            let slot_count = if agg.targets.is_empty() {
+                parse_agg_models(&agg.models).len()
+            } else {
+                let Some(highest_priority) = agg
+                    .targets
+                    .iter()
+                    .filter(|target| target.enabled && target.weight > 0)
+                    .map(|target| target.priority)
+                    .max()
+                else {
+                    return;
+                };
+                agg.targets
+                    .iter()
+                    .filter(|target| {
+                        target.enabled
+                            && target.weight > 0
+                            && target.priority == highest_priority
+                    })
+                    .map(|target| target.weight as usize)
+                    .sum()
+            };
+            if slot_count > 0 {
                 let idx = cfg.round_robin_index.get(agg_name).copied().unwrap_or(0);
-                let next = (idx + 1) % model_names.len();
+                let next = (idx + 1) % slot_count;
                 cfg.round_robin_index.insert(agg_name.clone(), next);
             }
         }
@@ -514,6 +666,7 @@ mod tests {
                 id: "a1".into(),
                 name: "agg-1".into(),
                 models: "gpt-4".into(),
+                targets: vec![],
                 strategy: "round-robin".into(),
                 priority: "P0".into(),
                 enabled: true,
@@ -589,6 +742,80 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn explicit_target_preserves_protocol_and_policy_overrides() {
+        let state = make_state();
+        {
+            let mut cfg = state.write().await;
+            cfg.providers.push(Provider {
+                id: "openai-upstream".into(),
+                name: "OpenAI upstream".into(),
+                api_base: "https://example.com".into(),
+                api_key: "key".into(),
+                status: "active".into(),
+                models: vec![Model {
+                    id: "model-1".into(),
+                    name: "vendor-model".into(),
+                    alias: None,
+                    context_window: None,
+                    max_output_tokens: None,
+                    supports_vision: true,
+                    supports_reasoning: true,
+                    supports_reasoning_effort: true,
+                    default_reasoning_effort: None,
+                    supports_tool_calls: true,
+                    supports_json_mode: true,
+                }],
+                api_flavor: "openai-chat".into(),
+                api_key_encrypted: false,
+                model_mapping: None,
+                proxy_config: None,
+            });
+            cfg.aggregations.push(Aggregation {
+                id: "unified-id".into(),
+                name: "unified-model".into(),
+                models: String::new(),
+                targets: vec![crate::types::RouteTarget {
+                    id: "target-1".into(),
+                    provider_id: "openai-upstream".into(),
+                    model: "vendor-model".into(),
+                    upstream_model: Some("vendor-model-2026".into()),
+                    protocol: Some("openai-responses".into()),
+                    priority: 100,
+                    weight: 3,
+                    enabled: true,
+                    timeout_secs: Some(90),
+                    max_retries: Some(1),
+                }],
+                strategy: "round-robin".into(),
+                priority: "P0".into(),
+                enabled: true,
+            });
+        }
+
+        let route = route_request(
+            &state,
+            "unified-model",
+            &std::collections::HashSet::new(),
+            &RequestCapabilities {
+                needs_tools: true,
+                needs_vision: true,
+                needs_json_mode: true,
+                needs_reasoning: true,
+            },
+            "anthropic-messages",
+        )
+        .await
+        .expect("explicit target should support cross-protocol routing");
+
+        assert_eq!(route.provider.id, "openai-upstream");
+        assert_eq!(route.upstream_model, "vendor-model-2026");
+        assert_eq!(route.outbound_flavor, "openai-responses");
+        assert_eq!(route.target_id.as_deref(), Some("target-1"));
+        assert_eq!(route.timeout_secs, Some(90));
+        assert_eq!(route.max_retries, Some(1));
+    }
+
+    #[tokio::test]
     async fn rr_advances_only_matched_aggregation() {
         let state = make_state();
         {
@@ -599,6 +826,7 @@ mod tests {
                 id: "a1".into(),
                 name: "agg-1".into(),
                 models: "gpt-4, gpt-4o".into(),
+                targets: vec![],
                 strategy: "round-robin".into(),
                 priority: "P0".into(),
                 enabled: true,
@@ -607,6 +835,7 @@ mod tests {
                 id: "a2".into(),
                 name: "agg-2".into(),
                 models: "claude-3".into(),
+                targets: vec![],
                 strategy: "round-robin".into(),
                 priority: "P1".into(),
                 enabled: true,

@@ -5,11 +5,26 @@
 
 export type RoutingStrategy = 'round-robin' | 'lowest-latency' | 'random' | 'sequential';
 
+export interface RouteTarget {
+  id: string;
+  providerId: string;
+  model: string;
+  upstreamModel?: string;
+  protocol?: 'openai-chat' | 'anthropic-messages' | 'openai-responses';
+  priority: number;
+  weight: number;
+  enabled: boolean;
+  timeoutSecs?: number;
+  maxRetries?: number;
+}
+
 export interface Aggregation {
   id: string;
   name: string;
   /** Comma-separated model names. */
   models: string;
+  /** Explicit upstream destinations; absent/empty means legacy models routing. */
+  targets?: RouteTarget[];
   /** RoutingStrategy key (kebab-case). */
   strategy: string;
   priority: string;
@@ -27,12 +42,12 @@ export const STRATEGY_OPTIONS: { value: RoutingStrategy; label: string }[] = [
  * to the key itself (and tolerates legacy localized strings via
  * `normalizeStrategyKey`). */
 export function strategyLabel(strategy: string): string {
-  const found = STRATEGY_OPTIONS.find(o => o.value === strategy);
+  const found = STRATEGY_OPTIONS.find((o) => o.value === strategy);
   if (found) return found.label;
   // Legacy localized values (pre-refactor data): map them back.
   return normalizeStrategyKey(strategy) === strategy
     ? strategy
-    : STRATEGY_OPTIONS.find(o => o.value === normalizeStrategyKey(strategy))?.label ?? strategy;
+    : (STRATEGY_OPTIONS.find((o) => o.value === normalizeStrategyKey(strategy))?.label ?? strategy);
 }
 
 /** Convert a legacy localized strategy string to its stable key.

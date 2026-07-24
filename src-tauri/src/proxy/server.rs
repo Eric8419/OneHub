@@ -10,11 +10,11 @@ use std::net::{IpAddr, SocketAddr};
 use std::time::Instant;
 
 use axum::{
-    body::Body,
-    extract::{ConnectInfo, State},
+    body::{to_bytes, Body},
+    extract::{ConnectInfo, Request, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{any, get, post},
     Json, Router,
 };
 use chrono::Utc;
@@ -76,9 +76,18 @@ pub async fn start(
         let app = Router::new()
             .route("/health", get(health_handler))
             .route("/v1/models", get(models_handler))
+            .route("/v1/capabilities", get(capabilities_handler))
             .route("/v1/chat/completions", post(chat_completions_handler))
             .route("/v1/messages", post(messages_handler))
             .route("/v1/responses", post(responses_handler))
+            .route("/v1/messages/count_tokens", post(count_tokens_handler))
+            .route("/v1/responses/input_tokens", post(count_tokens_handler))
+            .route("/v1/images/{*rest}", any(extension_passthrough_handler))
+            .route("/v1/audio/{*rest}", any(extension_passthrough_handler))
+            .route("/v1/files", any(extension_passthrough_handler))
+            .route("/v1/files/{*rest}", any(extension_passthrough_handler))
+            .route("/v1/batches", any(extension_passthrough_handler))
+            .route("/v1/batches/{*rest}", any(extension_passthrough_handler))
             // Backward-compatible alias for the old endpoint name.
             .route("/v1/anthropic", post(messages_handler))
             .layer(cors)
@@ -224,23 +233,28 @@ fn require_auth(
         return Ok(());
     }
 
-    let auth_header = headers
+    // 1) Authorization: Bearer <token>  (OpenAI 风格)
+    let bearer = headers
         .get("Authorization")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
-    let provided = auth_header
-        .strip_prefix("Bearer ")
-        .unwrap_or(auth_header)
+    let bearer = bearer.strip_prefix("Bearer ").unwrap_or(bearer).trim();
+
+    // 2) x-api-key: <token>  (Anthropic 风格，Cherry Studio 等客户端使用)
+    let api_key = headers
+        .get("x-api-key")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
         .trim();
 
-    if provided == token {
+    if bearer == token || api_key == token {
         Ok(())
     } else {
-        eprintln!("[proxy] Auth failed: invalid bearer token");
+        eprintln!("[proxy] Auth failed: invalid token");
         Err((
             StatusCode::UNAUTHORIZED,
             Json(json!({
-                "error": "Unauthorized. Provide a valid auth token via Authorization: Bearer <token> header."
+                "error": "Unauthorized. Provide a valid auth token via Authorization: Bearer <token> or x-api-key header."
             })),
         ))
     }
@@ -359,6 +373,25 @@ fn standard_error_body(
     })
 }
 
+fn conversion_error_body(
+    status: StatusCode,
+    provider_name: &str,
+    request_id: &str,
+    error: &crate::proxy::protocols::ConversionError,
+) -> Value {
+    json!({
+        "error": {
+            "type": "capability_conversion_error",
+            "code": error.feature,
+            "message": error.message,
+            "path": error.path,
+            "provider": provider_name,
+            "request_id": request_id,
+            "status": status.as_u16(),
+        }
+    })
+}
+
 // ── Generic upstream proxy ──────────────────────────────────
 
 /// Determine if an HTTP status code is retryable on a different
@@ -374,45 +407,36 @@ fn parse_request_capabilities(
 ) -> crate::proxy::routing::RequestCapabilities {
     use crate::proxy::routing::RequestCapabilities;
 
-    let needs_tools = body.get("tools").is_some();
+    fn contains_type(value: &Value, expected: &[&str]) -> bool {
+        match value {
+            Value::Array(values) => {
+                values.iter().any(|value| contains_type(value, expected))
+            }
+            Value::Object(map) => {
+                map.get("type")
+                    .and_then(Value::as_str)
+                    .is_some_and(|kind| expected.contains(&kind))
+                    || map.values().any(|value| contains_type(value, expected))
+            }
+            _ => false,
+        }
+    }
 
-    // Vision: check if any message has an image_url content part
-    // (OpenAI format) or a source/image content block (Anthropic
-    // format).
-    let needs_vision =
-        body.get("messages")
-            .and_then(|m| m.as_array())
-            .map(|msgs| {
-                msgs.iter().any(|m| {
-                    // OpenAI: content array with type "image_url"
-                    if let Some(parts) = m.get("content").and_then(|c| c.as_array()) {
-                        if parts.iter().any(|p| {
-                            p.get("type").and_then(|t| t.as_str()) == Some("image_url")
-                        }) {
-                            return true;
-                        }
-                    }
-                    // Anthropic: content array with type "image"
-                    if let Some(parts) = m.get("content").and_then(|c| c.as_array()) {
-                        if parts.iter().any(|p| {
-                            p.get("type").and_then(|t| t.as_str()) == Some("image")
-                        }) {
-                            return true;
-                        }
-                    }
-                    false
-                })
-            })
-            .unwrap_or(false);
-
+    let needs_tools = body
+        .get("tools")
+        .and_then(Value::as_array)
+        .is_some_and(|tools| !tools.is_empty())
+        || contains_type(body, &["tool_use", "function_call"]);
+    let needs_vision = contains_type(body, &["image", "image_url", "input_image"]);
     let needs_json_mode = body
-        .get("response_format")
-        .and_then(|r| r.get("type"))
-        .and_then(|t| t.as_str())
-        .map(|t| t == "json_object" || t == "json_schema")
-        .unwrap_or(false);
-
-    let needs_reasoning = body.get("reasoning_effort").is_some();
+        .pointer("/response_format/type")
+        .or_else(|| body.pointer("/text/format/type"))
+        .or_else(|| body.pointer("/output_config/format/type"))
+        .and_then(Value::as_str)
+        .is_some_and(|kind| kind == "json_object" || kind == "json_schema");
+    let needs_reasoning = body.get("reasoning_effort").is_some()
+        || body.get("reasoning").is_some()
+        || body.get("thinking").is_some();
 
     RequestCapabilities {
         needs_tools,
@@ -458,8 +482,9 @@ async fn proxy_request_with_failover(
     let max_attempts = 5;
     let mut excluded: HashSet<String> = HashSet::new();
     let mut last_error: Option<(StatusCode, Json<Value>)> = None;
+    let mut original_provider = String::new();
 
-    for _ in 0..max_attempts {
+    for attempt in 0..max_attempts {
         // Route to an available provider (skips excluded + unhealthy
         // + capability-mismatched + protocol-incompatible).
         let route = match route_request(
@@ -484,7 +509,10 @@ async fn proxy_request_with_failover(
         };
 
         let provider_id = route.provider.id.clone();
-        let adapter = crate::proxy::adapter::resolve(&route.provider.api_flavor);
+        if original_provider.is_empty() {
+            original_provider = route.provider.name.clone();
+        }
+        let adapter = crate::proxy::adapter::resolve(&route.outbound_flavor);
 
         // Try this provider. proxy_request records metrics for each
         // attempt, giving visibility into intermediate failures.
@@ -493,8 +521,13 @@ async fn proxy_request_with_failover(
             route,
             body.clone(),
             is_streaming,
-            request_id,
             adapter.as_ref(),
+            ProxyRequestContext {
+                request_id,
+                inbound_flavor,
+                failover_count: attempt,
+                original_provider: &original_provider,
+            },
         )
         .await
         {
@@ -546,15 +579,28 @@ async fn proxy_request_with_failover(
     )))
 }
 
+struct ProxyRequestContext<'a> {
+    request_id: &'a str,
+    inbound_flavor: &'a str,
+    failover_count: u32,
+    original_provider: &'a str,
+}
+
 /// Handle an upstream proxy request using the given adapter.
 async fn proxy_request(
     state: &SharedAppState,
     route: RouteResult,
     body: Value,
     is_streaming: bool,
-    request_id: &str,
     adapter: &dyn ProviderAdapter,
+    context: ProxyRequestContext<'_>,
 ) -> Result<Response, (StatusCode, Json<Value>)> {
+    let ProxyRequestContext {
+        request_id,
+        inbound_flavor,
+        failover_count,
+        original_provider,
+    } = context;
     // Concurrency permit (wait if at max concurrency).
     let _concurrency_guard = {
         let limits = state.runtime.read().await;
@@ -580,6 +626,8 @@ async fn proxy_request(
     let provider_name = route.provider.name.clone();
     let selected_model = route.model.clone();
     let upstream_model = route.upstream_model.clone();
+    let target_id = route.target_id.clone();
+    let outbound_flavor = route.outbound_flavor.clone();
 
     // Reject requests with an empty API key early. This happens when
     // the OS keyring encryption key was regenerated (system reinstall,
@@ -608,8 +656,8 @@ async fn proxy_request(
                 status: "error".into(),
                 latency_ms: 0,
                 error_category: "missing_api_key".into(),
-                failover_count: 0,
-                original_provider: String::new(),
+                failover_count,
+                original_provider: original_provider.to_string(),
             },
             &route.aggregation_name,
         )
@@ -627,12 +675,38 @@ async fn proxy_request(
 
     let upstream_url = adapter.build_url(&route.provider.api_base, &upstream_model);
 
-    let mut upstream_body = body.clone();
-    upstream_body["model"] = json!(upstream_model);
+    let inbound_protocol =
+        crate::proxy::protocols::ProtocolKind::from_flavor(inbound_flavor);
+    let outbound_protocol =
+        crate::proxy::protocols::ProtocolKind::from_flavor(&route.outbound_flavor);
+    debug_assert!(crate::proxy::protocols::stream::supports_stream_conversion(
+        outbound_protocol,
+        inbound_protocol,
+    ));
+    let mut source_body = body.clone();
+    source_body["model"] = json!(upstream_model);
+    let upstream_body = crate::proxy::protocols::convert_request(
+        &source_body,
+        inbound_protocol,
+        outbound_protocol,
+    )
+    .map_err(|error| {
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(conversion_error_body(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                &provider_name,
+                request_id,
+                &error,
+            )),
+        )
+    })?;
 
     let start = Instant::now();
-    let timeout_secs = state.runtime.read().await.api_timeout_secs;
-    let max_retries = state.runtime.read().await.max_retries;
+    let runtime = state.runtime.read().await;
+    let timeout_secs = route.timeout_secs.unwrap_or(runtime.api_timeout_secs);
+    let max_retries = route.max_retries.unwrap_or(runtime.max_retries);
+    drop(runtime);
     // Use per-provider client (if provider has custom proxy) or
     // fall back to the shared global client.
     let client = match state.get_provider_client(&route.provider).await {
@@ -679,8 +753,8 @@ async fn proxy_request(
                     status: "error".into(),
                     latency_ms: start.elapsed().as_millis() as i64,
                     error_category: "upstream_connection_error".into(),
-                    failover_count: 0,
-                    original_provider: String::new(),
+                    failover_count,
+                    original_provider: original_provider.to_string(),
                 },
                 &route.aggregation_name,
             )
@@ -716,8 +790,8 @@ async fn proxy_request(
                 status: format!("upstream_{}", status.as_u16()),
                 latency_ms,
                 error_category: "upstream_error".into(),
-                failover_count: 0,
-                original_provider: String::new(),
+                failover_count,
+                original_provider: original_provider.to_string(),
             },
             &route.aggregation_name,
         )
@@ -751,21 +825,51 @@ async fn proxy_request(
         let req_type_clone = request_type_streaming.clone();
         let aggregation_name_clone = route.aggregation_name.clone();
         let request_id_owned = request_id.to_string();
+        let original_provider_clone = original_provider.to_string();
         // We can't move the borrowed `adapter` across spawn, so we
         // re-resolve it inside the task from the provider's flavor.
-        let flavor_clone = route.provider.api_flavor.clone();
+        let flavor_clone = route.outbound_flavor.clone();
         let start_clone = start;
+        let stream_source = outbound_protocol;
+        let stream_target = inbound_protocol;
 
         tokio::spawn(async move {
             let mut buffer: Vec<u8> = Vec::new();
             let mut stream = upstream_resp.bytes_stream();
             let mut had_error = false;
+            let mut converter = if stream_source != stream_target {
+                Some(crate::proxy::protocols::stream::StreamConverter::new(
+                    stream_source,
+                    stream_target,
+                ))
+            } else {
+                None
+            };
 
             while let Some(chunk) = stream.next().await {
                 match chunk {
                     Ok(bytes) => {
                         buffer.extend_from_slice(&bytes);
-                        if tx.send(Ok(bytes)).await.is_err() {
+                        let outgoing = if let Some(converter) = converter.as_mut() {
+                            match converter.push(&bytes) {
+                                Ok(converted) => axum::body::Bytes::from(converted),
+                                Err(error) => {
+                                    let _ = tx
+                                        .send(Err(std::io::Error::other(
+                                            error.to_string(),
+                                        )))
+                                        .await;
+                                    had_error = true;
+                                    break;
+                                }
+                            }
+                        } else {
+                            bytes
+                        };
+                        if outgoing.is_empty() {
+                            continue;
+                        }
+                        if tx.send(Ok(outgoing)).await.is_err() {
                             // Client disconnected — stop reading.
                             break;
                         }
@@ -775,6 +879,28 @@ async fn proxy_request(
                         let _ = tx.send(Err(io_err)).await;
                         had_error = true;
                         break;
+                    }
+                }
+            }
+            if !had_error {
+                if let Some(converter) = converter.as_mut() {
+                    match converter.finish() {
+                        Ok(remaining) if !remaining.is_empty() => {
+                            if tx
+                                .send(Ok(axum::body::Bytes::from(remaining)))
+                                .await
+                                .is_err()
+                            {
+                                had_error = true;
+                            }
+                        }
+                        Ok(_) => {}
+                        Err(error) => {
+                            let _ = tx
+                                .send(Err(std::io::Error::other(error.to_string())))
+                                .await;
+                            had_error = true;
+                        }
                     }
                 }
             }
@@ -809,8 +935,8 @@ async fn proxy_request(
                     } else {
                         String::new()
                     },
-                    failover_count: 0,
-                    original_provider: String::new(),
+                    failover_count,
+                    original_provider: original_provider_clone,
                 },
                 &aggregation_name_clone,
             )
@@ -825,18 +951,21 @@ async fn proxy_request(
         });
         let body = Body::from_stream(receiver_stream);
 
-        let response = Response::builder()
+        let mut response_builder = Response::builder()
             .header("content-type", "text/event-stream")
             .header("cache-control", "no-cache")
             .header("connection", "keep-alive")
             .header("x-request-id", request_id)
-            .body(body)
-            .map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"error": e.to_string()})),
-                )
-            })?;
+            .header("x-melody-upstream-protocol", &outbound_flavor);
+        if let Some(target_id) = target_id.as_deref() {
+            response_builder = response_builder.header("x-melody-target-id", target_id);
+        }
+        let response = response_builder.body(body).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
         return Ok(response);
     }
 
@@ -857,6 +986,22 @@ async fn proxy_request(
     };
 
     let tokens = adapter.count_tokens(&resp_json);
+    let client_json = crate::proxy::protocols::convert_response(
+        &resp_json,
+        outbound_protocol,
+        inbound_protocol,
+    )
+    .map_err(|error| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(conversion_error_body(
+                StatusCode::BAD_GATEWAY,
+                &provider_name,
+                request_id,
+                &error,
+            )),
+        )
+    })?;
 
     finalize_record(
         &state.metrics,
@@ -872,14 +1017,25 @@ async fn proxy_request(
             status: "success".into(),
             latency_ms,
             error_category: String::new(),
-            failover_count: 0,
-            original_provider: String::new(),
+            failover_count,
+            original_provider: original_provider.to_string(),
         },
         &route.aggregation_name,
     )
     .await;
 
-    Ok(Json(resp_json).into_response())
+    let mut response = Json(client_json).into_response();
+    if let Ok(value) = axum::http::HeaderValue::from_str(&outbound_flavor) {
+        response
+            .headers_mut()
+            .insert("x-melody-upstream-protocol", value);
+    }
+    if let Some(target_id) = target_id {
+        if let Ok(value) = axum::http::HeaderValue::from_str(&target_id) {
+            response.headers_mut().insert("x-melody-target-id", value);
+        }
+    }
+    Ok(response)
 }
 
 async fn send_with_retries(
@@ -1006,6 +1162,248 @@ async fn models_handler(
     }
 
     Ok(Json(json!({ "object": "list", "data": data })))
+}
+
+async fn capabilities_handler(
+    State(state): State<SharedAppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    {
+        let auth = state.auth.read().await;
+        require_ip(addr.ip(), &auth)?;
+        require_auth(&headers, &auth)?;
+    }
+    let routing = state.routing.read().await;
+    let providers = routing
+        .providers
+        .iter()
+        .map(|provider| {
+            let health = routing.provider_health.get(&provider.id);
+            json!({
+                "id": provider.id,
+                "name": provider.name,
+                "protocol": provider.api_flavor,
+                "available": health.map(|health| health.is_available()).unwrap_or(true),
+                "in_flight": health.map(|health| health.in_flight).unwrap_or(0),
+                "models": provider.models.iter().map(|model| json!({
+                    "name": model.name,
+                    "vision": model.supports_vision,
+                    "reasoning": model.supports_reasoning,
+                    "reasoning_effort": model.supports_reasoning_effort,
+                    "tools": model.supports_tool_calls,
+                    "structured_output": model.supports_json_mode,
+                })).collect::<Vec<_>>(),
+            })
+        })
+        .collect::<Vec<_>>();
+    let aggregations = routing
+        .aggregations
+        .iter()
+        .filter(|aggregation| aggregation.enabled)
+        .map(|aggregation| {
+            json!({
+                "name": aggregation.name,
+                "strategy": aggregation.strategy_enum().as_key(),
+                "targets": aggregation.targets.iter().map(|target| json!({
+                    "id": target.id,
+                    "provider_id": target.provider_id,
+                    "model": target.model,
+                    "protocol": target.protocol,
+                    "priority": target.priority,
+                    "weight": target.weight,
+                    "enabled": target.enabled,
+                })).collect::<Vec<_>>(),
+            })
+        })
+        .collect::<Vec<_>>();
+    Ok(Json(json!({
+        "protocols": ["openai-chat", "anthropic-messages", "openai-responses"],
+        "conversion": {
+            "non_streaming": "full-matrix",
+            "streaming": "full-matrix",
+            "strict_features": ["tools", "structured_output"],
+        },
+        "providers": providers,
+        "aggregations": aggregations,
+    })))
+}
+
+async fn count_tokens_handler(
+    State(state): State<SharedAppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    {
+        let mut limits = state.runtime.write().await;
+        let auth = state.auth.read().await;
+        require_ip(addr.ip(), &auth)?;
+        require_auth(&headers, &auth)?;
+        check_body_size(&body, limits.max_body_size)?;
+        check_rate_limit(&mut limits)?;
+    }
+    let serialized = serde_json::to_string(&body).unwrap_or_default();
+    let estimated = serialized.chars().count().div_ceil(4).max(1);
+    Ok(Json(json!({
+        "input_tokens": estimated,
+        "estimated": true,
+    })))
+}
+
+/// Pass through auxiliary OpenAI-compatible resources (images, audio,
+/// files and batches). A model in a JSON request selects its provider;
+/// otherwise callers can set `x-melody-provider-id`. When exactly one
+/// provider exists it is selected automatically.
+async fn extension_passthrough_handler(
+    State(state): State<SharedAppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request: Request,
+) -> Result<Response, (StatusCode, Json<Value>)> {
+    let (parts, body) = request.into_parts();
+    let max_body_size = {
+        let mut limits = state.runtime.write().await;
+        let auth = state.auth.read().await;
+        require_ip(addr.ip(), &auth)?;
+        require_auth(&parts.headers, &auth)?;
+        check_rate_limit(&mut limits)?;
+        limits.max_body_size
+    };
+    let body_limit = usize::try_from(max_body_size).unwrap_or(usize::MAX);
+    let bytes = to_bytes(body, body_limit).await.map_err(|error| {
+        (
+            StatusCode::PAYLOAD_TOO_LARGE,
+            Json(json!({"error":{"type":"request_too_large","message":error.to_string()}})),
+        )
+    })?;
+    let body_json = serde_json::from_slice::<Value>(&bytes).ok();
+    let requested_provider = parts
+        .headers
+        .get("x-melody-provider-id")
+        .and_then(|value| value.to_str().ok());
+    let requested_model = body_json
+        .as_ref()
+        .and_then(|body| body.get("model"))
+        .and_then(Value::as_str);
+
+    let provider = if let Some(provider_id) = requested_provider {
+        state
+            .routing
+            .read()
+            .await
+            .providers
+            .iter()
+            .find(|provider| provider.id == provider_id)
+            .cloned()
+    } else if let Some(model) = requested_model {
+        route_request(
+            &state.routing,
+            model,
+            &std::collections::HashSet::new(),
+            &crate::proxy::routing::RequestCapabilities::default(),
+            "openai-compatible",
+        )
+        .await
+        .ok()
+        .map(|route| route.provider)
+    } else {
+        let routing = state.routing.read().await;
+        if routing.providers.len() == 1 {
+            routing.providers.first().cloned()
+        } else {
+            None
+        }
+    }
+    .ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error":{
+                    "type":"provider_selection_error",
+                    "message":"Set a JSON model or x-melody-provider-id for this endpoint"
+                }
+            })),
+        )
+    })?;
+
+    if provider.api_key.trim().is_empty() {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error":{"type":"missing_api_key","provider":provider.name}})),
+        ));
+    }
+    let client = state.get_provider_client(&provider).await.map_err(|error| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error":{"type":"client_configuration_error","message":error}})),
+        )
+    })?;
+    let url =
+        extension_upstream_url(&provider.api_base, parts.uri.path(), parts.uri.query());
+    let method = reqwest::Method::from_bytes(parts.method.as_str().as_bytes()).map_err(
+        |error| {
+            (
+                StatusCode::METHOD_NOT_ALLOWED,
+                Json(json!({"error":{"message":error.to_string()}})),
+            )
+        },
+    )?;
+    let adapter = crate::proxy::adapter::resolve(&provider.api_flavor);
+    let (auth_name, auth_value) = adapter.auth_header(&provider.api_key);
+    let mut upstream = client
+        .request(method, url)
+        .header(auth_name, auth_value)
+        .body(bytes);
+    for (name, value) in adapter.extra_headers() {
+        upstream = upstream.header(name, value);
+    }
+    for header in ["content-type", "accept", "openai-beta", "anthropic-beta"] {
+        if let Some(value) = parts.headers.get(header) {
+            upstream = upstream.header(header, value);
+        }
+    }
+    let upstream = upstream.send().await.map_err(|error| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({"error":{"type":"upstream_connection_error","message":sanitize_error(&error.to_string())}})),
+        )
+    })?;
+    let status = upstream.status();
+    let content_type = upstream.headers().get("content-type").cloned();
+    let response_bytes = upstream.bytes().await.map_err(|error| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({"error":{"type":"upstream_body_error","message":error.to_string()}})),
+        )
+    })?;
+    let mut response = Response::builder().status(status);
+    if let Some(content_type) = content_type {
+        response = response.header("content-type", content_type);
+    }
+    response
+        .header("x-melody-provider-id", provider.id)
+        .body(Body::from(response_bytes))
+        .map_err(|error| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":{"message":error.to_string()}})),
+            )
+        })
+}
+
+fn extension_upstream_url(base: &str, path: &str, query: Option<&str>) -> String {
+    let base = base.trim_end_matches('/');
+    let suffix = path.strip_prefix("/v1").unwrap_or(path);
+    let mut url = if base.ends_with("/v1") {
+        format!("{base}{suffix}")
+    } else {
+        format!("{base}/v1{suffix}")
+    };
+    if let Some(query) = query {
+        url.push('?');
+        url.push_str(query);
+    }
+    url
 }
 
 async fn chat_completions_handler(
@@ -1146,6 +1544,22 @@ mod tests {
     }
 
     #[test]
+    fn extension_url_avoids_duplicate_v1_and_preserves_query() {
+        assert_eq!(
+            extension_upstream_url(
+                "https://api.example.com/v1/",
+                "/v1/files/file_1",
+                Some("purpose=batch")
+            ),
+            "https://api.example.com/v1/files/file_1?purpose=batch"
+        );
+        assert_eq!(
+            extension_upstream_url("https://api.example.com", "/v1/audio/speech", None),
+            "https://api.example.com/v1/audio/speech"
+        );
+    }
+
+    #[test]
     fn test_sanitize_error_keeps_short() {
         assert_eq!(sanitize_error("short"), "short");
     }
@@ -1202,6 +1616,33 @@ mod tests {
         // payload is correct.
         let resp = health_handler().await;
         assert_eq!(resp.0.get("status").and_then(|v| v.as_str()), Some("ok"));
+    }
+
+    #[test]
+    fn require_auth_accepts_bearer_and_x_api_key() {
+        let auth = AuthConfig {
+            auth_token: "s3cret".into(),
+            cors_enabled: false,
+            ip_whitelist: String::new(),
+        };
+
+        // Authorization: Bearer <token>
+        let mut h1 = HeaderMap::new();
+        h1.insert("Authorization", "Bearer s3cret".parse().unwrap());
+        assert!(require_auth(&h1, &auth).is_ok());
+
+        // x-api-key: <token>  (Anthropic 风格)
+        let mut h2 = HeaderMap::new();
+        h2.insert("x-api-key", "s3cret".parse().unwrap());
+        assert!(require_auth(&h2, &auth).is_ok());
+
+        // 错误的 token 应被拒绝
+        let mut h3 = HeaderMap::new();
+        h3.insert("x-api-key", "wrong".parse().unwrap());
+        assert!(require_auth(&h3, &auth).is_err());
+
+        // 无任何鉴权头应被拒绝
+        assert!(require_auth(&HeaderMap::new(), &auth).is_err());
     }
 
     async fn build_test_state(
@@ -1287,6 +1728,7 @@ mod tests {
             id: "a1".into(),
             name: "smart-pick".into(),
             models: "gpt-4".into(),
+            targets: vec![],
             strategy: "round-robin".into(),
             priority: "normal".into(),
             enabled: true,
@@ -1295,6 +1737,7 @@ mod tests {
             id: "a2".into(),
             name: "disabled-agg".into(),
             models: "gpt-4".into(),
+            targets: vec![],
             strategy: "round-robin".into(),
             priority: "normal".into(),
             enabled: false,

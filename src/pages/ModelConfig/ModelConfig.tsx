@@ -3,15 +3,15 @@ import { useProviderStore } from '../../store/providerStore';
 import { useAggregationStore } from '../../store/aggregationStore';
 import { AnimatedContent } from '../../components/ui';
 import { ModelInventory } from './ModelInventory';
-// 聚合规则 UI 暂时隐藏，待功能完善后再启用
-// import { AggregationTable } from './AggregationTable';
-// import { QuickAddPanel } from './QuickAddPanel';
+import { AggregationTable } from './AggregationTable';
+import { QuickAddPanel } from './QuickAddPanel';
+import { ProtocolMatrix } from './ProtocolMatrix';
 
 export const ModelConfig: React.FC = () => {
-  const loadProviders = useProviderStore(s => s.loadProviders);
-  const loadedProviders = useProviderStore(s => s.loaded);
-  const loadAggregations = useAggregationStore(s => s.loadAggregations);
-  const loadedAggregations = useAggregationStore(s => s.loaded);
+  const loadProviders = useProviderStore((s) => s.loadProviders);
+  const loadedProviders = useProviderStore((s) => s.loaded);
+  const loadAggregations = useAggregationStore((s) => s.loadAggregations);
+  const loadedAggregations = useAggregationStore((s) => s.loaded);
 
   // Load persisted data on mount
   useEffect(() => {
@@ -49,15 +49,17 @@ export const ModelConfig: React.FC = () => {
         <ModelInventory />
       </AnimatedContent>
 
-      {/* 聚合规则 UI 暂时隐藏，待功能完善后再启用
       <AnimatedContent delay={160}>
+        <ProtocolMatrix />
+      </AnimatedContent>
+
+      <AnimatedContent delay={200}>
         <AggregationTable />
       </AnimatedContent>
 
-      <AnimatedContent delay={220}>
+      <AnimatedContent delay={240}>
         <QuickAddPanel />
       </AnimatedContent>
-      */}
     </div>
   );
 };

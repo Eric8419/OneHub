@@ -28,7 +28,14 @@ export const Input = forwardRef<HTMLDivElement, InputProps>(
           ...wrapperStyle,
         }}
       >
-        {icon && <span className="ds-input__icon" style={{ color: 'var(--icon-secondary)', display: 'inline-flex', alignItems: 'center' }}>{icon}</span>}
+        {icon && (
+          <span
+            className="ds-input__icon"
+            style={{ color: 'var(--icon-secondary)', display: 'inline-flex', alignItems: 'center' }}
+          >
+            {icon}
+          </span>
+        )}
         <input
           style={{
             flex: 1,
@@ -44,7 +51,7 @@ export const Input = forwardRef<HTMLDivElement, InputProps>(
         />
       </div>
     );
-  }
+  },
 );
 
 Input.displayName = 'Input';

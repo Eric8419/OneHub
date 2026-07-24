@@ -12,7 +12,9 @@ function useMaximized() {
     const win = getCurrentWindow();
     win.isMaximized().then(setMaximized);
     const unlisten = win.onResized(() => win.isMaximized().then(setMaximized));
-    return () => { unlisten.then(fn => fn()); };
+    return () => {
+      unlisten.then((fn) => fn());
+    };
   }, []);
   return maximized;
 }
@@ -33,7 +35,9 @@ export function useWindowFilled() {
     };
     check();
     const unlisten = win.onResized(check);
-    return () => { unlisten.then(fn => fn()); };
+    return () => {
+      unlisten.then((fn) => fn());
+    };
   }, []);
   return filled;
 }
@@ -108,12 +112,7 @@ const WinControls: React.FC = () => {
           </svg>
         )}
       </WinBtn>
-      <WinBtn
-        onClick={() => handleClick('close')}
-        ariaLabel="关闭"
-        hoverColor="#E81123"
-        hoverText="#FFFFFF"
-      >
+      <WinBtn onClick={() => handleClick('close')} ariaLabel="关闭" hoverColor="#E81123" hoverText="#FFFFFF">
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
           <path d="M1 1L9 9M9 1L1 9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
         </svg>

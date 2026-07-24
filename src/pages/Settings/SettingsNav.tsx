@@ -15,21 +15,21 @@ const categoryKeys: { key: SettingsCategory; icon: React.ReactNode }[] = [
 
 export const SettingsNav: React.FC = () => {
   const t = useT();
-  const activeCategory = useSettingsStore(s => s.activeCategory);
-  const setActiveCategory = useSettingsStore(s => s.setActiveCategory);
+  const activeCategory = useSettingsStore((s) => s.activeCategory);
+  const setActiveCategory = useSettingsStore((s) => s.setActiveCategory);
 
-  const labelMap: Record<SettingsCategory, string> = useMemo(() => ({
-    general: t('settings.general'),
-    security: t('settings.security'),
-    proxy: t('settings.proxy'),
-    advanced: t('settings.advanced'),
-    about: t('settings.about'),
-  }), [t]);
-
-  const categories = useMemo(() =>
-    categoryKeys.map(c => ({ ...c, label: labelMap[c.key] })),
-    [labelMap]
+  const labelMap: Record<SettingsCategory, string> = useMemo(
+    () => ({
+      general: t('settings.general'),
+      security: t('settings.security'),
+      proxy: t('settings.proxy'),
+      advanced: t('settings.advanced'),
+      about: t('settings.about'),
+    }),
+    [t],
   );
+
+  const categories = useMemo(() => categoryKeys.map((c) => ({ ...c, label: labelMap[c.key] })), [labelMap]);
 
   return (
     <div
@@ -41,7 +41,7 @@ export const SettingsNav: React.FC = () => {
         paddingBottom: 0,
       }}
     >
-      {categories.map(cat => {
+      {categories.map((cat) => {
         const isActive = cat.key === activeCategory;
         return (
           <button
@@ -66,10 +66,10 @@ export const SettingsNav: React.FC = () => {
               transition: 'color 0.18s cubic-bezier(0.22,1,0.36,1), border-color 0.18s cubic-bezier(0.22,1,0.36,1)',
               marginBottom: '-1px',
             }}
-            onMouseEnter={e => {
+            onMouseEnter={(e) => {
               if (!isActive) e.currentTarget.style.color = 'var(--text-default)';
             }}
-            onMouseLeave={e => {
+            onMouseLeave={(e) => {
               if (!isActive) e.currentTarget.style.color = 'var(--text-secondary)';
             }}
           >
@@ -82,9 +82,7 @@ export const SettingsNav: React.FC = () => {
             >
               {cat.icon}
             </span>
-            <span style={{ whiteSpace: 'nowrap' }}>
-              {cat.label}
-            </span>
+            <span style={{ whiteSpace: 'nowrap' }}>{cat.label}</span>
           </button>
         );
       })}

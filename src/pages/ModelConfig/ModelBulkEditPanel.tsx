@@ -54,8 +54,10 @@ export const ModelBulkEditPanel: React.FC<ModelBulkEditPanelProps> = ({ initialV
     setValues(initialValues);
   }, [initialValues]);
 
-  const toggle = (key: 'supportsVision' | 'supportsReasoning' | 'supportsReasoningEffort' | 'supportsToolCalls' | 'supportsJsonMode') => {
-    setValues(prev => {
+  const toggle = (
+    key: 'supportsVision' | 'supportsReasoning' | 'supportsReasoningEffort' | 'supportsToolCalls' | 'supportsJsonMode',
+  ) => {
+    setValues((prev) => {
       const next = { ...prev };
       const cycled = cycleTriState(prev[key]);
       next[key] = cycled;
@@ -67,7 +69,10 @@ export const ModelBulkEditPanel: React.FC<ModelBulkEditPanelProps> = ({ initialV
     });
   };
 
-  const swRow = (key: 'supportsVision' | 'supportsReasoning' | 'supportsReasoningEffort' | 'supportsToolCalls' | 'supportsJsonMode', label: string) => (
+  const swRow = (
+    key: 'supportsVision' | 'supportsReasoning' | 'supportsReasoningEffort' | 'supportsToolCalls' | 'supportsJsonMode',
+    label: string,
+  ) => (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
       <Switch
         checked={values[key] === true}
@@ -80,12 +85,14 @@ export const ModelBulkEditPanel: React.FC<ModelBulkEditPanelProps> = ({ initialV
   );
 
   return (
-    <div style={{
-      padding: 16,
-      borderRadius: 12,
-      border: '1px solid var(--border-neutral-l1)',
-      background: 'var(--bg-overlay-l1)',
-    }}>
+    <div
+      style={{
+        padding: 16,
+        borderRadius: 12,
+        border: '1px solid var(--border-neutral-l1)',
+        background: 'var(--bg-overlay-l1)',
+      }}
+    >
       <div style={{ fontSize: 'var(--body-base-font-size)', fontWeight: 500, marginBottom: 4 }}>批量参数设置</div>
       <div style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)', marginBottom: 16 }}>
         设置要统一修改的参数，横线/留空的参数保持各来源原值
@@ -102,7 +109,9 @@ export const ModelBulkEditPanel: React.FC<ModelBulkEditPanelProps> = ({ initialV
           <input
             type="number"
             value={values.contextWindow ?? ''}
-            onChange={(e) => setValues(prev => ({ ...prev, contextWindow: e.target.value ? Number(e.target.value) : null }))}
+            onChange={(e) =>
+              setValues((prev) => ({ ...prev, contextWindow: e.target.value ? Number(e.target.value) : null }))
+            }
             placeholder="不修改"
             style={inputBaseStyle}
             disabled={disabled}
@@ -113,7 +122,9 @@ export const ModelBulkEditPanel: React.FC<ModelBulkEditPanelProps> = ({ initialV
           <input
             type="number"
             value={values.maxOutputTokens ?? ''}
-            onChange={(e) => setValues(prev => ({ ...prev, maxOutputTokens: e.target.value ? Number(e.target.value) : null }))}
+            onChange={(e) =>
+              setValues((prev) => ({ ...prev, maxOutputTokens: e.target.value ? Number(e.target.value) : null }))
+            }
             placeholder="不修改"
             style={inputBaseStyle}
             disabled={disabled}
@@ -124,7 +135,9 @@ export const ModelBulkEditPanel: React.FC<ModelBulkEditPanelProps> = ({ initialV
           <Dropdown
             options={[{ value: '', label: '不修改' }, ...REASONING_OPTS]}
             value={values.defaultReasoningEffort ?? ''}
-            onChange={(v) => setValues(prev => ({ ...prev, defaultReasoningEffort: v ? v as 'low'|'medium'|'high' : null }))}
+            onChange={(v) =>
+              setValues((prev) => ({ ...prev, defaultReasoningEffort: v ? (v as 'low' | 'medium' | 'high') : null }))
+            }
             disabled={disabled || values.supportsReasoning === false}
             size="sm"
           />

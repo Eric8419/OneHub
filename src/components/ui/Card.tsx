@@ -29,7 +29,10 @@ export const Card: React.FC<CardProps> = ({ children, style, className = '', pad
   );
 };
 
-export const CardTitle: React.FC<{ children: React.ReactNode; style?: React.CSSProperties }> = ({ children, style }) => (
+export const CardTitle: React.FC<{ children: React.ReactNode; style?: React.CSSProperties }> = ({
+  children,
+  style,
+}) => (
   <div
     style={{
       fontSize: 'var(--heading-sm-font-size)',
@@ -44,7 +47,13 @@ export const CardTitle: React.FC<{ children: React.ReactNode; style?: React.CSSP
 );
 
 export const CardDesc: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div style={{ fontSize: 'var(--body-base-font-size)', lineHeight: 'var(--body-base-line-height)', color: 'var(--text-secondary)' }}>
+  <div
+    style={{
+      fontSize: 'var(--body-base-font-size)',
+      lineHeight: 'var(--body-base-line-height)',
+      color: 'var(--text-secondary)',
+    }}
+  >
     {children}
   </div>
 );

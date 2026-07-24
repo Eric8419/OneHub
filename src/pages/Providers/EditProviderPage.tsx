@@ -44,7 +44,7 @@ export const EditProviderPage: React.FC = () => {
   const { providerId } = useParams<{ providerId: string }>();
   const { providers, updateProvider, removeProvider } = useProviderStore();
 
-  const provider = providers.find(p => p.id === providerId);
+  const provider = providers.find((p) => p.id === providerId);
 
   const [activeTab, setActiveTab] = useState<TabKey>('basic');
   const [form, setForm] = useState<Provider | null>(null);
@@ -112,10 +112,13 @@ export const EditProviderPage: React.FC = () => {
     return () => window.removeEventListener('beforeunload', handler);
   }, [flushSave]);
 
-  const updateField = useCallback(<K extends keyof Provider>(key: K, value: Provider[K]) => {
-    setForm(prev => prev ? { ...prev, [key]: value } : prev);
-    scheduleAutoSave();
-  }, [scheduleAutoSave]);
+  const updateField = useCallback(
+    <K extends keyof Provider>(key: K, value: Provider[K]) => {
+      setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
+      scheduleAutoSave();
+    },
+    [scheduleAutoSave],
+  );
 
   const handleTestConnection = useCallback(async () => {
     if (!form) return;
@@ -125,7 +128,7 @@ export const EditProviderPage: React.FC = () => {
       const result = await desktopApi.testProviderConnection(
         form.apiFlavor || 'openai-compatible',
         form.apiBase,
-        form.apiKey
+        form.apiKey,
       );
       if (result.success) {
         setTestMessage(undefined);
@@ -169,13 +172,14 @@ export const EditProviderPage: React.FC = () => {
     );
   }
 
-  const statusDotColor = {
-    connected: '#10b981',
-    error: '#ef4444',
-    testing: '#f59e0b',
-    configuring: '#9ca3af',
-    disabled: '#9ca3af',
-  }[form.status] || '#9ca3af';
+  const statusDotColor =
+    {
+      connected: '#10b981',
+      error: '#ef4444',
+      testing: '#f59e0b',
+      configuring: '#9ca3af',
+      disabled: '#9ca3af',
+    }[form.status] || '#9ca3af';
 
   const saveStateText = {
     saved: '所有更改已保存',
@@ -198,19 +202,30 @@ export const EditProviderPage: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{
-        padding: '16px 24px 0',
-        borderBottom: '1px solid var(--border-neutral-l1)',
-        background: 'var(--bg-primary)',
-        flexShrink: 0,
-      }}>
+      <div
+        style={{
+          padding: '16px 24px 0',
+          borderBottom: '1px solid var(--border-neutral-l1)',
+          background: 'var(--bg-primary)',
+          flexShrink: 0,
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
           <button
             type="button"
-            onClick={() => { flushSave(); navigate('/providers'); }}
+            onClick={() => {
+              flushSave();
+              navigate('/providers');
+            }}
             style={{
-              width: 32, height: 32, display: 'grid', placeItems: 'center',
-              borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer',
+              width: 32,
+              height: 32,
+              display: 'grid',
+              placeItems: 'center',
+              borderRadius: 8,
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
               color: 'var(--text-secondary)',
             }}
           >
@@ -224,30 +239,55 @@ export const EditProviderPage: React.FC = () => {
             style={headerInputStyle}
           />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{
-              width: 8, height: 8, borderRadius: '50%', background: statusDotColor, flexShrink: 0,
-            }} />
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: statusDotColor,
+                flexShrink: 0,
+              }}
+            />
             <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)' }}>
-              {{ connected: '已连接', error: '连接失败', testing: '测试中', configuring: '未测试', disabled: '已禁用' }[form.status]}
+              {
+                {
+                  connected: '已连接',
+                  error: '连接失败',
+                  testing: '测试中',
+                  configuring: '未测试',
+                  disabled: '已禁用',
+                }[form.status]
+              }
             </span>
           </div>
           <div style={{ flex: 1 }} />
-          <span style={{ fontSize: 'var(--body-sm-font-size)', color: saveStateColor, cursor: saveState === 'error' ? 'pointer' : 'default' }}
-            onClick={saveState === 'error' ? doAutoSave : undefined}>
+          <span
+            style={{
+              fontSize: 'var(--body-sm-font-size)',
+              color: saveStateColor,
+              cursor: saveState === 'error' ? 'pointer' : 'default',
+            }}
+            onClick={saveState === 'error' ? doAutoSave : undefined}
+          >
             {saveStateText}
           </span>
           <Button variant="secondary" size="sm" icon={RefreshCw} loading={testing} onClick={handleTestConnection}>
             测试连接
           </Button>
-          <Button variant="secondary" size="sm" icon={Save} onClick={doAutoSave}>保存</Button>
+          <Button variant="secondary" size="sm" icon={Save} onClick={doAutoSave}>
+            保存
+          </Button>
           <Button variant="secondary" size="sm" icon={Trash2} onClick={() => setShowDeleteConfirm(true)}>
             删除
           </Button>
         </div>
         <Tabs
-          tabs={TAB_TABS.map(t => ({ ...t, count: tabCounts[t.key] }))}
+          tabs={TAB_TABS.map((t) => ({ ...t, count: tabCounts[t.key] }))}
           activeKey={activeTab}
-          onChange={(k) => { flushSave(); setActiveTab(k as TabKey); }}
+          onChange={(k) => {
+            flushSave();
+            setActiveTab(k as TabKey);
+          }}
         />
       </div>
 
@@ -258,7 +298,15 @@ export const EditProviderPage: React.FC = () => {
             apiKey={form.apiKey}
             apiKeyConfigured={!!provider.apiKey}
             apiFlavor={form.apiFlavor || 'openai-compatible'}
-            testStatus={form.status === 'connected' ? 'connected' : form.status === 'error' ? 'error' : testing ? 'testing' : 'idle'}
+            testStatus={
+              form.status === 'connected'
+                ? 'connected'
+                : form.status === 'error'
+                  ? 'error'
+                  : testing
+                    ? 'testing'
+                    : 'idle'
+            }
             testMessage={testMessage}
             testTime={testTime}
             testing={testing}

@@ -269,12 +269,7 @@ const Prism = ({
     resize();
 
     const rotBuf = new Float32Array(9);
-    const setMat3FromEuler = (
-      yawY: number,
-      pitchX: number,
-      rollZ: number,
-      out: Float32Array,
-    ): Float32Array => {
+    const setMat3FromEuler = (yawY: number, pitchX: number, rollZ: number, out: Float32Array): Float32Array => {
       const cy = Math.cos(yawY),
         sy = Math.sin(yawY);
       const cx = Math.cos(pitchX),
@@ -353,7 +348,7 @@ const Prism = ({
 
     let onPointerMove: ((e: PointerEvent) => void) | null = null;
     if (animationType === 'hover') {
-      onPointerMove = e => {
+      onPointerMove = (e) => {
         onMove(e);
         startRAF();
       };
@@ -388,9 +383,7 @@ const Prism = ({
 
         if (NOISE_IS_ZERO) {
           const settled =
-            Math.abs(yaw - targetYaw) < 1e-4 &&
-            Math.abs(pitch - targetPitch) < 1e-4 &&
-            Math.abs(roll) < 1e-4;
+            Math.abs(yaw - targetYaw) < 1e-4 && Math.abs(pitch - targetPitch) < 1e-4 && Math.abs(roll) < 1e-4;
           if (settled) continueRAF = false;
         }
       } else if (animationType === '3drotate') {
@@ -423,8 +416,8 @@ const Prism = ({
     }
 
     if (suspendWhenOffscreen) {
-      const io = new IntersectionObserver(entries => {
-        const vis = entries.some(e => e.isIntersecting);
+      const io = new IntersectionObserver((entries) => {
+        const vis = entries.some((e) => e.isIntersecting);
         if (vis) startRAF();
         else stopRAF();
       });
@@ -469,14 +462,7 @@ const Prism = ({
     suspendWhenOffscreen,
   ]);
 
-  return (
-    <div
-      className={`prism-container ${className ?? ''}`}
-      ref={containerRef}
-      style={style}
-      {...rest}
-    />
-  );
+  return <div className={`prism-container ${className ?? ''}`} ref={containerRef} style={style} {...rest} />;
 };
 
 Prism.displayName = 'Prism';

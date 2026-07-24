@@ -13,12 +13,7 @@ interface SegmentedControlProps {
   size?: 'sm' | 'md';
 }
 
-export const SegmentedControl: React.FC<SegmentedControlProps> = ({
-  options,
-  value,
-  onChange,
-  size = 'md',
-}) => {
+export const SegmentedControl: React.FC<SegmentedControlProps> = ({ options, value, onChange, size = 'md' }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const optionRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const [indicatorStyle, setIndicatorStyle] = useState<React.CSSProperties>({ opacity: 0 });
@@ -68,16 +63,19 @@ export const SegmentedControl: React.FC<SegmentedControlProps> = ({
           borderRadius: 'var(--radius-8)',
           background: 'var(--bg-base-default)',
           boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
-          transition: 'left 0.2s cubic-bezier(0.22,1,0.36,1), top 0.2s cubic-bezier(0.22,1,0.36,1), width 0.2s cubic-bezier(0.22,1,0.36,1), height 0.2s cubic-bezier(0.22,1,0.36,1), opacity 0.15s',
+          transition:
+            'left 0.2s cubic-bezier(0.22,1,0.36,1), top 0.2s cubic-bezier(0.22,1,0.36,1), width 0.2s cubic-bezier(0.22,1,0.36,1), height 0.2s cubic-bezier(0.22,1,0.36,1), opacity 0.15s',
           ...indicatorStyle,
         }}
       />
-      {options.map(opt => {
+      {options.map((opt) => {
         const isSelected = opt.value === value;
         return (
           <button
             key={opt.value}
-            ref={el => { if (el) optionRefs.current.set(opt.value, el); }}
+            ref={(el) => {
+              if (el) optionRefs.current.set(opt.value, el);
+            }}
             type="button"
             onClick={() => onChange(opt.value)}
             style={{

@@ -217,7 +217,7 @@ function hexToRgb(hex: string): [number, number, number] {
   if (h.length === 3)
     h = h
       .split('')
-      .map(c => c + c)
+      .map((c) => c + c)
       .join('');
   const num = parseInt(h.slice(0, 6), 16);
   return [((num >> 16) & 255) / 255, ((num >> 8) & 255) / 255, (num & 255) / 255];
@@ -282,10 +282,7 @@ const FaultyTerminal = ({
 
   const tintVec = useMemo<[number, number, number]>(() => hexToRgb(tint), [tint]);
 
-  const ditherValue = useMemo<number>(
-    () => (typeof dither === 'boolean' ? (dither ? 1 : 0) : dither),
-    [dither],
-  );
+  const ditherValue = useMemo<number>(() => (typeof dither === 'boolean' ? (dither ? 1 : 0) : dither), [dither]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     const ctn = containerRef.current;
@@ -427,14 +424,7 @@ const FaultyTerminal = ({
     handleMouseMove,
   ]);
 
-  return (
-    <div
-      ref={containerRef}
-      className={`faulty-terminal-container ${className ?? ''}`}
-      style={style}
-      {...rest}
-    />
-  );
+  return <div ref={containerRef} className={`faulty-terminal-container ${className ?? ''}`} style={style} {...rest} />;
 };
 
 FaultyTerminal.displayName = 'FaultyTerminal';

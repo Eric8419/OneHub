@@ -2269,8 +2269,14 @@ export function buildModelFromName(name: string, id?: string): Model {
   const trimmed = name.trim();
   const preset = applyModelPreset(trimmed);
   return {
-    id: id?.trim() || trimmed.toLowerCase().replace(/[^a-z0-9._:/-]+/g, '-').replace(/^-+|-+$/g, '') ||
-      crypto.randomUUID?.() || Date.now().toString(36),
+    id:
+      id?.trim() ||
+      trimmed
+        .toLowerCase()
+        .replace(/[^a-z0-9._:/-]+/g, '-')
+        .replace(/^-+|-+$/g, '') ||
+      crypto.randomUUID?.() ||
+      Date.now().toString(36),
     name: trimmed,
     supportsVision: false,
     supportsReasoning: false,

@@ -10,7 +10,7 @@ interface TrendPoint {
 
 /** Compute the last N days of trend from daily usage data. */
 function computeTrend(dailyUsage: { date: string; tokens: number }[], days: number): TrendPoint[] {
-  const byDate = new Map(dailyUsage.map(d => [d.date, d.tokens]));
+  const byDate = new Map(dailyUsage.map((d) => [d.date, d.tokens]));
   const result: TrendPoint[] = [];
   const today = new Date();
   const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -19,9 +19,8 @@ function computeTrend(dailyUsage: { date: string; tokens: number }[], days: numb
     const date = new Date(today);
     date.setDate(today.getDate() - offset);
     const key = date.toISOString().slice(0, 10);
-    const label = days <= 7
-      ? dayLabels[date.getDay() === 0 ? 6 : date.getDay() - 1]
-      : `${date.getMonth() + 1}/${date.getDate()}`;
+    const label =
+      days <= 7 ? dayLabels[date.getDay() === 0 ? 6 : date.getDay() - 1] : `${date.getMonth() + 1}/${date.getDate()}`;
     result.push({ day: label, tokens: byDate.get(key) ?? 0 });
   }
 
@@ -41,8 +40,8 @@ function formatTokens(v: number): string {
 }
 
 export const TokenTrendChart: React.FC = () => {
-  const dailyUsage = useStatsStore(s => s.dailyUsage);
-  const timeRange = useStatsStore(s => s.timeRange);
+  const dailyUsage = useStatsStore((s) => s.dailyUsage);
+  const timeRange = useStatsStore((s) => s.timeRange);
   const days = rangeToDays(timeRange);
   const trendData = computeTrend(dailyUsage, days);
   const themeVersion = useThemeVersion();
@@ -75,7 +74,7 @@ export const TokenTrendChart: React.FC = () => {
       xAxis: {
         type: 'category',
         boundaryGap: false,
-        data: trendData.map(d => d.day),
+        data: trendData.map((d) => d.day),
         axisTick: { show: false },
         axisLine: { lineStyle: { color: gridColor } },
         axisLabel: {
@@ -101,7 +100,7 @@ export const TokenTrendChart: React.FC = () => {
       series: [
         {
           type: 'line',
-          data: trendData.map(d => d.tokens),
+          data: trendData.map((d) => d.tokens),
           smooth: true,
           symbol: 'circle',
           symbolSize: 5,
@@ -116,7 +115,10 @@ export const TokenTrendChart: React.FC = () => {
           areaStyle: {
             color: {
               type: 'linear',
-              x: 0, y: 0, x2: 0, y2: 1,
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
               colorStops: [
                 { offset: 0, color: brandColor },
                 { offset: 0.05, color: hexWithAlpha(brandColor, 0.2) },
@@ -143,13 +145,29 @@ export const TokenTrendChart: React.FC = () => {
         }}
       >
         Token 用量趋势
-        <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)', marginLeft: 'var(--spacer-8)', fontWeight: 400 }}>
+        <span
+          style={{
+            fontSize: 'var(--body-sm-font-size)',
+            color: 'var(--text-tertiary)',
+            marginLeft: 'var(--spacer-8)',
+            fontWeight: 400,
+          }}
+        >
           (近{days}日)
         </span>
       </div>
       <div style={{ height: 220, position: 'relative' }}>
         {dailyUsage.length === 0 ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-tertiary)', fontSize: 'var(--body-sm-font-size)' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+              color: 'var(--text-tertiary)',
+              fontSize: 'var(--body-sm-font-size)',
+            }}
+          >
             暂无数据 — 启动代理并发送请求后将显示趋势
           </div>
         ) : (

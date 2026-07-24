@@ -164,6 +164,44 @@ impl Provider {
 
 // ── Aggregation ─────────────────────────────────────────────
 
+/// A concrete upstream destination for an externally exposed
+/// aggregation model. Targets make protocol conversion explicit:
+/// the client-facing protocol is selected by the endpoint while
+/// `protocol` describes the wire format expected by this upstream.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RouteTarget {
+    pub id: String,
+    pub provider_id: String,
+    /// Model configured on the provider. Aliases are accepted.
+    pub model: String,
+    /// Optional model name override sent to the upstream.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upstream_model: Option<String>,
+    /// Optional upstream protocol override. When omitted the
+    /// provider's `api_flavor` is used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol: Option<String>,
+    #[serde(default)]
+    pub priority: i32,
+    #[serde(default = "default_route_target_weight")]
+    pub weight: u32,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_secs: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_retries: Option<u32>,
+}
+
+fn default_route_target_weight() -> u32 {
+    1
+}
+
+fn default_true() -> bool {
+    true
+}
+
 /// On-disk aggregation. `strategy` is serialized as the enum key
 /// (kebab-case). Legacy localized strings are tolerated on load
 /// via [`RoutingStrategy::from_stored`].
@@ -172,8 +210,13 @@ impl Provider {
 pub struct Aggregation {
     pub id: String,
     pub name: String,
-    /// Comma-separated model names.
+    /// Legacy comma-separated model names. Used only when
+    /// `targets` is empty.
+    #[serde(default)]
     pub models: String,
+    /// Explicit upstream destinations. Empty for legacy configs.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub targets: Vec<RouteTarget>,
     /// Serialized [`RoutingStrategy`] key. Kept as a String for
     /// forward-compat (unknown values fall back to RoundRobin).
     #[serde(default)]

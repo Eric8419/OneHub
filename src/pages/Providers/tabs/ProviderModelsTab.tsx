@@ -37,7 +37,8 @@ interface ProviderModelsTabProps {
   onModelsChange: (models: Model[]) => void;
 }
 
-type BulkCapKey = 'supportsVision' | 'supportsReasoning' | 'supportsReasoningEffort' | 'supportsToolCalls' | 'supportsJsonMode';
+type BulkCapKey =
+  'supportsVision' | 'supportsReasoning' | 'supportsReasoningEffort' | 'supportsToolCalls' | 'supportsJsonMode';
 
 const BULK_CAPS: { key: BulkCapKey; label: string }[] = [
   { key: 'supportsVision', label: '视觉' },
@@ -61,12 +62,13 @@ function formatTokens(n?: number): string {
 }
 
 function modelIdFromName(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9._:/-]+/g, '-')
-    .replace(/^-+|-+$/g, '') ||
-    `m_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9._:/-]+/g, '-')
+      .replace(/^-+|-+$/g, '') || `m_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+  );
 }
 
 export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
@@ -83,50 +85,61 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
   const [fetchingRemote, setFetchingRemote] = useState(false);
   const [bulkPopoverOpen, setBulkPopoverOpen] = useState(false);
   const [bulkValues, setBulkValues] = useState<Record<BulkCapKey, boolean | null>>({
-    supportsVision: null, supportsReasoning: null, supportsReasoningEffort: null, supportsToolCalls: null, supportsJsonMode: null,
+    supportsVision: null,
+    supportsReasoning: null,
+    supportsReasoningEffort: null,
+    supportsToolCalls: null,
+    supportsJsonMode: null,
   });
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'row' | 'bulk'; ids: string[] } | null>(null);
 
-  const updateModel = useCallback((id: string, patch: Partial<Model>) => {
-    onModelsChange(models.map(m => {
-      if (m.id !== id) return m;
-      const next = { ...m, ...patch };
-      if (patch.supportsReasoning === false) {
-        next.supportsReasoningEffort = false;
-        next.defaultReasoningEffort = undefined;
-      }
-      if (patch.supportsReasoningEffort === false) {
-        next.defaultReasoningEffort = undefined;
-      }
-      return next;
-    }));
-  }, [models, onModelsChange]);
+  const updateModel = useCallback(
+    (id: string, patch: Partial<Model>) => {
+      onModelsChange(
+        models.map((m) => {
+          if (m.id !== id) return m;
+          const next = { ...m, ...patch };
+          if (patch.supportsReasoning === false) {
+            next.supportsReasoningEffort = false;
+            next.defaultReasoningEffort = undefined;
+          }
+          if (patch.supportsReasoningEffort === false) {
+            next.defaultReasoningEffort = undefined;
+          }
+          return next;
+        }),
+      );
+    },
+    [models, onModelsChange],
+  );
 
   const toggleExpand = (id: string) => {
-    setExpandedIds(prev => {
+    setExpandedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
 
   const toggleSelect = (id: string) => {
-    setSelectedIds(prev => {
+    setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
 
   const toggleSelectAll = () => {
     if (selectedIds.size === models.length) setSelectedIds(new Set());
-    else setSelectedIds(new Set(models.map(m => m.id)));
+    else setSelectedIds(new Set(models.map((m) => m.id)));
   };
 
   const addModel = () => {
     const name = newModelName.trim();
     if (!name) return;
-    if (models.some(m => m.name.toLowerCase() === name.toLowerCase())) {
+    if (models.some((m) => m.name.toLowerCase() === name.toLowerCase())) {
       toast(`模型「${name}」已在列表中`, 'info');
       return;
     }
@@ -142,10 +155,10 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
   };
 
   const handleDelete = (ids: string[]) => {
-    onModelsChange(models.filter(m => !ids.includes(m.id)));
-    setSelectedIds(prev => {
+    onModelsChange(models.filter((m) => !ids.includes(m.id)));
+    setSelectedIds((prev) => {
       const next = new Set(prev);
-      ids.forEach(id => next.delete(id));
+      ids.forEach((id) => next.delete(id));
       return next;
     });
     setConfirmDelete(null);
@@ -156,7 +169,7 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
     try {
       const result = await desktopApi.fetchProviderModels(apiFlavor || 'openai-compatible', apiBase, apiKey);
       if (result.success) {
-        setRemoteModels(result.models.map(m => m.name));
+        setRemoteModels(result.models.map((m) => m.name));
       } else {
         toast(`拉取模型失败: ${result.message}`, 'error');
       }
@@ -168,7 +181,7 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
   };
 
   const addRemoteModel = (name: string) => {
-    if (models.some(m => m.name.toLowerCase() === name.toLowerCase())) return;
+    if (models.some((m) => m.name.toLowerCase() === name.toLowerCase())) return;
     const newModel: Model = {
       id: modelIdFromName(name),
       name,
@@ -180,7 +193,7 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
   };
 
   const addAllRemote = () => {
-    const toAdd = remoteModels.filter(n => !models.some(m => m.name.toLowerCase() === n.toLowerCase()));
+    const toAdd = remoteModels.filter((n) => !models.some((m) => m.name.toLowerCase() === n.toLowerCase()));
     if (!toAdd.length) return;
     const newModels = toAdd.map((name) => ({
       id: modelIdFromName(name),
@@ -197,31 +210,42 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
     (Object.entries(bulkValues) as [BulkCapKey, boolean | null][]).forEach(([k, v]) => {
       if (v !== null) (patch as Record<string, unknown>)[k] = v;
     });
-    if (Object.keys(patch).length === 0) { setBulkPopoverOpen(false); return; }
+    if (Object.keys(patch).length === 0) {
+      setBulkPopoverOpen(false);
+      return;
+    }
     if (patch.supportsReasoning === false) {
       patch.supportsReasoningEffort = false;
       patch.defaultReasoningEffort = undefined;
     }
-    onModelsChange(models.map(m => selectedIds.has(m.id) ? { ...m, ...patch } : m));
-    setBulkValues({ supportsVision: null, supportsReasoning: null, supportsReasoningEffort: null, supportsToolCalls: null, supportsJsonMode: null });
+    onModelsChange(models.map((m) => (selectedIds.has(m.id) ? { ...m, ...patch } : m)));
+    setBulkValues({
+      supportsVision: null,
+      supportsReasoning: null,
+      supportsReasoningEffort: null,
+      supportsToolCalls: null,
+      supportsJsonMode: null,
+    });
     setBulkPopoverOpen(false);
   };
 
   const allSelected = models.length > 0 && selectedIds.size === models.length;
-  const addedRemoteSet = useMemo(() => new Set(models.map(m => m.name.toLowerCase())), [models]);
-  const filteredRemote = remoteModels.filter(n => !addedRemoteSet.has(n.toLowerCase()));
+  const addedRemoteSet = useMemo(() => new Set(models.map((m) => m.name.toLowerCase())), [models]);
+  const filteredRemote = remoteModels.filter((n) => !addedRemoteSet.has(n.toLowerCase()));
 
   return (
     <div style={{ padding: '24px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{
-        padding: '10px 14px',
-        borderRadius: 10,
-        background: 'var(--bg-overlay-l1)',
-        border: '1px solid var(--border-neutral-l1)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-      }}>
+      <div
+        style={{
+          padding: '10px 14px',
+          borderRadius: 10,
+          background: 'var(--bg-overlay-l1)',
+          border: '1px solid var(--border-neutral-l1)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
         <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)', flex: 1 }}>
           {apiFlavor === 'anthropic'
             ? 'Anthropic 接口不支持模型列表端点，请手动添加模型'
@@ -246,17 +270,21 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
           type="text"
           value={newModelName}
           onChange={(e) => setNewModelName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') addModel(); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') addModel();
+          }}
           placeholder="手动添加模型名称，如 gpt-4o"
           style={{ ...inputBaseStyle, flex: 1, height: 34 }}
         />
-        <Button variant="primary" size="sm" icon={Plus} onClick={addModel}>添加</Button>
+        <Button variant="primary" size="sm" icon={Plus} onClick={addModel}>
+          添加
+        </Button>
       </div>
 
       {filteredRemote.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {filteredRemote.map(name => (
+            {filteredRemote.map((name) => (
               <button
                 key={name}
                 type="button"
@@ -286,22 +314,24 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
         </div>
       )}
 
-      <div style={{
-        borderRadius: 10,
-        border: '1px solid var(--border-neutral-l1)',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '8px 12px',
-          background: 'var(--bg-overlay-l1)',
-          borderBottom: '1px solid var(--border-neutral-l1)',
-          gap: 8,
-        }}>
-          <span style={{ fontSize: 'var(--body-sm-font-size)', fontWeight: 500 }}>
-            已添加模型
-          </span>
+      <div
+        style={{
+          borderRadius: 10,
+          border: '1px solid var(--border-neutral-l1)',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '8px 12px',
+            background: 'var(--bg-overlay-l1)',
+            borderBottom: '1px solid var(--border-neutral-l1)',
+            gap: 8,
+          }}
+        >
+          <span style={{ fontSize: 'var(--body-sm-font-size)', fontWeight: 500 }}>已添加模型</span>
           <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>({models.length})</span>
           {selectedIds.size > 0 && (
             <>
@@ -313,26 +343,48 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
                   批量设置能力 ▾
                 </Button>
                 {bulkPopoverOpen && (
-                  <div style={{
-                    position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 20,
-                    background: 'var(--bg-elevated)', border: '1px solid var(--border-neutral-l1)',
-                    borderRadius: 10, padding: 12, minWidth: 200, boxShadow: 'var(--shadow-floating)',
-                  }}>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      right: 0,
+                      top: '100%',
+                      marginTop: 4,
+                      zIndex: 20,
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border-neutral-l1)',
+                      borderRadius: 10,
+                      padding: 12,
+                      minWidth: 200,
+                      boxShadow: 'var(--shadow-floating)',
+                    }}
+                  >
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {BULK_CAPS.map(({ key, label }) => (
-                        <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                        <div
+                          key={key}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
+                        >
                           <span style={{ fontSize: 'var(--body-sm-font-size)' }}>{label}</span>
                           <Switch
                             checked={bulkValues[key] === true}
                             indeterminate={bulkValues[key] === null}
-                            onChange={(v: boolean) => setBulkValues(prev => ({ ...prev, [key]: v ? true : false }))}
+                            onChange={(v: boolean) => setBulkValues((prev) => ({ ...prev, [key]: v ? true : false }))}
                           />
                         </div>
                       ))}
                     </div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                      <Button size="sm" variant="secondary" onClick={() => setBulkPopoverOpen(false)} style={{ flex: 1 }}>取消</Button>
-                      <Button size="sm" variant="primary" onClick={applyBulkCaps} style={{ flex: 1 }}>应用</Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setBulkPopoverOpen(false)}
+                        style={{ flex: 1 }}
+                      >
+                        取消
+                      </Button>
+                      <Button size="sm" variant="primary" onClick={applyBulkCaps} style={{ flex: 1 }}>
+                        应用
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -350,17 +402,19 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
         </div>
 
         <div style={{ maxHeight: 500, overflowY: 'auto' }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '28px 1fr 80px 80px 40px 40px 40px 40px 40px 36px',
-            alignItems: 'center',
-            padding: '6px 12px',
-            borderBottom: '1px solid var(--border-neutral-l1)',
-            background: 'var(--bg-overlay-l2)',
-            fontSize: 'var(--body-xs-font-size)',
-            color: 'var(--text-tertiary)',
-            fontWeight: 500,
-          }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '28px 1fr 80px 80px 40px 40px 40px 40px 40px 36px',
+              alignItems: 'center',
+              padding: '6px 12px',
+              borderBottom: '1px solid var(--border-neutral-l1)',
+              background: 'var(--bg-overlay-l2)',
+              fontSize: 'var(--body-xs-font-size)',
+              color: 'var(--text-tertiary)',
+              fontWeight: 500,
+            }}
+          >
             <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} style={{ margin: 0 }} />
             <span style={{ ...cellStyle, justifyContent: 'flex-start', padding: '0 8px' }}>模型名称</span>
             <span style={cellStyle}>上下文</span>
@@ -373,39 +427,67 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
             <span></span>
           </div>
 
-          {models.map(m => {
+          {models.map((m) => {
             const isExpanded = expandedIds.has(m.id);
             const isSelected = selectedIds.has(m.id);
             return (
               <React.Fragment key={m.id}>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '28px 1fr 80px 80px 40px 40px 40px 40px 40px 36px',
-                  alignItems: 'center',
-                  padding: '4px 12px',
-                  borderBottom: '1px solid var(--border-neutral-l1)',
-                  background: isSelected ? 'var(--bg-overlay-l1)' : 'transparent',
-                }}>
-                  <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(m.id)} style={{ margin: 0 }} />
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '28px 1fr 80px 80px 40px 40px 40px 40px 40px 36px',
+                    alignItems: 'center',
+                    padding: '4px 12px',
+                    borderBottom: '1px solid var(--border-neutral-l1)',
+                    background: isSelected ? 'var(--bg-overlay-l1)' : 'transparent',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelect(m.id)}
+                    style={{ margin: 0 }}
+                  />
                   <div style={{ ...cellStyle, justifyContent: 'flex-start', gap: 4, overflow: 'hidden' }}>
-                    <button type="button" onClick={() => toggleExpand(m.id)} style={{
-                      width: 20, height: 20, display: 'grid', placeItems: 'center',
-                      background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', flexShrink: 0,
-                    }}>
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(m.id)}
+                      style={{
+                        width: 20,
+                        height: 20,
+                        display: 'grid',
+                        placeItems: 'center',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--text-tertiary)',
+                        flexShrink: 0,
+                      }}
+                    >
                       {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </button>
                     <input
                       type="text"
                       value={m.name}
                       onChange={(e) => updateModel(m.id, { name: e.target.value })}
-                      style={{ ...inputBaseStyle, fontFamily: 'var(--font-family-mono)', border: 'none', background: 'transparent', padding: '0 2px', minWidth: 0, flex: 1 }}
+                      style={{
+                        ...inputBaseStyle,
+                        fontFamily: 'var(--font-family-mono)',
+                        border: 'none',
+                        background: 'transparent',
+                        padding: '0 2px',
+                        minWidth: 0,
+                        flex: 1,
+                      }}
                     />
                   </div>
                   <div style={cellStyle}>
                     <input
                       type="number"
                       value={m.contextWindow ?? ''}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateModel(m.id, { contextWindow: e.target.value ? Number(e.target.value) : undefined })}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        updateModel(m.id, { contextWindow: e.target.value ? Number(e.target.value) : undefined })
+                      }
                       placeholder="-"
                       style={{ ...inputBaseStyle, width: '100%' }}
                     />
@@ -414,22 +496,56 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
                     <input
                       type="number"
                       value={m.maxOutputTokens ?? ''}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateModel(m.id, { maxOutputTokens: e.target.value ? Number(e.target.value) : undefined })}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        updateModel(m.id, { maxOutputTokens: e.target.value ? Number(e.target.value) : undefined })
+                      }
                       placeholder="-"
                       style={{ ...inputBaseStyle, width: '100%' }}
                     />
                   </div>
-                  <div style={cellStyle}><Switch checked={!!m.supportsVision} onChange={(v: boolean) => updateModel(m.id, { supportsVision: v })} /></div>
-                  <div style={cellStyle}><Switch checked={!!m.supportsReasoning} onChange={(v: boolean) => updateModel(m.id, { supportsReasoning: v })} /></div>
-                  <div style={cellStyle}><Switch checked={!!m.supportsReasoningEffort} onChange={(v: boolean) => updateModel(m.id, { supportsReasoningEffort: v })} disabled={!m.supportsReasoning} /></div>
-                  <div style={cellStyle}><Switch checked={!!m.supportsToolCalls} onChange={(v: boolean) => updateModel(m.id, { supportsToolCalls: v })} /></div>
-                  <div style={cellStyle}><Switch checked={!!m.supportsJsonMode} onChange={(v: boolean) => updateModel(m.id, { supportsJsonMode: v })} /></div>
+                  <div style={cellStyle}>
+                    <Switch
+                      checked={!!m.supportsVision}
+                      onChange={(v: boolean) => updateModel(m.id, { supportsVision: v })}
+                    />
+                  </div>
+                  <div style={cellStyle}>
+                    <Switch
+                      checked={!!m.supportsReasoning}
+                      onChange={(v: boolean) => updateModel(m.id, { supportsReasoning: v })}
+                    />
+                  </div>
+                  <div style={cellStyle}>
+                    <Switch
+                      checked={!!m.supportsReasoningEffort}
+                      onChange={(v: boolean) => updateModel(m.id, { supportsReasoningEffort: v })}
+                      disabled={!m.supportsReasoning}
+                    />
+                  </div>
+                  <div style={cellStyle}>
+                    <Switch
+                      checked={!!m.supportsToolCalls}
+                      onChange={(v: boolean) => updateModel(m.id, { supportsToolCalls: v })}
+                    />
+                  </div>
+                  <div style={cellStyle}>
+                    <Switch
+                      checked={!!m.supportsJsonMode}
+                      onChange={(v: boolean) => updateModel(m.id, { supportsJsonMode: v })}
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={() => setConfirmDelete({ type: 'row', ids: [m.id] })}
                     style={{
-                      width: 28, height: 28, display: 'grid', placeItems: 'center',
-                      background: 'none', border: 'none', borderRadius: 6, cursor: 'pointer',
+                      width: 28,
+                      height: 28,
+                      display: 'grid',
+                      placeItems: 'center',
+                      background: 'none',
+                      border: 'none',
+                      borderRadius: 6,
+                      cursor: 'pointer',
                       color: 'var(--text-tertiary)',
                     }}
                   >
@@ -437,17 +553,27 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
                   </button>
                 </div>
                 {isExpanded && (
-                  <div style={{
-                    padding: '10px 12px 10px 48px',
-                    background: 'var(--bg-overlay-l1)',
-                    borderBottom: '1px solid var(--border-neutral-l1)',
-                    display: 'flex',
-                    gap: 16,
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                  }}>
+                  <div
+                    style={{
+                      padding: '10px 12px 10px 48px',
+                      background: 'var(--bg-overlay-l1)',
+                      borderBottom: '1px solid var(--border-neutral-l1)',
+                      display: 'flex',
+                      gap: 16,
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                    }}
+                  >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <label style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>别名:</label>
+                      <label
+                        style={{
+                          fontSize: 'var(--body-sm-font-size)',
+                          color: 'var(--text-secondary)',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        别名:
+                      </label>
                       <input
                         type="text"
                         value={m.alias ?? ''}
@@ -457,11 +583,23 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
                       />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <label style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>默认思考强度:</label>
+                      <label
+                        style={{
+                          fontSize: 'var(--body-sm-font-size)',
+                          color: 'var(--text-secondary)',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        默认思考强度:
+                      </label>
                       <Dropdown
                         options={REASONING_EFFORT_OPTS}
                         value={m.defaultReasoningEffort ?? ''}
-                        onChange={(v: string) => updateModel(m.id, { defaultReasoningEffort: (v || undefined) as 'low' | 'medium' | 'high' | undefined })}
+                        onChange={(v: string) =>
+                          updateModel(m.id, {
+                            defaultReasoningEffort: (v || undefined) as 'low' | 'medium' | 'high' | undefined,
+                          })
+                        }
                         placeholder="未设置"
                         size="sm"
                       />
@@ -478,7 +616,14 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
           })}
 
           {models.length === 0 && (
-            <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 'var(--body-sm-font-size)' }}>
+            <div
+              style={{
+                padding: 32,
+                textAlign: 'center',
+                color: 'var(--text-tertiary)',
+                fontSize: 'var(--body-sm-font-size)',
+              }}
+            >
               暂无模型，请从接口拉取或手动添加
             </div>
           )}

@@ -11,16 +11,16 @@ function resolveColor(input: string): string {
 }
 
 export const ModelDonutChart: React.FC = () => {
-  const modelBreakdown = useStatsStore(s => s.modelBreakdown);
-  const totalRequests = useStatsStore(s => s.stats.totalRequests);
+  const modelBreakdown = useStatsStore((s) => s.modelBreakdown);
+  const totalRequests = useStatsStore((s) => s.stats.totalRequests);
   const [hiddenModels, setHiddenModels] = useState<Set<string>>(new Set());
   const themeVersion = useThemeVersion();
 
-  const filteredData = modelBreakdown.filter(item => !hiddenModels.has(item.name));
+  const filteredData = modelBreakdown.filter((item) => !hiddenModels.has(item.name));
   const showAll = filteredData.length === modelBreakdown.length;
 
   const toggleModel = (name: string) => {
-    setHiddenModels(prev => {
+    setHiddenModels((prev) => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
       else next.add(name);
@@ -33,7 +33,7 @@ export const ModelDonutChart: React.FC = () => {
     const borderColor = getCssVar('--bg-base-secondary') || '#F5F5F5';
     const emptyColor = getCssVar('--bg-overlay-l3') || '#D4D4D4';
     const data = hasData
-      ? filteredData.map(d => ({
+      ? filteredData.map((d) => ({
           name: d.name,
           value: d.percentage,
           itemStyle: { color: resolveColor(d.color) },
@@ -96,7 +96,13 @@ export const ModelDonutChart: React.FC = () => {
 
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {modelBreakdown.length === 0 ? (
-          <div style={{ padding: 'var(--spacer-24) 0', color: 'var(--text-tertiary)', fontSize: 'var(--body-sm-font-size)' }}>
+          <div
+            style={{
+              padding: 'var(--spacer-24) 0',
+              color: 'var(--text-tertiary)',
+              fontSize: 'var(--body-sm-font-size)',
+            }}
+          >
             暂无数据
           </div>
         ) : (
@@ -158,7 +164,7 @@ export const ModelDonutChart: React.FC = () => {
                 width: '100%',
               }}
             >
-              {modelBreakdown.map(item => {
+              {modelBreakdown.map((item) => {
                 const isHidden = hiddenModels.has(item.name);
                 return (
                   <div
@@ -172,10 +178,15 @@ export const ModelDonutChart: React.FC = () => {
                       opacity: isHidden ? 0.4 : 1,
                       padding: 'var(--spacer-4) var(--spacer-6)',
                       borderRadius: 'var(--radius-6)',
-                      transition: 'opacity var(--transition-fast, 0.12s ease), background var(--transition-fast, 0.12s ease)',
+                      transition:
+                        'opacity var(--transition-fast, 0.12s ease), background var(--transition-fast, 0.12s ease)',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                    }}
                   >
                     <span
                       style={{
@@ -223,8 +234,12 @@ export const ModelDonutChart: React.FC = () => {
                     padding: 'var(--spacer-4) 0',
                     transition: 'opacity var(--transition-fast, 0.12s ease)',
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.opacity = '0.7'; }}
-                  onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = '0.7';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = '1';
+                  }}
                 >
                   显示全部
                 </div>

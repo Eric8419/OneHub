@@ -50,10 +50,10 @@ export function useThemeVersion(): number {
   const [version, setVersion] = useState(0);
   useEffect(() => {
     const root = document.documentElement;
-    const observer = new MutationObserver(mutations => {
+    const observer = new MutationObserver((mutations) => {
       for (const m of mutations) {
         if (m.attributeName === 'data-theme' || m.attributeName === 'class') {
-          setVersion(v => v + 1);
+          setVersion((v) => v + 1);
           return;
         }
       }

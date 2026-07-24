@@ -27,29 +27,23 @@ pub const FLAVOR_ANTHROPIC: &str = "anthropic";
 pub const FLAVOR_OPENAI_COMPAT: &str = "openai-compatible";
 pub const FLAVOR_RESPONSES: &str = "responses";
 
-/// Determine if an inbound protocol (the endpoint the client
-/// called) is compatible with a provider's outbound protocol
-/// (the upstream API format). In native-passthrough mode, the
-/// inbound and outbound protocols must match - no format
-/// conversion is performed.
-///
-/// This is the extension point for future cross-protocol
-/// conversion (e.g. Anthropic Messages -> OpenAI Chat). For now,
-/// only same-protocol routing is allowed.
+/// Determine whether both protocol identifiers are recognized by
+/// the conversion layer. All three supported protocols can be
+/// routed to one another; feature-level compatibility is checked
+/// separately from the wire protocol.
 pub fn is_protocol_compatible(inbound_flavor: &str, provider_flavor: &str) -> bool {
-    match (inbound_flavor, provider_flavor) {
-        // OpenAI Chat Completions is compatible with both "openai"
-        // and "openai-compatible" providers (same wire format).
-        (FLAVOR_OPENAI | FLAVOR_OPENAI_COMPAT, FLAVOR_OPENAI | FLAVOR_OPENAI_COMPAT) => {
-            true
-        }
-        // Anthropic Messages only works with Anthropic-native providers.
-        (FLAVOR_ANTHROPIC, FLAVOR_ANTHROPIC) => true,
-        // Responses API works with OpenAI native (Responses endpoint)
-        // and "openai" flavor providers.
-        (FLAVOR_RESPONSES, FLAVOR_RESPONSES | FLAVOR_OPENAI) => true,
-        _ => false,
+    fn recognized(flavor: &str) -> bool {
+        matches!(
+            flavor,
+            FLAVOR_OPENAI
+                | FLAVOR_OPENAI_COMPAT
+                | FLAVOR_ANTHROPIC
+                | FLAVOR_RESPONSES
+                | "anthropic-messages"
+                | "openai-responses"
+        )
     }
+    recognized(inbound_flavor) && recognized(provider_flavor)
 }
 
 // ── Auth ────────────────────────────────────────────────────

@@ -1,17 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { getVersion } from '@tauri-apps/api/app';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { useSettingsStore } from '../../store/settingsStore';
-import {
-  Button,
-  Input,
-  Switch,
-  Card,
-  toast,
-  AnimatedContent,
-  SegmentedControl,
-} from '../../components/ui';
+import { Button, Input, Switch, Card, toast, AnimatedContent, SegmentedControl } from '../../components/ui';
 import type { SegmentOption } from '../../components/ui/SegmentedControl';
 import { desktopApi, onUpdateAvailable, type UpdateMetadata } from '../../lib/desktopApi';
 import { isValidHex, normalizeHex } from '../../lib/colorUtils';
@@ -50,7 +43,7 @@ const GithubMark: React.FC<{ size?: number }> = ({ size = 20 }) => (
 function generateAuthToken(): string {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
-  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 const languageOptions: SegmentOption[] = [
@@ -98,19 +91,9 @@ const retryOptions: SegmentOption[] = [
   { value: '5', label: '5次' },
 ];
 
-const COLOR_PRESETS = [
-  '#00B95C',
-  '#2F74FF',
-  '#7C3AED',
-  '#E8463A',
-  '#F2A90C',
-  '#E91E8C',
-  '#00B6F5',
-  '#171717',
-];
+const COLOR_PRESETS = ['#00B95C', '#2F74FF', '#7C3AED', '#E8463A', '#F2A90C', '#E91E8C', '#00B6F5', '#171717'];
 
-const errorMessage = (e: unknown, fallback: string) =>
-  e instanceof Error ? e.message : e ? String(e) : fallback;
+const errorMessage = (e: unknown, fallback: string) => (e instanceof Error ? e.message : e ? String(e) : fallback);
 
 interface SettingsGroupProps {
   title?: string;
@@ -144,9 +127,7 @@ const SettingsGroup: React.FC<SettingsGroupProps> = ({ title, isNew, children, s
         }}
       >
         {title}
-        {isNew && (
-          <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--bg-brand)' }}>New</span>
-        )}
+        {isNew && <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--bg-brand)' }}>New</span>}
       </div>
     )}
     {children}
@@ -259,8 +240,7 @@ const TextInput: React.FC<{
 );
 
 export const SettingsForm: React.FC = () => {
-  const { settings, activeCategory, loaded, loadSettings, updateSettings, error, clearError } =
-    useSettingsStore();
+  const { settings, activeCategory, loaded, loadSettings, updateSettings, error, clearError } = useSettingsStore();
   const [exporting, setExporting] = useState(false);
   const [openingDir, setOpeningDir] = useState(false);
   const [showToken, setShowToken] = useState(false);
@@ -276,10 +256,14 @@ export const SettingsForm: React.FC = () => {
   const [installProgress, setInstallProgress] = useState(0);
   const [appVersion, setAppVersion] = useState('0.0.0');
   const installContentLengthRef = useRef<number | null>(null);
+  const installDownloadedRef = useRef<number>(0);
+  const installRafRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!loaded) loadSettings();
-    getVersion().then(setAppVersion).catch(() => {});
+    getVersion()
+      .then(setAppVersion)
+      .catch(() => {});
   }, [loaded, loadSettings]);
 
   useEffect(() => {
@@ -319,7 +303,10 @@ export const SettingsForm: React.FC = () => {
   }, []);
 
   const handleCheckUpdates = async () => {
-    setChecking(true);
+    flushSync(() => {
+      setChecking(true);
+    });
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     try {
       const meta = await desktopApi.checkForUpdates();
       if (!meta) {
@@ -336,30 +323,47 @@ export const SettingsForm: React.FC = () => {
   };
 
   const handleInstallUpdate = async () => {
-    setInstalling(true);
-    setInstallProgress(0);
+    flushSync(() => {
+      setInstalling(true);
+      setInstallProgress(0);
+    });
     installContentLengthRef.current = null;
+    installDownloadedRef.current = 0;
+    if (installRafRef.current !== null) {
+      cancelAnimationFrame(installRafRef.current);
+      installRafRef.current = null;
+    }
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     try {
       await desktopApi.downloadAndInstallUpdate((event) => {
         if (event.event === 'started') {
           installContentLengthRef.current = event.data.contentLength ?? null;
+          installDownloadedRef.current = 0;
         } else if (event.event === 'progress') {
           const total = installContentLengthRef.current;
+          installDownloadedRef.current += event.data.chunkLength;
           if (total && total > 0) {
-            // Progress events only carry chunkLength, so we accumulate
-            // by tracking total in a ref. We can't read state here
-            // (stale closure), so recompute from the event stream.
-            setInstallProgress((prev) => {
-              const next = prev + event.data.chunkLength / total;
-              return Math.min(next, 1);
-            });
+            const next = Math.min(installDownloadedRef.current / total, 1);
+            if (installRafRef.current === null) {
+              installRafRef.current = requestAnimationFrame(() => {
+                installRafRef.current = null;
+                flushSync(() => {
+                  setInstallProgress(next);
+                });
+              });
+            }
           }
         } else if (event.event === 'finished') {
-          setInstallProgress(1);
+          if (installRafRef.current !== null) {
+            cancelAnimationFrame(installRafRef.current);
+            installRafRef.current = null;
+          }
+          flushSync(() => {
+            setInstallProgress(1);
+          });
         }
       });
       toast('更新已安装，应用即将重启', 'success');
-      // Give the toast a moment to render before the process restarts.
       setTimeout(() => {
         desktopApi.exitApp();
       }, 800);
@@ -377,7 +381,8 @@ export const SettingsForm: React.FC = () => {
   };
 
   const handleExportLogs = async () => {
-    setExporting(true);
+    flushSync(() => setExporting(true));
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     try {
       const path = await desktopApi.exportLogs();
       toast(`日志已导出到: ${path}`, 'success');
@@ -388,7 +393,8 @@ export const SettingsForm: React.FC = () => {
     }
   };
   const handleOpenLogDir = async () => {
-    setOpeningDir(true);
+    flushSync(() => setOpeningDir(true));
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     try {
       await desktopApi.openLogDir();
       toast('已打开日志目录', 'info');
@@ -486,7 +492,11 @@ export const SettingsForm: React.FC = () => {
                     }
                   }}
                   wrapperStyle={{ width: 96 }}
-                  style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 13, textAlign: 'center' }}
+                  style={{
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                    fontSize: 13,
+                    textAlign: 'center',
+                  }}
                   maxLength={7}
                 />
               </div>
@@ -523,16 +533,10 @@ export const SettingsForm: React.FC = () => {
 
           <SettingsGroup title="应用设置" isNew>
             <SettingsRow label="开机启动" hint="系统启动时自动运行 Melody Hub">
-              <Switch
-                checked={settings.launchAtLogin}
-                onChange={(v) => updateSettings({ launchAtLogin: v })}
-              />
+              <Switch checked={settings.launchAtLogin} onChange={(v) => updateSettings({ launchAtLogin: v })} />
             </SettingsRow>
             <SettingsRow label="启动时最小化到托盘" hint="下次启动生效" isLast>
-              <Switch
-                checked={settings.startMinimized}
-                onChange={(v) => updateSettings({ startMinimized: v })}
-              />
+              <Switch checked={settings.startMinimized} onChange={(v) => updateSettings({ startMinimized: v })} />
             </SettingsRow>
           </SettingsGroup>
         </AnimatedContent>
@@ -549,13 +553,17 @@ export const SettingsForm: React.FC = () => {
                   value={settings.authToken}
                   onChange={(e) => updateSettings({ authToken: e.target.value })}
                   placeholder="点击右侧按钮生成随机令牌"
-                  wrapperStyle={{ width: 280, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 13 }}
+                  wrapperStyle={{
+                    width: 280,
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                    fontSize: 13,
+                  }}
                   style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 13 }}
                 />
                 <button
                   type="button"
                   className="icon-action-btn"
-                  onClick={() => setShowToken(v => !v)}
+                  onClick={() => setShowToken((v) => !v)}
                   aria-label={showToken ? '隐藏令牌' : '显示令牌'}
                   title={showToken ? '隐藏令牌' : '显示令牌'}
                 >
@@ -619,11 +627,7 @@ export const SettingsForm: React.FC = () => {
               />
             </SettingsRow>
             <SettingsRow label="代理端口">
-              <NumberInput
-                value={settings.proxyPort}
-                onChange={(v) => updateSettings({ proxyPort: v })}
-                min={1}
-              />
+              <NumberInput value={settings.proxyPort} onChange={(v) => updateSettings({ proxyPort: v })} min={1} />
             </SettingsRow>
             <SettingsRow label="代理协议">
               <SegmentedControl
@@ -657,11 +661,7 @@ export const SettingsForm: React.FC = () => {
         <AnimatedContent>
           <SettingsGroup title="高级选项">
             <SettingsRow label="API 超时(秒)">
-              <NumberInput
-                value={settings.apiTimeout}
-                onChange={(v) => updateSettings({ apiTimeout: v })}
-                min={1}
-              />
+              <NumberInput value={settings.apiTimeout} onChange={(v) => updateSettings({ apiTimeout: v })} min={1} />
             </SettingsRow>
             <SettingsRow label="最大重试次数" isLast>
               <SegmentedControl
@@ -1015,10 +1015,7 @@ export const SettingsForm: React.FC = () => {
                         // Celebration pulse when the download completes:
                         // the bar briefly radiates a brand-colored ring
                         // before the installer takes over.
-                        animation:
-                          installProgress >= 1
-                            ? 'progressDonePulse 0.9s ease-out'
-                            : 'none',
+                        animation: installProgress >= 1 ? 'progressDonePulse 0.9s ease-out' : 'none',
                       }}
                     >
                       {/* Shimmer overlay — a soft highlight that sweeps
@@ -1083,11 +1080,7 @@ export const SettingsForm: React.FC = () => {
                   justifyContent: 'flex-end',
                 }}
               >
-                <Button
-                  variant="secondary"
-                  onClick={handleDismissUpdate}
-                  disabled={installing}
-                >
+                <Button variant="secondary" onClick={handleDismissUpdate} disabled={installing}>
                   稍后
                 </Button>
                 <Button

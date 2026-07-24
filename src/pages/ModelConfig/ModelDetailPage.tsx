@@ -49,7 +49,7 @@ export const ModelDetailPage: React.FC = () => {
   const { modelName } = useParams<{ modelName: string }>();
   const navigate = useNavigate();
   const { providers, updateProvider } = useProviderStore();
-  const aggregations = useAggregationStore(s => s.aggregations);
+  const aggregations = useAggregationStore((s) => s.aggregations);
 
   const decodedName = decodeURIComponent(modelName || '');
 
@@ -88,7 +88,10 @@ export const ModelDetailPage: React.FC = () => {
     for (const agg of aggregations) {
       if (!agg.enabled) continue;
       if (agg.name !== decodedName) continue;
-      const modelNames = agg.models.split(',').map(s => s.trim()).filter(Boolean);
+      const modelNames = agg.models
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
       const resolvedModels: AggMapping['resolvedModels'] = [];
       for (const mn of modelNames) {
         for (const provider of providers) {
@@ -113,25 +116,26 @@ export const ModelDetailPage: React.FC = () => {
     return result;
   }, [decodedName, providers, aggregations]);
 
-  const paramSources = sources.filter(
-    (s): s is DirectMapping => s.kind === 'direct' || s.kind === 'alias',
+  const paramSources = sources.filter((s): s is DirectMapping => s.kind === 'direct' || s.kind === 'alias');
+
+  const getEffectiveModel = useCallback(
+    (source: DirectMapping): Model => {
+      const patch = pendingEdits.get(source.providerId);
+      return patch ? { ...source.model, ...patch } : source.model;
+    },
+    [pendingEdits],
   );
 
-  const getEffectiveModel = useCallback((source: DirectMapping): Model => {
-    const patch = pendingEdits.get(source.providerId);
-    return patch ? { ...source.model, ...patch } : source.model;
-  }, [pendingEdits]);
-
-  const allVision = paramSources.length > 0 && paramSources.every(s => getEffectiveModel(s).supportsVision);
-  const allReasoning = paramSources.length > 0 && paramSources.every(s => getEffectiveModel(s).supportsReasoning);
-  const anyEffort = paramSources.some(s => getEffectiveModel(s).supportsReasoningEffort);
-  const allToolCalls = paramSources.length > 0 && paramSources.every(s => getEffectiveModel(s).supportsToolCalls);
-  const allJsonMode = paramSources.length > 0 && paramSources.every(s => getEffectiveModel(s).supportsJsonMode);
-  const maxCtx = Math.max(0, ...paramSources.map(s => getEffectiveModel(s).contextWindow || 0));
-  const maxOutput = Math.max(0, ...paramSources.map(s => getEffectiveModel(s).maxOutputTokens || 0));
-  const hasDirect = sources.some(s => s.kind === 'direct');
-  const hasAlias = sources.some(s => s.kind === 'alias');
-  const hasAgg = sources.some(s => s.kind === 'aggregation');
+  const allVision = paramSources.length > 0 && paramSources.every((s) => getEffectiveModel(s).supportsVision);
+  const allReasoning = paramSources.length > 0 && paramSources.every((s) => getEffectiveModel(s).supportsReasoning);
+  const anyEffort = paramSources.some((s) => getEffectiveModel(s).supportsReasoningEffort);
+  const allToolCalls = paramSources.length > 0 && paramSources.every((s) => getEffectiveModel(s).supportsToolCalls);
+  const allJsonMode = paramSources.length > 0 && paramSources.every((s) => getEffectiveModel(s).supportsJsonMode);
+  const maxCtx = Math.max(0, ...paramSources.map((s) => getEffectiveModel(s).contextWindow || 0));
+  const maxOutput = Math.max(0, ...paramSources.map((s) => getEffectiveModel(s).maxOutputTokens || 0));
+  const hasDirect = sources.some((s) => s.kind === 'direct');
+  const hasAlias = sources.some((s) => s.kind === 'alias');
+  const hasAgg = sources.some((s) => s.kind === 'aggregation');
 
   const directSources: SourceRow[] = useMemo(() => {
     const rows: SourceRow[] = [];
@@ -176,19 +180,22 @@ export const ModelDetailPage: React.FC = () => {
   const allRows = useMemo(() => [...directSources, ...aggSources], [directSources, aggSources]);
 
   const bulkInitialValues: BulkEditValues = useMemo(() => {
-    const ms = directSources.map(r => r.model);
-    const allSame = <K extends keyof Model>(key: K): boolean => ms.length > 0 && ms.every(m => m[key] === ms[0][key]);
-    const allSameBool = (key: 'supportsVision'|'supportsReasoning'|'supportsReasoningEffort'|'supportsToolCalls'|'supportsJsonMode'): boolean | null => {
+    const ms = directSources.map((r) => r.model);
+    const allSame = <K extends keyof Model>(key: K): boolean => ms.length > 0 && ms.every((m) => m[key] === ms[0][key]);
+    const allSameBool = (
+      key:
+        'supportsVision' | 'supportsReasoning' | 'supportsReasoningEffort' | 'supportsToolCalls' | 'supportsJsonMode',
+    ): boolean | null => {
       if (ms.length === 0) return null;
-      if (allSame(key)) return ms[0][key] as boolean | null ?? null;
+      if (allSame(key)) return (ms[0][key] as boolean | null) ?? null;
       return null;
     };
-    const allSameNum = (key: 'contextWindow'|'maxOutputTokens'): number | null => {
+    const allSameNum = (key: 'contextWindow' | 'maxOutputTokens'): number | null => {
       if (ms.length === 0) return null;
-      if (allSame(key)) return ms[0][key] as number | null ?? null;
+      if (allSame(key)) return (ms[0][key] as number | null) ?? null;
       return null;
     };
-    const allSameEffort = (): 'low'|'medium'|'high'|null => {
+    const allSameEffort = (): 'low' | 'medium' | 'high' | null => {
       if (ms.length === 0) return null;
       if (allSame('defaultReasoningEffort')) return ms[0].defaultReasoningEffort ?? null;
       return null;
@@ -205,33 +212,36 @@ export const ModelDetailPage: React.FC = () => {
     };
   }, [directSources]);
 
-  const handleBulkApply = useCallback((values: BulkEditValues) => {
-    setPendingEdits(prev => {
-      const next = new Map(prev);
-      directSources.forEach(row => {
-        const existing = next.get(row.providerId) ?? {};
-        const patch: ModelPatch = { ...existing };
-        if (values.supportsVision !== null) patch.supportsVision = values.supportsVision;
-        if (values.supportsReasoning !== null) patch.supportsReasoning = values.supportsReasoning;
-        if (values.supportsReasoningEffort !== null) patch.supportsReasoningEffort = values.supportsReasoningEffort;
-        if (values.supportsToolCalls !== null) patch.supportsToolCalls = values.supportsToolCalls;
-        if (values.supportsJsonMode !== null) patch.supportsJsonMode = values.supportsJsonMode;
-        if (values.contextWindow !== null) patch.contextWindow = values.contextWindow;
-        if (values.maxOutputTokens !== null) patch.maxOutputTokens = values.maxOutputTokens;
-        if (values.defaultReasoningEffort !== null) patch.defaultReasoningEffort = values.defaultReasoningEffort;
-        if (values.supportsReasoning === false) {
-          patch.supportsReasoningEffort = false;
-          patch.defaultReasoningEffort = undefined;
-        }
-        next.set(row.providerId, patch);
+  const handleBulkApply = useCallback(
+    (values: BulkEditValues) => {
+      setPendingEdits((prev) => {
+        const next = new Map(prev);
+        directSources.forEach((row) => {
+          const existing = next.get(row.providerId) ?? {};
+          const patch: ModelPatch = { ...existing };
+          if (values.supportsVision !== null) patch.supportsVision = values.supportsVision;
+          if (values.supportsReasoning !== null) patch.supportsReasoning = values.supportsReasoning;
+          if (values.supportsReasoningEffort !== null) patch.supportsReasoningEffort = values.supportsReasoningEffort;
+          if (values.supportsToolCalls !== null) patch.supportsToolCalls = values.supportsToolCalls;
+          if (values.supportsJsonMode !== null) patch.supportsJsonMode = values.supportsJsonMode;
+          if (values.contextWindow !== null) patch.contextWindow = values.contextWindow;
+          if (values.maxOutputTokens !== null) patch.maxOutputTokens = values.maxOutputTokens;
+          if (values.defaultReasoningEffort !== null) patch.defaultReasoningEffort = values.defaultReasoningEffort;
+          if (values.supportsReasoning === false) {
+            patch.supportsReasoningEffort = false;
+            patch.defaultReasoningEffort = undefined;
+          }
+          next.set(row.providerId, patch);
+        });
+        return next;
       });
-      return next;
-    });
-    toast('已应用批量设置，请点击保存确认', 'info');
-  }, [directSources]);
+      toast('已应用批量设置，请点击保存确认', 'info');
+    },
+    [directSources],
+  );
 
   const handleSourceChange = useCallback((providerId: string, patch: ModelPatch) => {
-    setPendingEdits(prev => {
+    setPendingEdits((prev) => {
       const next = new Map(prev);
       const existing = next.get(providerId) ?? {};
       const merged = { ...existing, ...patch };
@@ -252,15 +262,16 @@ export const ModelDetailPage: React.FC = () => {
     setSaving(true);
     try {
       for (const [pid, patch] of pendingEdits) {
-        const provider = providers.find(p => p.id === pid);
+        const provider = providers.find((p) => p.id === pid);
         if (!provider) continue;
-        const updatedModels = provider.models.map(m => {
+        const updatedModels = provider.models.map((m) => {
           if (m.name !== decodedName && m.alias !== decodedName) return m;
           const merged: Model = { ...m };
           if (patch.alias !== undefined) merged.alias = patch.alias;
           if (patch.supportsVision !== undefined) merged.supportsVision = patch.supportsVision;
           if (patch.supportsReasoning !== undefined) merged.supportsReasoning = patch.supportsReasoning;
-          if (patch.supportsReasoningEffort !== undefined) merged.supportsReasoningEffort = patch.supportsReasoningEffort;
+          if (patch.supportsReasoningEffort !== undefined)
+            merged.supportsReasoningEffort = patch.supportsReasoningEffort;
           if (patch.supportsToolCalls !== undefined) merged.supportsToolCalls = patch.supportsToolCalls;
           if (patch.supportsJsonMode !== undefined) merged.supportsJsonMode = patch.supportsJsonMode;
           if (patch.contextWindow !== undefined) merged.contextWindow = patch.contextWindow;
@@ -283,14 +294,21 @@ export const ModelDetailPage: React.FC = () => {
     }
   }, [pendingEdits, providers, decodedName, updateProvider]);
 
-  const handleRemoveModel = useCallback(async (providerId: string) => {
-    const provider = providers.find(p => p.id === providerId);
-    if (!provider) return;
-    const updatedModels = provider.models.filter(m => m.name !== decodedName && m.alias !== decodedName);
-    await updateProvider(providerId, { models: updatedModels });
-    setPendingEdits(prev => { const n = new Map(prev); n.delete(providerId); return n; });
-    toast('已从该供应商移除模型', 'success');
-  }, [providers, decodedName, updateProvider]);
+  const handleRemoveModel = useCallback(
+    async (providerId: string) => {
+      const provider = providers.find((p) => p.id === providerId);
+      if (!provider) return;
+      const updatedModels = provider.models.filter((m) => m.name !== decodedName && m.alias !== decodedName);
+      await updateProvider(providerId, { models: updatedModels });
+      setPendingEdits((prev) => {
+        const n = new Map(prev);
+        n.delete(providerId);
+        return n;
+      });
+      toast('已从该供应商移除模型', 'success');
+    },
+    [providers, decodedName, updateProvider],
+  );
 
   useEffect(() => {
     setPendingEdits(new Map());
@@ -299,9 +317,7 @@ export const ModelDetailPage: React.FC = () => {
   if (sources.length === 0) {
     return (
       <div style={{ padding: 'var(--spacer-48)', textAlign: 'center' }}>
-        <p style={{ color: 'var(--text-tertiary)', marginBottom: 'var(--spacer-16)' }}>
-          未找到模型「{decodedName}」
-        </p>
+        <p style={{ color: 'var(--text-tertiary)', marginBottom: 'var(--spacer-16)' }}>未找到模型「{decodedName}」</p>
         <button
           onClick={() => navigate('/models')}
           style={{
@@ -342,15 +358,21 @@ export const ModelDetailPage: React.FC = () => {
           marginBottom: 'var(--spacer-20)',
           transition: 'color 0.15s ease',
         }}
-        onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-default)'; }}
-        onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-tertiary)'; }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = 'var(--text-default)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = 'var(--text-tertiary)';
+        }}
       >
         <ArrowLeft size={16} /> 模型配置
       </button>
 
       <AnimatedContent>
         <div style={{ marginBottom: 'var(--spacer-32)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-12)', marginBottom: 'var(--spacer-8)' }}>
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-12)', marginBottom: 'var(--spacer-8)' }}
+          >
             <div
               style={{
                 display: 'flex',
@@ -409,37 +431,15 @@ export const ModelDetailPage: React.FC = () => {
               gap: 'var(--spacer-16)',
             }}
           >
-            <CapabilityItem
-              icon={<Eye size={18} />}
-              label="视觉理解"
-              enabled={allVision}
-            />
-            <CapabilityItem
-              icon={<Brain size={18} />}
-              label="深度思考"
-              enabled={allReasoning}
-            />
-            <CapabilityItem
-              icon={<SlidersHorizontal size={18} />}
-              label="思考强度"
-              enabled={anyEffort}
-            />
-            <CapabilityItem
-              icon={<Wrench size={18} />}
-              label="工具调用"
-              enabled={allToolCalls}
-            />
-            <CapabilityItem
-              icon={<Braces size={18} />}
-              label="JSON 模式"
-              enabled={allJsonMode}
-            />
+            <CapabilityItem icon={<Eye size={18} />} label="视觉理解" enabled={allVision} />
+            <CapabilityItem icon={<Brain size={18} />} label="深度思考" enabled={allReasoning} />
+            <CapabilityItem icon={<SlidersHorizontal size={18} />} label="思考强度" enabled={anyEffort} />
+            <CapabilityItem icon={<Wrench size={18} />} label="工具调用" enabled={allToolCalls} />
+            <CapabilityItem icon={<Braces size={18} />} label="JSON 模式" enabled={allJsonMode} />
             {maxCtx > 0 && (
               <SpecItem icon={<FileText size={18} />} label="上下文窗口" value={maxCtx.toLocaleString()} />
             )}
-            {maxOutput > 0 && (
-              <SpecItem icon={<Cpu size={18} />} label="最大输出" value={maxOutput.toLocaleString()} />
-            )}
+            {maxOutput > 0 && <SpecItem icon={<Cpu size={18} />} label="最大输出" value={maxOutput.toLocaleString()} />}
           </div>
         </Card>
       </AnimatedContent>
@@ -447,10 +447,7 @@ export const ModelDetailPage: React.FC = () => {
       {directSources.length > 0 && (
         <>
           <div style={{ marginBottom: 'var(--spacer-16)' }}>
-            <ModelBulkEditPanel
-              initialValues={bulkInitialValues}
-              onApply={handleBulkApply}
-            />
+            <ModelBulkEditPanel initialValues={bulkInitialValues} onApply={handleBulkApply} />
           </div>
 
           <AnimatedContent delay={90}>
@@ -489,7 +486,13 @@ export const ModelDetailPage: React.FC = () => {
               if (source.kind === 'aggregation') {
                 return <AggregationDetailRow key={`agg-${idx}`} source={source} />;
               }
-              return <DirectDetailRow key={`dir-${idx}`} source={source} pendingPatch={pendingEdits.get(source.providerId)} />;
+              return (
+                <DirectDetailRow
+                  key={`dir-${idx}`}
+                  source={source}
+                  pendingPatch={pendingEdits.get(source.providerId)}
+                />
+              );
             })}
           </div>
         </Card>
@@ -514,9 +517,7 @@ const CapabilityItem: React.FC<{ icon: React.ReactNode; label: string; enabled: 
       opacity: enabled ? 1 : 0.5,
     }}
   >
-    <span style={{ color: enabled ? 'var(--icon-brand)' : 'var(--icon-tertiary)', display: 'flex' }}>
-      {icon}
-    </span>
+    <span style={{ color: enabled ? 'var(--icon-brand)' : 'var(--icon-tertiary)', display: 'flex' }}>{icon}</span>
     <span
       style={{
         fontSize: 'var(--body-sm-font-size)',
@@ -529,11 +530,7 @@ const CapabilityItem: React.FC<{ icon: React.ReactNode; label: string; enabled: 
   </div>
 );
 
-const SpecItem: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({
-  icon,
-  label,
-  value,
-}) => (
+const SpecItem: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
   <div
     style={{
       display: 'flex',
@@ -662,7 +659,7 @@ const DirectDetailRow: React.FC<{ source: DirectMapping; pendingPatch?: ModelPat
         )}
         {tags.length > 0 && (
           <div style={{ display: 'flex', gap: 'var(--spacer-8)', alignItems: 'center', flexWrap: 'wrap' }}>
-            {tags.map(t => (
+            {tags.map((t) => (
               <span
                 key={t}
                 style={{
@@ -785,9 +782,7 @@ const AggregationDetailRow: React.FC<{ source: AggMapping }> = ({ source }) => {
 
 const Spec: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div>
-    <div style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)', marginBottom: 2 }}>
-      {label}
-    </div>
+    <div style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)', marginBottom: 2 }}>{label}</div>
     <div
       style={{
         fontSize: 'var(--body-sm-font-size)',

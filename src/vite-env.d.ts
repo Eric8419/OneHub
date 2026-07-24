@@ -8,4 +8,3 @@ declare module 'react' {
     WebkitAppRegion?: 'drag' | 'no-drag';
   }
 }
-

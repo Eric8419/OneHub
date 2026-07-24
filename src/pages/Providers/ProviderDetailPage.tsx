@@ -42,13 +42,16 @@ const describeModelCapabilities = (model: Model) => {
 };
 
 const FLAVOR_LABELS: Record<string, string> = {
-  'openai': 'OpenAI',
+  openai: 'OpenAI',
   'openai-compatible': 'OpenAI 兼容',
-  'anthropic': 'Anthropic',
-  'responses': 'Responses API',
+  anthropic: 'Anthropic',
+  responses: 'Responses API',
 };
 
-const HEALTH_STATUS_CONFIG: Record<string, { variant: 'green' | 'orange' | 'danger'; label: string; icon: React.ReactNode }> = {
+const HEALTH_STATUS_CONFIG: Record<
+  string,
+  { variant: 'green' | 'orange' | 'danger'; label: string; icon: React.ReactNode }
+> = {
   healthy: { variant: 'green', label: '健康', icon: <CheckCircle size={14} /> },
   rate_limited: { variant: 'orange', label: '限流中', icon: <Clock size={14} /> },
   unhealthy: { variant: 'danger', label: '熔断中', icon: <AlertTriangle size={14} /> },
@@ -112,7 +115,8 @@ const iconBtnStyle: React.CSSProperties = {
   background: 'transparent',
   color: 'var(--text-secondary)',
   cursor: 'pointer',
-  transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease), border-color var(--transition-fast, 0.12s ease)',
+  transition:
+    'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease), border-color var(--transition-fast, 0.12s ease)',
 };
 
 const statCardStyle: React.CSSProperties = {
@@ -158,11 +162,11 @@ export const ProviderDetailPage: React.FC = () => {
   const { providerId } = useParams<{ providerId: string }>();
   const navigate = useNavigate();
 
-  const provider = useProviderStore(s => s.providers.find(p => p.id === providerId));
-  const updateProvider = useProviderStore(s => s.updateProvider);
-  const removeProvider = useProviderStore(s => s.removeProvider);
-  const recentRequests = useStatsStore(s => s.recentRequests);
-  const fetchRequests = useStatsStore(s => s.fetchRequests);
+  const provider = useProviderStore((s) => s.providers.find((p) => p.id === providerId));
+  const updateProvider = useProviderStore((s) => s.updateProvider);
+  const removeProvider = useProviderStore((s) => s.removeProvider);
+  const recentRequests = useStatsStore((s) => s.recentRequests);
+  const fetchRequests = useStatsStore((s) => s.fetchRequests);
 
   const [health, setHealth] = useState<ProviderHealthSnapshot | undefined>();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -177,11 +181,16 @@ export const ProviderDetailPage: React.FC = () => {
       try {
         const map = await desktopApi.getProviderHealth();
         if (active) setHealth(map[providerId]);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     };
     fetchHealth();
     const timer = setInterval(fetchHealth, 5000);
-    return () => { active = false; clearInterval(timer); };
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
   }, [providerId]);
 
   // Fetch recent requests for stats
@@ -192,7 +201,7 @@ export const ProviderDetailPage: React.FC = () => {
   // Filter requests for this provider
   const providerRequests = useMemo(() => {
     if (!provider) return [];
-    return recentRequests.filter(r => r.provider === provider.name);
+    return recentRequests.filter((r) => r.provider === provider.name);
   }, [recentRequests, provider]);
 
   // Compute stats
@@ -201,7 +210,7 @@ export const ProviderDetailPage: React.FC = () => {
       return { totalRequests: 0, totalTokens: 0, successCount: 0, avgLatency: 0, successRate: 0 };
     }
     const totalTokens = providerRequests.reduce((sum, r) => sum + r.tokens, 0);
-    const successCount = providerRequests.filter(r => r.status === 'success' || r.status === 'streaming').length;
+    const successCount = providerRequests.filter((r) => r.status === 'success' || r.status === 'streaming').length;
     const avgLatency = providerRequests.reduce((sum, r) => sum + r.latencyMs, 0) / providerRequests.length;
     return {
       totalRequests: providerRequests.length,
@@ -216,7 +225,16 @@ export const ProviderDetailPage: React.FC = () => {
     return (
       <div style={{ padding: 'var(--spacer-40)', textAlign: 'center', color: 'var(--text-tertiary)' }}>
         <p>未找到该供应商。</p>
-        <button onClick={() => navigate('/providers')} style={{ marginTop: 'var(--spacer-12)', cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--text-brand)' }}>
+        <button
+          onClick={() => navigate('/providers')}
+          style={{
+            marginTop: 'var(--spacer-12)',
+            cursor: 'pointer',
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--text-brand)',
+          }}
+        >
           返回供应商列表
         </button>
       </div>
@@ -224,14 +242,18 @@ export const ProviderDetailPage: React.FC = () => {
   }
 
   const statusCfg = STATUS_TAG_CONFIG[provider.status] || STATUS_TAG_CONFIG.configuring;
-  const healthCfg = health && health.status !== 'healthy' ? HEALTH_STATUS_CONFIG[health.status] : HEALTH_STATUS_CONFIG.healthy;
+  const healthCfg =
+    health && health.status !== 'healthy' ? HEALTH_STATUS_CONFIG[health.status] : HEALTH_STATUS_CONFIG.healthy;
   const isDisabled = provider.status === 'disabled';
 
   const handleCopyKey = () => {
     if (provider.apiKey) {
-      navigator.clipboard.writeText(provider.apiKey).then(() => {
-        toast('API Key 已复制', 'success');
-      }).catch(() => toast('复制失败', 'error'));
+      navigator.clipboard
+        .writeText(provider.apiKey)
+        .then(() => {
+          toast('API Key 已复制', 'success');
+        })
+        .catch(() => toast('复制失败', 'error'));
     }
   };
 
@@ -274,25 +296,26 @@ export const ProviderDetailPage: React.FC = () => {
     }
   };
 
-  const apiKeyMasked = provider.apiKey
-    ? provider.apiKey.slice(0, 8) + '••••••••'
-    : '未配置';
+  const apiKeyMasked = provider.apiKey ? provider.apiKey.slice(0, 8) + '••••••••' : '未配置';
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 'var(--spacer-24)' }}>
       {/* ── Top Bar: Back + Title + Actions ─────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--spacer-16)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-12)' }}>
-          <button
-            onClick={() => navigate('/providers')}
-            style={{ ...iconBtnStyle, flexShrink: 0 }}
-            title="返回"
-          >
+          <button onClick={() => navigate('/providers')} style={{ ...iconBtnStyle, flexShrink: 0 }} title="返回">
             <ArrowLeft size={18} />
           </button>
           <ProviderLogo providerId={provider.id} name={provider.name} size={40} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-4)' }}>
-            <h1 style={{ fontSize: 'var(--heading-lg-font-size)', fontWeight: 'var(--heading-lg-font-weight)', color: 'var(--text-default)', margin: 0 }}>
+            <h1
+              style={{
+                fontSize: 'var(--heading-lg-font-size)',
+                fontWeight: 'var(--heading-lg-font-weight)',
+                color: 'var(--text-default)',
+                margin: 0,
+              }}
+            >
               {provider.name}
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-8)' }}>
@@ -308,26 +331,13 @@ export const ProviderDetailPage: React.FC = () => {
 
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: 'var(--spacer-8)' }}>
-          <button
-            onClick={handleToggleEnabled}
-            style={iconBtnStyle}
-            title={isDisabled ? '启用' : '禁用'}
-          >
+          <button onClick={handleToggleEnabled} style={iconBtnStyle} title={isDisabled ? '启用' : '禁用'}>
             {isDisabled ? <Power size={16} /> : <PowerOff size={16} />}
           </button>
-          <button
-            onClick={handleTestConnection}
-            style={iconBtnStyle}
-            title="测试连接"
-            disabled={testing}
-          >
+          <button onClick={handleTestConnection} style={iconBtnStyle} title="测试连接" disabled={testing}>
             {testing ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
           </button>
-          <button
-            onClick={() => navigate(`/providers/${provider.id}/edit`)}
-            style={iconBtnStyle}
-            title="编辑"
-          >
+          <button onClick={() => navigate(`/providers/${provider.id}/edit`)} style={iconBtnStyle} title="编辑">
             <Pencil size={16} />
           </button>
           <button
@@ -342,16 +352,18 @@ export const ProviderDetailPage: React.FC = () => {
 
       {/* Test result banner */}
       {testResult && (
-        <div style={{
-          padding: 'var(--spacer-12) var(--spacer-16)',
-          borderRadius: 'var(--radius-8)',
-          background: testResult.success ? 'var(--status-success-bg)' : 'var(--status-error-bg)',
-          color: testResult.success ? 'var(--status-success-default)' : 'var(--status-error-default)',
-          fontSize: 'var(--body-base-font-size)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--spacer-8)',
-        }}>
+        <div
+          style={{
+            padding: 'var(--spacer-12) var(--spacer-16)',
+            borderRadius: 'var(--radius-8)',
+            background: testResult.success ? 'var(--status-success-bg)' : 'var(--status-error-bg)',
+            color: testResult.success ? 'var(--status-success-default)' : 'var(--status-error-default)',
+            fontSize: 'var(--body-base-font-size)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--spacer-8)',
+          }}
+        >
           {testResult.success ? <CheckCircle size={16} /> : <XCircle size={16} />}
           {testResult.message}
         </div>
@@ -368,7 +380,9 @@ export const ProviderDetailPage: React.FC = () => {
           <div style={statCardStyle}>
             <div style={statLabelStyle}>当前状态</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-8)' }}>
-              <Tag variant={healthCfg.variant} style={tagStyle}>{healthCfg.icon} {healthCfg.label}</Tag>
+              <Tag variant={healthCfg.variant} style={tagStyle}>
+                {healthCfg.icon} {healthCfg.label}
+              </Tag>
             </div>
           </div>
           <div style={statCardStyle}>
@@ -381,9 +395,7 @@ export const ProviderDetailPage: React.FC = () => {
           </div>
           <div style={statCardStyle}>
             <div style={statLabelStyle}>冷却倒计时</div>
-            <div style={statValueStyle}>
-              {health?.cooldownSecs ? `${health.cooldownSecs}s` : '—'}
-            </div>
+            <div style={statValueStyle}>{health?.cooldownSecs ? `${health.cooldownSecs}s` : '—'}</div>
           </div>
         </div>
       </Card>
@@ -417,30 +429,90 @@ export const ProviderDetailPage: React.FC = () => {
         {/* Recent requests table */}
         {providerRequests.length > 0 && (
           <div style={{ marginTop: 'var(--spacer-20)' }}>
-            <div style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)', marginBottom: 'var(--spacer-8)' }}>
+            <div
+              style={{
+                fontSize: 'var(--body-sm-font-size)',
+                color: 'var(--text-tertiary)',
+                marginBottom: 'var(--spacer-8)',
+              }}
+            >
               近期请求（{providerRequests.length} 条）
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', minWidth: 500, borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    {['时间', '模型', 'Token', '状态', '延迟'].map(h => (
-                      <th key={h} style={{ padding: 'var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: h === 'Token' || h === '延迟' ? 'right' : 'left', fontSize: 'var(--body-md-font-size)', color: 'var(--text-tertiary)', fontWeight: 'var(--font-weight-medium)' }}>{h}</th>
+                    {['时间', '模型', 'Token', '状态', '延迟'].map((h) => (
+                      <th
+                        key={h}
+                        style={{
+                          padding: 'var(--spacer-8)',
+                          borderBottom: '1px solid var(--border-neutral-l1)',
+                          textAlign: h === 'Token' || h === '延迟' ? 'right' : 'left',
+                          fontSize: 'var(--body-md-font-size)',
+                          color: 'var(--text-tertiary)',
+                          fontWeight: 'var(--font-weight-medium)',
+                        }}
+                      >
+                        {h}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {providerRequests.slice(0, 10).map(req => (
+                  {providerRequests.slice(0, 10).map((req) => (
                     <tr key={req.id}>
-                      <td style={{ padding: 'var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', fontFamily: 'var(--code-terminal-font-family)', fontSize: 'var(--body-md-font-size)', color: 'var(--text-secondary)' }}>{req.timestamp}</td>
-                      <td style={{ padding: 'var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', fontSize: 'var(--body-md-font-size)', color: 'var(--text-default)' }}>{req.model}</td>
-                      <td style={{ padding: 'var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'right', fontFamily: 'var(--font-family-metric)', fontSize: 'var(--body-md-font-size)' }}>{req.tokens.toLocaleString()}</td>
+                      <td
+                        style={{
+                          padding: 'var(--spacer-8)',
+                          borderBottom: '1px solid var(--border-neutral-l1)',
+                          fontFamily: 'var(--code-terminal-font-family)',
+                          fontSize: 'var(--body-md-font-size)',
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        {req.timestamp}
+                      </td>
+                      <td
+                        style={{
+                          padding: 'var(--spacer-8)',
+                          borderBottom: '1px solid var(--border-neutral-l1)',
+                          fontSize: 'var(--body-md-font-size)',
+                          color: 'var(--text-default)',
+                        }}
+                      >
+                        {req.model}
+                      </td>
+                      <td
+                        style={{
+                          padding: 'var(--spacer-8)',
+                          borderBottom: '1px solid var(--border-neutral-l1)',
+                          textAlign: 'right',
+                          fontFamily: 'var(--font-family-metric)',
+                          fontSize: 'var(--body-md-font-size)',
+                        }}
+                      >
+                        {req.tokens.toLocaleString()}
+                      </td>
                       <td style={{ padding: 'var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)' }}>
-                        <Tag variant={req.status === 'success' || req.status === 'streaming' ? 'green' : 'danger'} style={tagStyle}>
+                        <Tag
+                          variant={req.status === 'success' || req.status === 'streaming' ? 'green' : 'danger'}
+                          style={tagStyle}
+                        >
                           {req.status === 'success' || req.status === 'streaming' ? '成功' : '失败'}
                         </Tag>
                       </td>
-                      <td style={{ padding: 'var(--spacer-8)', borderBottom: '1px solid var(--border-neutral-l1)', textAlign: 'right', fontFamily: 'var(--font-family-metric)', fontSize: 'var(--body-md-font-size)' }}>{(req.latencyMs / 1000).toFixed(2)}s</td>
+                      <td
+                        style={{
+                          padding: 'var(--spacer-8)',
+                          borderBottom: '1px solid var(--border-neutral-l1)',
+                          textAlign: 'right',
+                          fontFamily: 'var(--font-family-metric)',
+                          fontSize: 'var(--body-md-font-size)',
+                        }}
+                      >
+                        {(req.latencyMs / 1000).toFixed(2)}s
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -458,22 +530,32 @@ export const ProviderDetailPage: React.FC = () => {
         </div>
 
         <div style={infoRowStyle}>
-          <span style={infoLabelStyle}><Globe size={14} /> API Base</span>
+          <span style={infoLabelStyle}>
+            <Globe size={14} /> API Base
+          </span>
           <span style={infoValueStyle}>{provider.apiBase}</span>
         </div>
         <div style={infoRowStyle}>
-          <span style={infoLabelStyle}><Pencil size={14} /> API Key</span>
+          <span style={infoLabelStyle}>
+            <Pencil size={14} /> API Key
+          </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-8)' }}>
             <span style={infoValueStyle}>{apiKeyMasked}</span>
             {provider.apiKey && (
-              <button onClick={handleCopyKey} style={{ ...iconBtnStyle, width: 28, height: 28, border: 'none' }} title="复制">
+              <button
+                onClick={handleCopyKey}
+                style={{ ...iconBtnStyle, width: 28, height: 28, border: 'none' }}
+                title="复制"
+              >
                 <Copy size={12} />
               </button>
             )}
           </div>
         </div>
         <div style={infoRowStyle}>
-          <span style={infoLabelStyle}><Network size={14} /> 协议类型</span>
+          <span style={infoLabelStyle}>
+            <Network size={14} /> 协议类型
+          </span>
           <span style={{ ...infoValueStyle, fontFamily: 'inherit' }}>
             {FLAVOR_LABELS[provider.apiFlavor || 'openai-compatible'] || provider.apiFlavor}
           </span>
@@ -482,7 +564,9 @@ export const ProviderDetailPage: React.FC = () => {
         {/* Proxy config */}
         {provider.proxyConfig?.enabled && (
           <div style={infoRowStyle}>
-            <span style={infoLabelStyle}><Globe size={14} /> 独立代理</span>
+            <span style={infoLabelStyle}>
+              <Globe size={14} /> 独立代理
+            </span>
             <span style={infoValueStyle}>{provider.proxyConfig.url || '未配置'}</span>
           </div>
         )}
@@ -495,16 +579,19 @@ export const ProviderDetailPage: React.FC = () => {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-4)' }}>
               {Object.entries(provider.modelMapping).map(([key, value]) => (
-                <div key={key} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--spacer-8)',
-                  padding: 'var(--spacer-8) var(--spacer-12)',
-                  borderRadius: 'var(--radius-8)',
-                  background: 'var(--bg-overlay-l1)',
-                  fontSize: 'var(--body-sm-font-size)',
-                  fontFamily: 'var(--code-terminal-font-family)',
-                }}>
+                <div
+                  key={key}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--spacer-8)',
+                    padding: 'var(--spacer-8) var(--spacer-12)',
+                    borderRadius: 'var(--radius-8)',
+                    background: 'var(--bg-overlay-l1)',
+                    fontSize: 'var(--body-sm-font-size)',
+                    fontFamily: 'var(--code-terminal-font-family)',
+                  }}
+                >
                   <span style={{ color: 'var(--text-secondary)' }}>{key}</span>
                   <ArrowLeft size={12} style={{ transform: 'rotate(180deg)', color: 'var(--text-tertiary)' }} />
                   <span style={{ color: 'var(--text-default)' }}>{value}</span>
@@ -523,24 +610,45 @@ export const ProviderDetailPage: React.FC = () => {
         </div>
 
         {provider.models.length === 0 ? (
-          <div style={{ padding: 'var(--spacer-32) 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 'var(--body-base-font-size)' }}>
+          <div
+            style={{
+              padding: 'var(--spacer-32) 0',
+              textAlign: 'center',
+              color: 'var(--text-tertiary)',
+              fontSize: 'var(--body-base-font-size)',
+            }}
+          >
             该供应商暂无配置的模型
           </div>
         ) : (
-          provider.models.map(model => {
+          provider.models.map((model) => {
             const caps = describeModelCapabilities(model);
             return (
               <div key={model.id} style={modelRowStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-8)' }}>
                   <Bot size={16} style={{ color: 'var(--text-tertiary)' }} />
-                  <span style={{ fontSize: 'var(--body-base-font-size)', color: 'var(--text-default)' }}>{model.name}</span>
+                  <span style={{ fontSize: 'var(--body-base-font-size)', color: 'var(--text-default)' }}>
+                    {model.name}
+                  </span>
                   {model.alias && (
-                    <Tag variant="neutral" style={tagStyle}>别名: {model.alias}</Tag>
+                    <Tag variant="neutral" style={tagStyle}>
+                      别名: {model.alias}
+                    </Tag>
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: 'var(--spacer-4)', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 400 }}>
-                  {caps.map(tag => (
-                    <Tag key={tag} variant="neutral" style={tagStyle}>{tag}</Tag>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 'var(--spacer-4)',
+                    flexWrap: 'wrap',
+                    justifyContent: 'flex-end',
+                    maxWidth: 400,
+                  }}
+                >
+                  {caps.map((tag) => (
+                    <Tag key={tag} variant="neutral" style={tagStyle}>
+                      {tag}
+                    </Tag>
                   ))}
                 </div>
               </div>

@@ -5,7 +5,7 @@
 <h1 align="center">Melody Hub</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.2-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-0.1.3-blue?style=flat-square" alt="version" />
   <img src="https://github.com/Lhy723/MelodyHub/actions/workflows/ci.yml/badge.svg" alt="ci" />
   <img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square" alt="tauri" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square" alt="react" />
@@ -22,7 +22,7 @@ Melody Hub 基于 Tauri、React 和 Rust 构建，用一个本地地址统一接
 
 **核心特性：**
 
-- **多协议统一入口** - 提供 `/v1/chat/completions`、`/v1/responses`、`/v1/messages` 和 `/v1/models`，支持 SSE 流式响应。
+- **三协议双向转换** - OpenAI Chat Completions、Anthropic Messages 与 OpenAI Responses 任一入口均可访问另外两种协议的上游，并支持 SSE 流式转换。
 - **多提供商与模型管理** - 内置常用服务预设，也可连接自定义 OpenAI-compatible API；支持模型别名、能力参数和详情查看。
 - **聚合路由与故障转移** - 支持轮询、最低延迟、随机和顺序策略，并根据能力、并发与上游健康状态选择可用模型。
 - **安全的本地配置** - API Key 使用 AES-256-GCM 加密保存；首次启动自动生成代理认证令牌。
@@ -145,9 +145,30 @@ curl http://127.0.0.1:8080/health
 |------|------|------|
 | `GET` | `/health` | 本地代理健康检查，无需认证。 |
 | `GET` | `/v1/models` | 返回当前可路由的模型。 |
+| `GET` | `/v1/capabilities` | 返回协议矩阵、模型能力、目标配置与当前可用性。 |
 | `POST` | `/v1/chat/completions` | OpenAI Chat Completions 兼容接口。 |
 | `POST` | `/v1/responses` | OpenAI Responses API 兼容接口。 |
 | `POST` | `/v1/messages` | Anthropic Messages API 兼容接口。 |
+| `POST` | `/v1/messages/count_tokens` | 返回输入 Token 估算值（`estimated: true`）。 |
+| `POST` | `/v1/responses/input_tokens` | 返回输入 Token 估算值（`estimated: true`）。 |
+| `*` | `/v1/images/*` | 图像 API 透传。 |
+| `*` | `/v1/audio/*` | 语音 API 透传。 |
+| `*` | `/v1/files/*` | 文件 API 透传。 |
+| `*` | `/v1/batches/*` | Batch API 透传。 |
+
+图像、语音、文件和 Batch 等无统一模型字段的请求，可通过
+`x-melody-provider-id` 指定上游；仅配置一个提供商时会自动选择。
+这些端点不包含 Embeddings。
+
+### 转换与降级规则
+
+- 文本、流式文本、工具定义/选择/调用结果、JSON Schema 结构化输出、图像/文件输入和推理参数通过内部统一表示转换。
+- 工具调用和结构化输出不能无损转换时返回
+  `capability_conversion_error`（请求侧为 HTTP `422`），不会静默删除字段。
+- 其他协议差异按可表示能力转换；响应会带
+  `x-melody-upstream-protocol`，显式目标还会带 `x-melody-target-id`。
+- 聚合目标可分别设置上游协议、模型名、优先级、权重、超时与重试。
+  老版本仅含 `models` 的聚合配置继续按原逻辑工作。
 
 ### 核心概念
 

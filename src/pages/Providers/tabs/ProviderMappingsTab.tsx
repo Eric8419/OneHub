@@ -63,7 +63,14 @@ export const ProviderMappingsTab: React.FC<ProviderMappingsTabProps> = ({ mappin
       >
         {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         <span>模型映射</span>
-        <span style={{ color: 'var(--text-tertiary)', fontSize: 'var(--body-sm-font-size)', fontWeight: 400, marginLeft: 8 }}>
+        <span
+          style={{
+            color: 'var(--text-tertiary)',
+            fontSize: 'var(--body-sm-font-size)',
+            fontWeight: 400,
+            marginLeft: 8,
+          }}
+        >
           将客户端请求的模型名映射到上游实际模型名
         </span>
         {entries.length > 0 && (
@@ -96,8 +103,14 @@ export const ProviderMappingsTab: React.FC<ProviderMappingsTabProps> = ({ mappin
                 type="button"
                 onClick={() => removeEntry(idx)}
                 style={{
-                  width: 32, height: 32, display: 'grid', placeItems: 'center',
-                  background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer',
+                  width: 32,
+                  height: 32,
+                  display: 'grid',
+                  placeItems: 'center',
+                  background: 'none',
+                  border: 'none',
+                  borderRadius: 8,
+                  cursor: 'pointer',
                   color: 'var(--text-tertiary)',
                 }}
               >

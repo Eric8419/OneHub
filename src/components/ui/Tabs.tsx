@@ -16,7 +16,7 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeKey, onChange }) => {
         borderBottom: '1px solid var(--border-neutral-l1)',
       }}
     >
-      {tabs.map(tab => {
+      {tabs.map((tab) => {
         const isActive = tab.key === activeKey;
         return (
           <button
@@ -36,10 +36,12 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeKey, onChange }) => {
               lineHeight: 'var(--body-base-line-height)',
               fontWeight: 'var(--font-weight-medium)',
               position: 'relative',
-              ...((isActive) ? {
-                // When active, the tab gets a custom style
-                // underline pseudo will be via className
-              } : {}),
+              ...(isActive
+                ? {
+                    // When active, the tab gets a custom style
+                    // underline pseudo will be via className
+                  }
+                : {}),
             }}
           >
             <span>{tab.label}</span>

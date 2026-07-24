@@ -42,7 +42,14 @@ export const ProviderProxyTab: React.FC<ProviderProxyTabProps> = ({
 
       {proxyEnabled && (
         <div>
-          <label style={{ display: 'block', fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)', marginBottom: 6 }}>
+          <label
+            style={{
+              display: 'block',
+              fontSize: 'var(--body-sm-font-size)',
+              color: 'var(--text-secondary)',
+              marginBottom: 6,
+            }}
+          >
             代理地址
           </label>
           <input

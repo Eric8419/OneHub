@@ -20,8 +20,8 @@ const cards: KpiCardConfig[] = [
     label: 'Token 总用量',
     icon: Coins,
     formatter: (v: number) => v.toLocaleString(),
-    getValue: (s: any) => s.totalTokens,
-    getChange: (s: any) => s.tokenChange,
+    getValue: (s) => s.totalTokens,
+    getChange: (s) => s.tokenChange,
     changeLabel: '较上一周期',
   },
   {
@@ -29,8 +29,8 @@ const cards: KpiCardConfig[] = [
     label: '请求总数',
     icon: Activity,
     formatter: (v: number) => v.toLocaleString(),
-    getValue: (s: any) => s.totalRequests,
-    getChange: (s: any) => s.requestChange,
+    getValue: (s) => s.totalRequests,
+    getChange: (s) => s.requestChange,
     changeLabel: '较上一周期',
   },
   {
@@ -38,7 +38,7 @@ const cards: KpiCardConfig[] = [
     label: '活跃模型',
     icon: Box,
     formatter: (v: number) => v.toString(),
-    getValue: (s: any) => s.activeModels,
+    getValue: (s) => s.activeModels,
     getChange: () => null,
     changeLabel: '全部模型运行正常',
   },
@@ -47,16 +47,16 @@ const cards: KpiCardConfig[] = [
     label: '平均响应时间',
     icon: Clock,
     formatter: (v: number) => `${v}s`,
-    getValue: (s: any) => s.avgResponseTime,
-    getChange: (s: any) => s.responseTimeChange,
+    getValue: (s) => s.avgResponseTime,
+    getChange: (s) => s.responseTimeChange,
     changeLabel: '较上一周期',
   },
 ];
 
 export const KPICards: React.FC = () => {
-  const stats = useStatsStore(s => s.stats);
-  const error = useStatsStore(s => s.statsError);
-  const fetchStats = useStatsStore(s => s.fetchStats);
+  const stats = useStatsStore((s) => s.stats);
+  const error = useStatsStore((s) => s.statsError);
+  const fetchStats = useStatsStore((s) => s.fetchStats);
   const [changedKeys, setChangedKeys] = useState<Set<string>>(new Set());
   const prevValues = useRef<Record<string, number>>({});
   const [showSkeleton, setShowSkeleton] = useState(true);
@@ -106,8 +106,13 @@ export const KPICards: React.FC = () => {
               <button
                 onClick={fetchStats}
                 style={{
-                  marginTop: 'var(--spacer-8)', cursor: 'pointer', border: 'none', background: 'transparent',
-                  color: 'var(--text-brand)', fontSize: 'var(--body-xs-font-size)', fontFamily: 'inherit',
+                  marginTop: 'var(--spacer-8)',
+                  cursor: 'pointer',
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-brand)',
+                  fontSize: 'var(--body-xs-font-size)',
+                  fontFamily: 'inherit',
                 }}
               >
                 <RefreshCw size={12} style={{ marginRight: 4, display: 'inline' }} />
@@ -159,9 +164,7 @@ export const KPICards: React.FC = () => {
         const Icon = card.icon;
         const value = card.getValue(stats);
         const change = card.getChange(stats);
-        const isUp = card.key === 'response'
-          ? (change != null && change <= 0)
-          : (change != null && change >= 0);
+        const isUp = card.key === 'response' ? change != null && change <= 0 : change != null && change >= 0;
         const trendDir = isUp ? 'up' : 'down';
         const trendColor = trendDir === 'up' ? 'var(--status-success-default)' : 'var(--status-error-default)';
         const isChanged = changedKeys.has(card.key);
@@ -238,9 +241,7 @@ export const KPICards: React.FC = () => {
               </FlexRow>
             ) : change != null ? (
               <FlexRow gap="var(--spacer-4)">
-                <span style={{ fontSize: 12, color: trendColor }}>
-                  {trendDir === 'up' ? '▲' : '▼'}
-                </span>
+                <span style={{ fontSize: 12, color: trendColor }}>{trendDir === 'up' ? '▲' : '▼'}</span>
                 <span
                   style={{
                     fontSize: 'var(--body-sm-font-size)',
@@ -248,7 +249,9 @@ export const KPICards: React.FC = () => {
                     color: trendColor,
                   }}
                 >
-                  {change >= 0 ? '+' : ''}{change}{card.key === 'response' ? 's' : '%'}
+                  {change >= 0 ? '+' : ''}
+                  {change}
+                  {card.key === 'response' ? 's' : '%'}
                 </span>
                 <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)' }}>
                   {card.changeLabel}
