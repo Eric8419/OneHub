@@ -200,23 +200,16 @@ curl http://127.0.0.1:8080/health
 </details>
 
 
-## 本地开发
+## 开发指南
 
 ```bash
-# 安装依赖
-pnpm install
-
-# 启动 Tauri 桌面开发模式
-pnpm tauri dev
-
-# 仅启动前端
-pnpm dev
-
-# 前端类型检查和构建
+# 前端类型检查
 pnpm typecheck
+
+# 前端构建
 pnpm build
 
-# 代码检查和格式化
+# 代码检查
 pnpm lint
 pnpm format:check
 
@@ -227,6 +220,8 @@ pnpm test
 cd src-tauri
 cargo check
 cargo test
+cargo clippy -- -D warnings
+cargo fmt --check
 ```
 
 ### 目录结构
