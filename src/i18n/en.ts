@@ -335,6 +335,12 @@ const en: Record<string, string> = {
   // Confirm dialog
   'confirm.exit.title': 'Exit Application',
   'confirm.exit.message': 'Are you sure you want to exit Melody Hub?',
+
+  // Window controls
+  'window.minimize': 'Minimize',
+  'window.maximize': 'Maximize',
+  'window.restore': 'Restore',
+  'window.close': 'Close',
 };
 
 export default en;

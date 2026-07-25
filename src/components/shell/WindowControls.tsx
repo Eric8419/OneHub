@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { useT } from '../../i18n';
 
 const isMac = (() => {
   if (typeof navigator === 'undefined') return false;
@@ -79,6 +80,7 @@ const WinBtn: React.FC<{
 
 const WinControls: React.FC = () => {
   const maximized = useMaximized();
+  const t = useT();
 
   const handleClick = (action: 'close' | 'minimize' | 'maximize') => {
     const win = getCurrentWindow();
@@ -95,12 +97,12 @@ const WinControls: React.FC = () => {
         height: '100%',
       }}
     >
-      <WinBtn onClick={() => handleClick('minimize')} ariaLabel="最小化" hoverColor="var(--bg-overlay-l2)">
+      <WinBtn onClick={() => handleClick('minimize')} ariaLabel={t('window.minimize')} hoverColor="var(--bg-overlay-l2)">
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
           <path d="M1 5H9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
         </svg>
       </WinBtn>
-      <WinBtn onClick={() => handleClick('maximize')} ariaLabel="最大化" hoverColor="var(--bg-overlay-l2)">
+      <WinBtn onClick={() => handleClick('maximize')} ariaLabel={maximized ? t('window.restore') : t('window.maximize')} hoverColor="var(--bg-overlay-l2)">
         {maximized ? (
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
             <rect x="1.5" y="3" width="5" height="5" stroke="currentColor" strokeWidth="1.1" fill="none" />
@@ -112,7 +114,7 @@ const WinControls: React.FC = () => {
           </svg>
         )}
       </WinBtn>
-      <WinBtn onClick={() => handleClick('close')} ariaLabel="关闭" hoverColor="#E81123" hoverText="#FFFFFF">
+      <WinBtn onClick={() => handleClick('close')} ariaLabel={t('window.close')} hoverColor="#E81123" hoverText="#FFFFFF">
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
           <path d="M1 1L9 9M9 1L1 9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
         </svg>

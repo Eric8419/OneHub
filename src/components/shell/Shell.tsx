@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { GradualBlur, ToastContainer } from '../ui';
-import { isMac, useWindowFilled } from './WindowControls';
+import { isMac, useWindowFilled, WindowControls } from './WindowControls';
 import { useT } from '../../i18n';
 
 export const Shell: React.FC = () => {
@@ -187,6 +187,23 @@ export const Shell: React.FC = () => {
             zIndex: 11,
           }}
         />
+
+        {/* Window control buttons (Windows/Linux only).
+            Positioned at the top-right, above the drag overlay so
+            minimize / maximize / close are always clickable. */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            zIndex: 12,
+            height: 32,
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <WindowControls />
+        </div>
       </div>
       <ToastContainer />
     </div>

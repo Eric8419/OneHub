@@ -340,6 +340,12 @@ const zh: Record<string, string> = {
   // Confirm dialog
   'confirm.exit.title': '退出应用',
   'confirm.exit.message': '确定要退出 Melody Hub 吗？',
+
+  // Window controls
+  'window.minimize': '最小化',
+  'window.maximize': '最大化',
+  'window.restore': '还原',
+  'window.close': '关闭',
 };
 
 export default zh;
