@@ -195,12 +195,6 @@ pnpm install
 pnpm tauri dev
 ```
 
-仅运行前端：
-
-```bash
-pnpm dev
-```
-
 ### 构建安装包
 
 ```bash
@@ -208,48 +202,6 @@ pnpm tauri build
 ```
 
 构建产物位于 `src-tauri/target/release/bundle/`。
-
-### CI 检查
-# 前端类型检查
-pnpm typecheck
-
-# 前端构建
-pnpm build
-
-# 代码检查
-pnpm lint
-pnpm format:check
-
-# 前端单元测试
-pnpm test
-
-# Rust 后端检查和测试
-cd src-tauri
-cargo check
-cargo test
-cargo clippy -- -D warnings
-cargo fmt --check
-```
-
-### 目录结构
-
-```text
-MelodyHub/
-├── src/                  # React 前端源码
-│   ├── components/        # Shell 与通用 UI 组件
-│   ├── i18n/              # 中英文文案
-│   ├── pages/             # Dashboard / ModelConfig / Settings
-│   ├── store/             # Zustand 状态管理
-│   └── types/             # 前端类型定义
-├── src-tauri/             # Tauri + Rust 后端
-│   ├── src/commands/      # Tauri command
-│   ├── src/proxy/         # 本地代理、路由、指标和适配器
-│   └── tauri.conf.json    # Tauri 应用配置
-├── docs/screenshots/      # README 截图、历史稿与调试截图
-├── public/                # 静态资源
-├── CHANGELOG.md           # 版本变更记录
-└── package.json           # 前端脚本和依赖
-```
 
 
 ## 数据与安全
