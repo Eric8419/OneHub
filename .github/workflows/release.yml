@@ -138,6 +138,29 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Extract changelog for this version
+        id: changelog
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.version) }}"
+          VERSION="${VERSION#v}"
+          # Extract section between "## VERSION" and the next "## " or end of file
+          BODY=$(awk -v ver="$VERSION" '
+            BEGIN { found=0 }
+            $0 ~ "^## " ver { found=1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md)
+          # Write to file to avoid escaping issues
+          echo "$BODY" > /tmp/changelog_body.md
+          # Also set as output (truncated if needed)
+          {
+            echo 'body<<EOF'
+            cat /tmp/changelog_body.md
+            echo
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and release with Tauri
         uses: tauri-apps/tauri-action@v1
         env:
@@ -149,6 +172,10 @@ jobs:
           releaseBody: |
             ## 更新说明 / Release Notes
 
+            ${{ steps.changelog.outputs.body }}
+
+            ---
+
             请查看下方资产下载安装对应平台的版本。
 
             | 平台 | 文件 |
@@ -158,10 +185,6 @@ jobs:
             | Windows (安装包) | `*_x64-setup.exe` |
             | Windows (便携版) | `*_x64-portable.zip` |
             | Linux | `*_amd64.deb` / `*.AppImage` |
-
-            ---
-
-            See the assets below to download and install this version.
           releaseDraft: false
           prerelease: false
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.version) }}
