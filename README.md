@@ -78,41 +78,6 @@ macOS 首次打开时如果提示"无法验证开发者"，请在系统设置 �
 http://127.0.0.1:8080
 ```
 
-### OpenAI 兼容调用
-
-```bash
-curl http://127.0.0.1:8080/v1/chat/completions \
-  -H "Authorization: Bearer <your-token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-4o",
-    "messages": [
-      { "role": "user", "content": "Hello from Melody Hub" }
-    ]
-  }'
-```
-
-流式响应：
-
-```bash
-curl http://127.0.0.1:8080/v1/chat/completions \
-  -H "Authorization: Bearer <your-token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-4o",
-    "messages": [
-      { "role": "user", "content": "Stream this response" }
-    ],
-    "stream": true
-  }'
-```
-
-健康检查：
-
-```bash
-curl http://127.0.0.1:8080/health
-```
-
 ### 支持的本地端点
 
 | 方法 | 路径 | 用途 |
