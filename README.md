@@ -42,49 +42,24 @@ Melody Hub 基于 Tauri、React 和 Rust 构建，用一个本地地址统一接
 
 ## 安装指南
 
+从 [GitHub Releases](https://github.com/Lhy723/MelodyHub/releases/latest) 下载对应平台的安装包：
+
+| 平台 | 文件 |
+|------|------|
+| macOS (Apple Silicon) | `MelodyHub_*_aarch64.dmg` |
+| macOS (Intel) | `MelodyHub_*_x64.dmg` |
+| Windows | `MelodyHub_*_x64-setup.exe` |
+| Linux | `melody-hub_*_amd64.deb` 或 `*.AppImage` |
+
+macOS 首次打开时如果提示"无法验证开发者"，请在系统设置 → 隐私与安全性中点击"仍要打开"。
+
 ### 环境要求
 
-- Node.js `^20.19.0 || >=22.12.0`
-- pnpm `>= 9`
-- Rust stable `>= 1.77`，建议通过 [rustup](https://rustup.rs/) 安装
 - Windows 10+，系统需具备 WebView2 Runtime
-- macOS（需安装 Xcode Command Line Tools）
-- Linux 需要安装 Tauri 系统依赖，如 `webkit2gtk-4.1`、`libappindicator` 等
+- macOS 10.15+
+- Linux 需安装 `webkit2gtk-4.1`、`libappindicator` 等系统依赖
 
-### 从源码运行
-
-```bash
-git clone https://github.com/Lhy723/MelodyHub.git
-cd MelodyHub
-
-pnpm install
-pnpm tauri dev
-```
-
-仅运行前端调试服务器：
-
-```bash
-pnpm dev
-```
-
-### 构建安装包
-
-```bash
-pnpm tauri build
-```
-
-构建产物默认位于：
-
-```text
-src-tauri/target/release/bundle/
-```
-
-Windows 会生成 MSI / NSIS 等安装包，具体目录通常为：
-
-```text
-src-tauri/target/release/bundle/msi/
-src-tauri/target/release/bundle/nsis/
-```
+从源码构建的环境要求见[开发指南](#开发指南)。
 
 
 ## 使用文档
@@ -202,7 +177,39 @@ curl http://127.0.0.1:8080/health
 
 ## 开发指南
 
+### 环境要求
+
+- Node.js `^20.19.0 || >=22.12.0`
+- pnpm `>= 9`
+- Rust stable `>= 1.77`，建议通过 [rustup](https://rustup.rs/) 安装
+- macOS 需安装 Xcode Command Line Tools
+- Linux 需安装 Tauri 系统依赖（`webkit2gtk-4.1`、`libappindicator` 等）
+
+### 从源码运行
+
 ```bash
+git clone https://github.com/Lhy723/MelodyHub.git
+cd MelodyHub
+
+pnpm install
+pnpm tauri dev
+```
+
+仅运行前端：
+
+```bash
+pnpm dev
+```
+
+### 构建安装包
+
+```bash
+pnpm tauri build
+```
+
+构建产物位于 `src-tauri/target/release/bundle/`。
+
+### CI 检查
 # 前端类型检查
 pnpm typecheck
 
