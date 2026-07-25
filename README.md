@@ -9,6 +9,7 @@
   <img src="https://github.com/Lhy723/MelodyHub/actions/workflows/ci.yml/badge.svg" alt="ci" />
   <img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square" alt="tauri" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square" alt="react" />
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license" />
 </p>
 
 <p align="center">
@@ -37,8 +38,6 @@ Melody Hub 基于 Tauri、React 和 Rust 构建，用一个本地地址统一接
 | 仪表盘 | 模型配置 | 设置 |
 |---|---|---|
 | <img src="./docs/screenshots/dashboard.png" alt="Melody Hub 仪表盘" width="280" /> | <img src="./docs/screenshots/models.png" alt="Melody Hub 模型配置" width="280" /> | <img src="./docs/screenshots/settings.png" alt="Melody Hub 设置" width="280" /> |
-
-截图源文件与历史稿的目录约定见 [docs/screenshots/README.md](./docs/screenshots/README.md)。
 
 
 ## 安装指南
@@ -94,8 +93,8 @@ src-tauri/target/release/bundle/nsis/
 
 1. 启动 Melody Hub。
 2. 在「API 供应商」中配置提供商，填写 Base URL、API Key 和模型列表。
-3. 在「模型配置」中创建聚合规则，将多个模型组合为可路由逻辑模型。
-4. 在「设置」中确认本地代理端口、认证令牌、并发数和超时配置。
+3. 在「模型配置」中查看和管理聚合规则，将多个模型组合为可路由逻辑模型。
+4. 在「应用设置」中确认本地代理端口、认证令牌、并发数和超时配置。
 5. 在其他客户端中把 API Base URL 指向 Melody Hub 本地代理，并使用设置页中的认证令牌。
 
 默认代理地址：
@@ -275,7 +274,7 @@ MelodyHub/
 
 ## 许可证
 
-MIT。当前仓库尚未包含 `LICENSE` 文件，公开发布前建议补充标准 MIT License 文本。
+本项目使用 [MIT License](./LICENSE)。
 
 
 ## Star 趋势
