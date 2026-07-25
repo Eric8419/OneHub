@@ -3,9 +3,8 @@ import { useProviderStore } from '../../store/providerStore';
 import { useAggregationStore } from '../../store/aggregationStore';
 import { AnimatedContent } from '../../components/ui';
 import { ModelInventory } from './ModelInventory';
-import { AggregationTable } from './AggregationTable';
-import { QuickAddPanel } from './QuickAddPanel';
-import { ProtocolMatrix } from './ProtocolMatrix';
+// import { AggregationTable } from './AggregationTable'; // 暂时隐藏
+// import { QuickAddPanel } from './QuickAddPanel'; // 暂时隐藏
 
 export const ModelConfig: React.FC = () => {
   const loadProviders = useProviderStore((s) => s.loadProviders);
@@ -49,17 +48,14 @@ export const ModelConfig: React.FC = () => {
         <ModelInventory />
       </AnimatedContent>
 
+      {/* Aggregation rules & quick add — temporarily hidden
       <AnimatedContent delay={160}>
-        <ProtocolMatrix />
-      </AnimatedContent>
-
-      <AnimatedContent delay={200}>
         <AggregationTable />
       </AnimatedContent>
-
-      <AnimatedContent delay={240}>
+      <AnimatedContent delay={200}>
         <QuickAddPanel />
       </AnimatedContent>
+      */}
     </div>
   );
 };

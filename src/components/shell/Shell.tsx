@@ -1,8 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { Header } from './Header';
-import { ToastContainer } from '../ui';
+import { GradualBlur, ToastContainer } from '../ui';
 import { isMac, useWindowFilled } from './WindowControls';
 
 const pageTitles: Record<string, string> = {
@@ -94,20 +93,81 @@ export const Shell: React.FC = () => {
           zIndex: 1,
         }}
       >
-        <Header title={pageTitle} />
         <main
           ref={mainRef}
           className="ds-shell__main"
           style={{
             flex: 1,
             minHeight: 0,
-            padding: 'var(--spacer-24)',
+            paddingTop: 0,
             overflowY: 'auto',
             scrollbarGutter: 'stable',
           }}
           key={location.pathname}
         >
-          <Outlet />
+          {/* Sticky header: blur + title, full 6rem draggable */}
+          <div
+            data-tauri-drag-region
+            style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 10,
+              height: '6rem',
+            }}
+          >
+            {/* Gradual blur background */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                pointerEvents: 'none',
+              }}
+              aria-hidden
+            >
+              <GradualBlur
+                target="parent"
+                position="top"
+                height="6rem"
+                strength={2}
+                divCount={6}
+                curve="bezier"
+                opacity={1}
+                zIndex={0}
+              />
+            </div>
+
+            {/* Page title */}
+            <div
+              style={{
+                position: 'relative',
+                zIndex: 1,
+                padding: 'var(--spacer-24) var(--spacer-24) var(--spacer-16)',
+              }}
+            >
+              <h1
+                style={{
+                  fontFamily: 'var(--heading-md-font-family)',
+                  fontSize: 'var(--heading-md-font-size)',
+                  fontWeight: 700,
+                  lineHeight: 'var(--heading-md-line-height)',
+                  color: 'var(--text-default)',
+                  margin: 0,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                }}
+              >
+                {pageTitle}
+              </h1>
+            </div>
+          </div>
+
+          {/* Page content */}
+          <div style={{ padding: '0 var(--spacer-24) var(--spacer-24)' }}>
+            <Outlet />
+          </div>
         </main>
       </div>
       <ToastContainer />

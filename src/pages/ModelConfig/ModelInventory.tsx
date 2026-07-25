@@ -206,6 +206,7 @@ export const ModelInventory: React.FC = () => {
               <div
                 style={{
                   cursor: 'pointer',
+                  height: '100%',
                 }}
                 onClick={() => navigate(`/models/${encodeURIComponent(entry.name)}`)}
                 onMouseEnter={(e) => {

@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.1.4 (2026-07-25)
+
+### 新增
+- Responses 协议支持：新增 `/v1/responses` 端点，兼容 OpenAI Responses API
+- Anthropic 协议支持：新增 `/v1/messages` 端点，支持 Anthropic Messages API
+- 页面标题栏恢复，添加渐进模糊效果（GradualBlur），标题滚动时悬浮固定
+- 全局禁用文本选中，仅保留输入框等可编辑区域的选中能力
+- 启动代理按钮添加 StarBorder 光晕动效
+- 关于页新增项目链接卡片（帮助文档、更新日志、官方网站、意见反馈）
+
+### 变更
+- 仪表盘时间范围 tab 调整到 KPI 卡片上方
+- 模型分布环形图和近期调用记录现在按时间范围筛选
+- 供应商卡片点击直接进入详情页，移除箭头按钮
+- 模型配置页隐藏协议转换能力、模型聚合规则和添加聚合功能
+- 模型卡片 hover 光晕效果范围调整
+- Dashboard 空状态文案优化
+
+### 修复
+- 修复 Responses 协议流式响应中 `msg_melody` text part 缺失的问题
+- 修复近期调用记录延迟列无数据显示的问题
+- 修复设置页背景色与其他页面有色差的问题
+- 修复检查更新按钮 loading 动画不旋转的问题
+- 修复检查更新时动画阻塞的问题
+- 修复模型颜色显示问题（GPT/DeepSeek/Qwen/Claude 更新为官方品牌色）
+
 ## 0.1.0 (2026-07-03)
 
 Initial development release.

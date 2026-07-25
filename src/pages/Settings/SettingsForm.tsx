@@ -303,10 +303,7 @@ export const SettingsForm: React.FC = () => {
   }, []);
 
   const handleCheckUpdates = async () => {
-    flushSync(() => {
-      setChecking(true);
-    });
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    setChecking(true);
     try {
       const meta = await desktopApi.checkForUpdates();
       if (!meta) {

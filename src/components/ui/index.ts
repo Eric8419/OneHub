@@ -25,3 +25,5 @@ export type { EChartProps, EChartsOption } from './EChart';
 export { getCssVar, useThemeVersion } from './EChart';
 export { ProviderLogo } from './ProviderLogo';
 export type { ProviderLogoProps } from './ProviderLogo';
+export { GradualBlur } from './GradualBlur';
+export { StarBorder } from './StarBorder';

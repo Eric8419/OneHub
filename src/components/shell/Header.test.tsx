@@ -9,7 +9,7 @@ import { Header } from './Header';
 describe('Header menu motion', () => {
   it('uses a top-right origin and motion for pointer interaction', async () => {
     const user = userEvent.setup();
-    render(<Header title="Dashboard" />);
+    render(<Header />);
 
     await user.click(screen.getByRole('button', { name: 'U' }));
     const menu = screen.getByRole('menu');
@@ -24,7 +24,7 @@ describe('Header menu motion', () => {
 
   it.each(['Enter', ' '])('opens instantly with the %s key', async (key) => {
     const user = userEvent.setup();
-    render(<Header title="Dashboard" />);
+    render(<Header />);
 
     const trigger = screen.getByRole('button', { name: 'U' });
     trigger.focus();
@@ -38,7 +38,7 @@ describe('Header menu motion', () => {
 
   it('closes instantly with Escape and returns focus to the trigger', async () => {
     const user = userEvent.setup();
-    render(<Header title="Dashboard" />);
+    render(<Header />);
 
     const trigger = screen.getByRole('button', { name: 'U' });
     await user.click(trigger);

@@ -124,8 +124,8 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
       <ProxyControl />
-      <KPICards />
       <TimeRangeTabs />
+      <KPICards />
       <div
         className="dashboard-chart-grid"
         style={{

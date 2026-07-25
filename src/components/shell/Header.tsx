@@ -6,11 +6,10 @@ import { Info, LogOut } from 'lucide-react';
 import { WindowControls } from './WindowControls';
 
 interface HeaderProps {
-  title: string;
   actions?: React.ReactNode;
 }
 
-export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
+export const Header: React.FC<HeaderProps> = ({ actions }) => {
   const t = useT();
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuMotionEnabled, setMenuMotionEnabled] = useState(false);
@@ -75,27 +74,10 @@ export const Header: React.FC<HeaderProps> = ({ title, actions }) => {
         zIndex: 10,
       }}
     >
-      {/* Page title */}
-      <h1
-        className="ds-shell__page-title"
+      <div
         data-tauri-drag-region
-        style={{
-          fontFamily: 'var(--heading-md-font-family)',
-          fontSize: 'var(--heading-md-font-size)',
-          fontWeight: 'var(--heading-md-font-weight)',
-          lineHeight: 'var(--heading-md-line-height)',
-          color: 'var(--text-default)',
-          margin: 0,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          flex: 1,
-          minWidth: 0,
-          WebkitUserSelect: 'none',
-        }}
-      >
-        {title}
-      </h1>
+        style={{ flex: 1, minWidth: 0, height: '100%' }}
+      />
       <div
         className="ds-shell__header-actions"
         style={{

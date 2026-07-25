@@ -6,7 +6,7 @@ export const Settings: React.FC = () => {
   return (
     <div
       style={{
-        background: 'var(--bg-base-secondary)',
+        background: 'var(--bg-base-default)',
         minHeight: 'calc(100vh - var(--header-height, 0px))',
         margin: '-24px -24px -24px',
         padding: '24px 28px 48px',

@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useSettingsStore } from '../../store/settingsStore';
 import { desktopApi } from '../../lib/desktopApi';
-import { toast, Counter } from '../../components/ui';
+import { toast, Counter, StarBorder } from '../../components/ui';
 import Prism from '../../components/ui/Prism';
 import { Play, Square, Copy, Check, Loader2, Cpu } from 'lucide-react';
 
@@ -417,8 +417,13 @@ export const ProxyControl: React.FC = () => {
               </div>
             </div>
 
-            {/* Toggle button — moved to top right */}
-            <motion.button
+            {/* Toggle button — with StarBorder glow when stopped */}
+            <StarBorder
+              color={running ? 'rgba(248,113,113,0.40)' : '#4ADE80'}
+              speed="5s"
+              thickness={2}
+            >
+              <motion.button
               onClick={handleToggle}
               disabled={toggling}
               initial={false}
@@ -516,6 +521,7 @@ export const ProxyControl: React.FC = () => {
                 )}
               </AnimatePresence>
             </motion.button>
+            </StarBorder>
           </div>
 
           {/* ── 2x2 grid: OpenAI / Anthropic / Responses / 令牌 ── */}

@@ -96,8 +96,13 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
         opacity: isDisabled ? 0.7 : 1,
         filter: isDisabled ? 'saturate(0.7)' : 'none',
         transition: 'opacity var(--transition-normal, 0.2s ease), filter var(--transition-normal, 0.2s ease)',
+        cursor: 'pointer',
       }}
     >
+      <div
+        onClick={() => navigate(`/providers/${provider.id}`)}
+        style={{ height: '100%' }}
+      >
       {/* Header */}
       <div
         className="mc-provider-card__header"
@@ -157,7 +162,10 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
             className="mc-icon-btn"
             aria-label={isDisabled ? '启用提供商' : '禁用提供商'}
             title={isDisabled ? '启用' : '禁用'}
-            onClick={handleToggleEnabled}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleEnabled();
+            }}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -184,38 +192,12 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
           </button>
           <button
             className="mc-icon-btn"
-            aria-label="供应商详情"
-            title="详情"
-            onClick={() => navigate(`/providers/${provider.id}`)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 28,
-              height: 28,
-              borderRadius: 'var(--radius-6)',
-              border: 'none',
-              background: 'transparent',
-              color: 'var(--icon-tertiary)',
-              cursor: 'pointer',
-              transition: 'background var(--transition-fast, 0.12s ease), color var(--transition-fast, 0.12s ease)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--bg-overlay-l1)';
-              e.currentTarget.style.color = 'var(--icon-default)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.color = 'var(--icon-tertiary)';
-            }}
-          >
-            <ChevronRight size={14} />
-          </button>
-          <button
-            className="mc-icon-btn"
             aria-label="编辑提供商"
             title="编辑"
-            onClick={() => navigate(`/providers/${provider.id}/edit`)}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/providers/${provider.id}/edit`);
+            }}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -244,7 +226,10 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
             className="mc-icon-btn"
             aria-label="删除提供商"
             title="删除"
-            onClick={() => setConfirmDelete(true)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setConfirmDelete(true);
+            }}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -319,7 +304,10 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
               </span>
               <button
                 title="复制 API Key"
-                onClick={handleCopyKey}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopyKey();
+                }}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -346,7 +334,10 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
             </div>
           ) : (
             <span
-              onClick={() => navigate(`/providers/${provider.id}/edit`)}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/providers/${provider.id}/edit`);
+              }}
               style={{
                 fontSize: 'var(--body-sm-font-size)',
                 color: 'var(--text-brand)',
@@ -412,7 +403,10 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
       <div style={{ height: 1, background: 'var(--border-neutral-l1)', margin: '0 var(--spacer-16)' }} />
       <div
         className="mc-provider-card__toggle"
-        onClick={() => setExpanded(!expanded)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setExpanded(!expanded);
+        }}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -512,6 +506,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
         onConfirm={handleDelete}
         onCancel={() => setConfirmDelete(false)}
       />
+      </div>
     </SpotlightCard>
   );
 };
