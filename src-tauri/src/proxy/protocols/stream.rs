@@ -881,7 +881,8 @@ impl StreamConverter {
                 if value.pointer("/delta/type").and_then(Value::as_str)
                     == Some("input_json_delta") =>
             {
-                let block_index = value.get("index").and_then(Value::as_u64).unwrap_or(0);
+                let block_index =
+                    value.get("index").and_then(Value::as_u64).unwrap_or(0);
                 let item_id = self
                     .anthropic_tool_item_ids
                     .get(&block_index)
@@ -1633,7 +1634,8 @@ mod tests {
             "data: {\"type\":\"message_stop\"}\n\n"
         );
 
-        let output = String::from_utf8(converter.push(input.as_bytes()).unwrap()).unwrap();
+        let output =
+            String::from_utf8(converter.push(input.as_bytes()).unwrap()).unwrap();
 
         // 验证事件顺序
         let created_pos = output.find("response.created").unwrap();
