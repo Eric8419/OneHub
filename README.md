@@ -196,10 +196,6 @@ pnpm tauri build
 本项目使用 [MIT License](./LICENSE)。
 
 
-## Star 趋势
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Lhy723/MelodyHub&type=Date)](https://star-history.com/#Lhy723/MelodyHub&Date)
-
 
 <p align="center">
   <sub>Built with Tauri, React and Rust by <a href="https://github.com/Lhy723">Lhy723</a></sub>
