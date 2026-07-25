@@ -93,8 +93,8 @@ src-tauri/target/release/bundle/nsis/
 ### 快速上手
 
 1. 启动 Melody Hub。
-2. 在「模型配置」中添加提供商，填写 Base URL、API Key 和模型列表。
-3. 创建聚合规则，选择路由策略和参与路由的模型。
+2. 在「API 供应商」中配置提供商，填写 Base URL、API Key 和模型列表。
+3. 在「模型配置」中创建聚合规则，将多个模型组合为可路由逻辑模型。
 4. 在「设置」中确认本地代理端口、认证令牌、并发数和超时配置。
 5. 在其他客户端中把 API Base URL 指向 Melody Hub 本地代理，并使用设置页中的认证令牌。
 
