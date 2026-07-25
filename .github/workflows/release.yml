@@ -18,8 +18,70 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            xdg-utils \
+            libgtk-3-dev \
+            libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Frontend type check
+        run: pnpm run typecheck
+
+      - name: Frontend lint
+        run: pnpm run lint
+
+      - name: Cargo check
+        run: cargo check
+        working-directory: src-tauri
+
+      - name: Cargo clippy
+        run: cargo clippy -- -D warnings
+        working-directory: src-tauri
+
+      - name: Check formatting
+        run: cargo fmt --check
+        working-directory: src-tauri
+
   release:
     name: Build (${{ matrix.args || matrix.platform }})
+    needs: lint
     strategy:
       fail-fast: false
       matrix:
