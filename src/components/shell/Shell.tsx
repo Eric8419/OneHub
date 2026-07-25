@@ -3,20 +3,21 @@ import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { GradualBlur, ToastContainer } from '../ui';
 import { isMac, useWindowFilled } from './WindowControls';
-
-const pageTitles: Record<string, string> = {
-  '/dashboard': '仪表盘',
-  '/providers': 'API 供应商',
-  '/models': '模型配置',
-  '/settings': '应用设置',
-};
+import { useT } from '../../i18n';
 
 export const Shell: React.FC = () => {
+  const t = useT();
   const navigate = useNavigate();
   const location = useLocation();
   const pathSegments = location.pathname.split('/').filter(Boolean);
   const activeKey = pathSegments[0] || 'dashboard';
   const rootPath = pathSegments[0] ? `/${pathSegments[0]}` : '/';
+  const pageTitles: Record<string, string> = {
+    '/dashboard': t('shell.dashboard'),
+    '/providers': t('shell.providers'),
+    '/models': t('shell.models'),
+    '/settings': t('shell.settings'),
+  };
   const pageTitle = pageTitles[location.pathname] || pageTitles[rootPath] || 'Melody Hub';
   const mainRef = useRef<HTMLElement>(null);
   const windowFilled = useWindowFilled();
@@ -99,20 +100,21 @@ export const Shell: React.FC = () => {
           style={{
             flex: 1,
             minHeight: 0,
-            paddingTop: 0,
             overflowY: 'auto',
             scrollbarGutter: 'stable',
           }}
           key={location.pathname}
         >
-          {/* Sticky header: blur + title, full 6rem draggable */}
+          {/* Visual layer: sticky header with blur.
+              pointer-events: none so mouse events pass through to the drag
+              overlay above. */}
           <div
-            data-tauri-drag-region
             style={{
               position: 'sticky',
               top: 0,
               zIndex: 10,
               height: '6rem',
+              pointerEvents: 'none',
             }}
           >
             {/* Gradual blur background */}
@@ -120,7 +122,6 @@ export const Shell: React.FC = () => {
               style={{
                 position: 'absolute',
                 inset: 0,
-                pointerEvents: 'none',
               }}
               aria-hidden
             >
@@ -169,6 +170,23 @@ export const Shell: React.FC = () => {
             <Outlet />
           </div>
         </main>
+
+        {/* Interaction layer: transparent drag overlay outside the scrollable
+            main. Positioned absolutely to cover the same 6rem area as the
+            sticky header. Since it is not inside an overflow:auto container,
+            WebKit hit-testing works reliably. The visual layer below has
+            pointer-events: none so all mouse events land here. */}
+        <div
+          data-tauri-drag-region
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '6rem',
+            zIndex: 11,
+          }}
+        />
       </div>
       <ToastContainer />
     </div>

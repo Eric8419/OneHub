@@ -1,3 +1,4 @@
+import { useT } from '../../i18n';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProviderStore } from '../../store/providerStore';
@@ -218,6 +219,7 @@ const labelStyle: React.CSSProperties = {
 // ── Page Component ──────────────────────────────────────────
 
 export const AddProviderPage: React.FC = () => {
+  const t = useT();
   const navigate = useNavigate();
   const addProvider = useProviderStore((s) => s.addProvider);
 
@@ -305,9 +307,9 @@ export const AddProviderPage: React.FC = () => {
       label: p.label,
       group: groupOf(p.id),
     }));
-    opts.push({ value: 'custom', label: '自定义' });
+    opts.push({ value: 'custom', label: t('providers.add.custom') });
     return opts;
-  }, [profiles]);
+  }, [profiles, t]);
 
   // ── Model management ─────────────────────────────────────
 
@@ -541,7 +543,7 @@ export const AddProviderPage: React.FC = () => {
               margin: 0,
             }}
           >
-            添加提供商
+            {t('providers.add.save')}
           </h2>
           <p
             style={{
@@ -550,7 +552,7 @@ export const AddProviderPage: React.FC = () => {
               margin: 'var(--spacer-4) 0 0 0',
             }}
           >
-            按步骤配置 API 提供商
+            {t('providers.subtitle')}
           </p>
         </div>
       </div>
@@ -571,7 +573,7 @@ export const AddProviderPage: React.FC = () => {
           onFinalStepCompleted={handleFinish}
           backButtonText="返回"
           nextButtonText="下一步"
-          completeButtonText={saving ? '添加中...' : finishError ? '重试添加' : '完成添加'}
+          completeButtonText={saving ? t('providers.add.saving') : finishError ? '重试添加' : '完成添加'}
           disableStepIndicators
           nextButtonProps={{ disabled: !canProceed || saving }}
           backButtonProps={currentStep === 1 ? { style: { display: 'none' } } : undefined}
@@ -587,7 +589,7 @@ export const AddProviderPage: React.FC = () => {
               }}
             >
               <div style={fieldStyle}>
-                <label style={labelStyle}>快速选择</label>
+                <label style={labelStyle}>{t('providers.add.selectType')}</label>
                 <Dropdown
                   options={profileOptions}
                   value={selectedProfile}
@@ -610,7 +612,7 @@ export const AddProviderPage: React.FC = () => {
               </div>
               <div style={fieldStyle}>
                 <label style={labelStyle}>
-                  提供商名称 <span style={{ color: 'var(--status-error-default)' }}>*</span>
+                  {t('providers.add.name')} <span style={{ color: 'var(--status-error-default)' }}>*</span>
                 </label>
                 <input
                   ref={nameInputRef}
@@ -650,7 +652,7 @@ export const AddProviderPage: React.FC = () => {
             >
               <div style={fieldStyle}>
                 <label style={labelStyle}>
-                  API Base URL <span style={{ color: 'var(--status-error-default)' }}>*</span>
+                  {t('providers.add.apiBase')} <span style={{ color: 'var(--status-error-default)' }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -677,7 +679,7 @@ export const AddProviderPage: React.FC = () => {
 
               <div style={fieldStyle}>
                 <label style={labelStyle}>
-                  API Key <span style={{ color: 'var(--status-error-default)' }}>*</span>
+                  {t('providers.add.apiKey')} <span style={{ color: 'var(--status-error-default)' }}>*</span>
                 </label>
                 <input
                   type="password"
@@ -700,7 +702,7 @@ export const AddProviderPage: React.FC = () => {
               </div>
 
               <div style={fieldStyle}>
-                <label style={labelStyle}>API 协议类型</label>
+                <label style={labelStyle}>{t('providers.add.protocol')}</label>
                 <Dropdown options={API_FLAVOR_OPTIONS} value={apiFlavor} onChange={setApiFlavor} size="sm" />
                 <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
                   选择适配协议，Anthropic API 需选 Anthropic
@@ -718,7 +720,7 @@ export const AddProviderPage: React.FC = () => {
                   }}
                 >
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-2)' }}>
-                    <label style={labelStyle}>使用独立代理</label>
+                    <label style={labelStyle}>{t('providers.add.proxySettings')}</label>
                     <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
                       为该提供商单独配置 HTTP/SOCKS 代理
                     </span>
@@ -900,7 +902,7 @@ export const AddProviderPage: React.FC = () => {
                 }}
               >
                 <div style={fieldStyle}>
-                  <label style={labelStyle}>手动添加模型</label>
+                  <label style={labelStyle}>{t('providers.form.manualAddModel')}</label>
                   <input
                     type="text"
                     placeholder="例如: gpt-4o, claude-3-5-sonnet-20241022"
@@ -935,14 +937,14 @@ export const AddProviderPage: React.FC = () => {
                     fontFamily: 'inherit',
                   }}
                 >
-                  <Plus size={14} /> 添加
+                  <Plus size={14} /> {t('providers.form.add')}
                 </button>
               </div>
 
               {/* Model list with alias mapping */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-8)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={labelStyle}>已添加模型</span>
+                  <span style={labelStyle}>{t('providers.form.addedModels')}</span>
                   <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
                     {models.length > 0 ? `${models.length} 个模型` : '暂无模型'}
                   </span>
@@ -1067,7 +1069,7 @@ export const AddProviderPage: React.FC = () => {
                             }}
                           >
                             <Eye size={14} style={{ color: 'var(--icon-tertiary)' }} />
-                            <span>视觉</span>
+                            <span>{t('capability.vision')}</span>
                             <input
                               type="checkbox"
                               checked={Boolean(model.supportsVision)}
@@ -1085,7 +1087,7 @@ export const AddProviderPage: React.FC = () => {
                             }}
                           >
                             <Brain size={14} style={{ color: 'var(--icon-tertiary)' }} />
-                            <span>思考</span>
+                            <span>{t('capability.reasoning')}</span>
                             <input
                               type="checkbox"
                               checked={Boolean(model.supportsReasoning)}
@@ -1141,7 +1143,7 @@ export const AddProviderPage: React.FC = () => {
                             }}
                           >
                             <Wrench size={14} style={{ color: 'var(--icon-tertiary)' }} />
-                            <span>工具调用</span>
+                            <span>{t('capability.tools')}</span>
                             <input
                               type="checkbox"
                               checked={Boolean(model.supportsToolCalls)}
@@ -1159,7 +1161,7 @@ export const AddProviderPage: React.FC = () => {
                             }}
                           >
                             <Braces size={14} style={{ color: 'var(--icon-tertiary)' }} />
-                            <span>JSON 模式</span>
+                            <span>{t('capability.json')}</span>
                             <input
                               type="checkbox"
                               checked={Boolean(model.supportsJsonMode)}
@@ -1263,7 +1265,7 @@ export const AddProviderPage: React.FC = () => {
                       alignItems: 'flex-start',
                     }}
                   >
-                    <span style={{ fontWeight: 'var(--font-weight-medium)' }}>模型映射</span>
+                    <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{t('providers.form.modelMapping')}</span>
                     <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
                       将客户端请求的模型名映射到上游实际模型名（支持通配符 *）
                     </span>
@@ -1460,19 +1462,19 @@ export const AddProviderPage: React.FC = () => {
                 >
                   {testing ? (
                     <>
-                      <Loader2 size={16} style={{ animation: 'spin 0.6s linear infinite' }} /> 测试中...
+                      <Loader2 size={16} style={{ animation: 'spin 0.6s linear infinite' }} /> {t('providers.status.testing')}
                     </>
                   ) : testResult === 'success' ? (
-                    <>
-                      <Check size={16} /> 连接成功
-                    </>
-                  ) : testResult === 'fail' ? (
-                    <>
-                      <RefreshCw size={16} /> 重新测试
-                    </>
-                  ) : (
-                    <>测试连接</>
-                  )}
+                      <>
+                        <Check size={16} /> {t('providers.status.connected')}
+                      </>
+                    ) : testResult === 'fail' ? (
+                      <>
+                        <RefreshCw size={16} /> 重新测试
+                      </>
+                    ) : (
+                      <>测试连接</>
+                    )}
                 </button>
 
                 {testResult === 'success' && (
@@ -1617,7 +1619,7 @@ export const AddProviderPage: React.FC = () => {
                       color: testResult === 'success' ? 'var(--status-success-default)' : 'var(--status-alert-default)',
                     }}
                   >
-                    {testResult === 'success' ? '已连接' : '未测试'}
+                    {testResult === 'success' ? t('providers.status.connected') : '未测试'}
                   </span>
                 </div>
               </div>

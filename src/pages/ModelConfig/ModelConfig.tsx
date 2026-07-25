@@ -3,10 +3,12 @@ import { useProviderStore } from '../../store/providerStore';
 import { useAggregationStore } from '../../store/aggregationStore';
 import { AnimatedContent } from '../../components/ui';
 import { ModelInventory } from './ModelInventory';
+import { useT } from '../../i18n';
 // import { AggregationTable } from './AggregationTable'; // 暂时隐藏
 // import { QuickAddPanel } from './QuickAddPanel'; // 暂时隐藏
 
 export const ModelConfig: React.FC = () => {
+  const t = useT();
   const loadProviders = useProviderStore((s) => s.loadProviders);
   const loadedProviders = useProviderStore((s) => s.loaded);
   const loadAggregations = useAggregationStore((s) => s.loadAggregations);
@@ -39,7 +41,7 @@ export const ModelConfig: React.FC = () => {
             margin: 0,
           }}
         >
-          管理对外暴露的模型映射
+          {t('models.subtitle')}
         </p>
       </div>
 

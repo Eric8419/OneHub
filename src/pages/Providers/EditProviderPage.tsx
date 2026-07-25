@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useProviderStore } from '../../store/providerStore';
+import { useT } from '../../i18n';
 import { ProviderLogo } from '../../components/ui/ProviderLogo';
 import { Tabs } from '../../components/ui/Tabs';
 import { Button } from '../../components/ui/Button';
@@ -16,12 +17,6 @@ import type { Model, Provider, ProviderProxyConfig } from '../../types/provider'
 
 type TabKey = 'basic' | 'models' | 'mappings' | 'proxy';
 
-const TAB_TABS = [
-  { key: 'basic', label: '基本信息' },
-  { key: 'models', label: '模型管理' },
-  { key: 'mappings', label: '模型映射' },
-  { key: 'proxy', label: '代理设置' },
-];
 
 const headerInputStyle: React.CSSProperties = {
   fontSize: 'var(--title-md-font-size)',
@@ -40,6 +35,7 @@ const headerInputStyle: React.CSSProperties = {
 type SaveState = 'saved' | 'saving' | 'error';
 
 export const EditProviderPage: React.FC = () => {
+  const t = useT();
   const navigate = useNavigate();
   const { providerId } = useParams<{ providerId: string }>();
   const { providers, updateProvider, removeProvider } = useProviderStore();
@@ -56,6 +52,13 @@ export const EditProviderPage: React.FC = () => {
 
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const formInitialized = useRef(false);
+
+  const TAB_TABS = [
+    { key: 'basic' as TabKey, label: t('providers.form.basicInfo') },
+    { key: 'models' as TabKey, label: t('providers.form.modelManagement') },
+    { key: 'mappings' as TabKey, label: t('providers.form.modelMapping') },
+    { key: 'proxy' as TabKey, label: t('providers.form.proxySettings') },
+  ];
 
   useEffect(() => {
     if (!provider) return;
@@ -251,11 +254,11 @@ export const EditProviderPage: React.FC = () => {
             <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)' }}>
               {
                 {
-                  connected: '已连接',
-                  error: '连接失败',
-                  testing: '测试中',
+                  connected: t('providers.status.connected'),
+                  error: t('providers.status.error'),
+                  testing: t('providers.status.testing'),
                   configuring: '未测试',
-                  disabled: '已禁用',
+                  disabled: t('providers.status.disabled'),
                 }[form.status]
               }
             </span>
@@ -272,13 +275,13 @@ export const EditProviderPage: React.FC = () => {
             {saveStateText}
           </span>
           <Button variant="secondary" size="sm" icon={RefreshCw} loading={testing} onClick={handleTestConnection}>
-            测试连接
+            {t('providers.status.testing')}
           </Button>
           <Button variant="secondary" size="sm" icon={Save} onClick={doAutoSave}>
-            保存
+            {t('common.save')}
           </Button>
           <Button variant="secondary" size="sm" icon={Trash2} onClick={() => setShowDeleteConfirm(true)}>
-            删除
+            {t('models.delete')}
           </Button>
         </div>
         <Tabs

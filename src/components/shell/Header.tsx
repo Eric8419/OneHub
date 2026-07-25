@@ -234,8 +234,8 @@ export const Header: React.FC<HeaderProps> = ({ actions }) => {
       {/* Exit confirmation dialog */}
       <ConfirmDialog
         open={confirmExit}
-        title="退出应用"
-        message="确定要退出 Melody Hub 吗？所有运行中的代理将会停止。"
+        title={t('confirm.exit.title')}
+        message={t('confirm.exit.message')}
         confirmLabel="退出"
         variant="danger"
         onConfirm={handleConfirmExit}

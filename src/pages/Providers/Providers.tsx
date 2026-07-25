@@ -5,8 +5,10 @@ import { desktopApi, type ProviderHealthSnapshot } from '../../lib/desktopApi';
 import { AnimatedContent, Card } from '../../components/ui';
 import { ProviderCard } from './ProviderCard';
 import { Plus, Cpu } from 'lucide-react';
+import { useT } from '../../i18n';
 
 export const Providers: React.FC = () => {
+  const t = useT();
   const navigate = useNavigate();
   const providers = useProviderStore((s) => s.providers);
   const loadProviders = useProviderStore((s) => s.loadProviders);
@@ -60,7 +62,7 @@ export const Providers: React.FC = () => {
             margin: 0,
           }}
         >
-          管理 API 提供商的连接、凭据和模型列表
+          {t('providers.subtitle')}
         </p>
         <button
           className="mc-btn mc-btn--primary"
@@ -82,7 +84,7 @@ export const Providers: React.FC = () => {
           }}
         >
           <Plus size={16} />
-          添加提供商
+          {t('providers.addProvider')}
         </button>
       </div>
 
@@ -102,9 +104,9 @@ export const Providers: React.FC = () => {
             >
               <Cpu size={40} style={{ opacity: 0.3 }} />
               <span style={{ fontSize: 'var(--body-base-font-size)', color: 'var(--text-secondary)' }}>
-                暂无 API 提供商
+                {t('providers.empty.title')}
               </span>
-              <span style={{ fontSize: 'var(--body-sm-font-size)' }}>点击右上角「添加提供商」开始配置</span>
+              <span style={{ fontSize: 'var(--body-sm-font-size)' }}>{t('providers.empty.desc')}</span>
             </div>
           </Card>
         </AnimatedContent>

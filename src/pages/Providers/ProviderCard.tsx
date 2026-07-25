@@ -1,3 +1,4 @@
+import { useT } from '../../i18n';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProviderStore } from '../../store/providerStore';
@@ -6,38 +7,41 @@ import type { ProviderHealthSnapshot } from '../../lib/desktopApi';
 import { ConfirmDialog, SpotlightCard, Tag, toast, ProviderLogo } from '../../components/ui';
 import { ChevronRight, Pencil, Trash2, Bot, Copy, Power, PowerOff, Loader2 } from 'lucide-react';
 
-const describeModelCapabilities = (model: Model) => {
+const describeModelCapabilities = (model: Model, t: ReturnType<typeof useT>) => {
   const tags: string[] = [];
   if (model.contextWindow) tags.push(`${model.contextWindow.toLocaleString()} ctx`);
   if (model.maxOutputTokens) tags.push(`${model.maxOutputTokens.toLocaleString()} out`);
-  if (model.supportsVision) tags.push('视觉');
-  if (model.supportsReasoning) tags.push('思考');
-  if (model.supportsReasoningEffort) tags.push('强度');
-  if (model.supportsToolCalls) tags.push('工具');
-  if (model.supportsJsonMode) tags.push('JSON');
+  if (model.supportsVision) tags.push(t('capability.vision'));
+  if (model.supportsReasoning) tags.push(t('capability.reasoning'));
+  if (model.supportsReasoningEffort) tags.push(t('capability.effort'));
+  if (model.supportsToolCalls) tags.push(t('capability.tools'));
+  if (model.supportsJsonMode) tags.push(t('capability.json'));
   return tags;
 };
 
-const STATUS_CONFIG: Record<
+const getStatusConfig = (
+  t: ReturnType<typeof useT>,
+): Record<
   string,
   { tagVariant: 'green' | 'orange' | 'danger' | 'neutral'; label: string; cardStatus: string }
-> = {
-  connected: { tagVariant: 'green', label: '已连接', cardStatus: 'normal' },
-  configuring: { tagVariant: 'orange', label: '配置中', cardStatus: 'unconfigured' },
-  error: { tagVariant: 'danger', label: '连接失败', cardStatus: 'failed' },
-  disabled: { tagVariant: 'neutral', label: '已禁用', cardStatus: 'disabled' },
-  testing: { tagVariant: 'orange', label: '测试中', cardStatus: 'testing' },
+> => ({
+  connected: { tagVariant: 'green', label: t('providers.status.connected'), cardStatus: 'normal' },
+  configuring: { tagVariant: 'orange', label: t('providers.status.configuring'), cardStatus: 'unconfigured' },
+  error: { tagVariant: 'danger', label: t('providers.status.error'), cardStatus: 'failed' },
+  disabled: { tagVariant: 'neutral', label: t('providers.status.disabled'), cardStatus: 'disabled' },
+  testing: { tagVariant: 'orange', label: t('providers.status.testing'), cardStatus: 'testing' },
   // Health-driven states (override provider.status Tag when not healthy)
-  rate_limited: { tagVariant: 'orange', label: '限流中', cardStatus: 'testing' },
-  unhealthy: { tagVariant: 'danger', label: '熔断中', cardStatus: 'failed' },
-  auth_error: { tagVariant: 'danger', label: '认证失败', cardStatus: 'failed' },
-};
+  rate_limited: { tagVariant: 'orange', label: t('providers.status.rateLimited'), cardStatus: 'testing' },
+  unhealthy: { tagVariant: 'danger', label: t('providers.status.circuitOpen'), cardStatus: 'failed' },
+  auth_error: { tagVariant: 'danger', label: t('providers.status.authFailed'), cardStatus: 'failed' },
+});
 
 export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealthSnapshot }> = ({
   providerId,
   health,
 }) => {
   const navigate = useNavigate();
+  const t = useT();
   const provider = useProviderStore((s) => s.providers.find((p) => p.id === providerId));
   const updateProvider = useProviderStore((s) => s.updateProvider);
   const [expanded, setExpanded] = useState(false);
@@ -45,9 +49,9 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
 
   if (!provider) return null;
 
-  const statusCfg = STATUS_CONFIG[provider.status] || STATUS_CONFIG.configuring;
+  const statusCfg = getStatusConfig(t)[provider.status] || getStatusConfig(t).configuring;
   // Health status takes priority over provider.status for the Tag display
-  const healthCfg = health && health.status !== 'healthy' ? STATUS_CONFIG[health.status] : null;
+  const healthCfg = health && health.status !== 'healthy' ? getStatusConfig(t)[health.status] : null;
   const tagVariant = healthCfg?.tagVariant ?? statusCfg.tagVariant;
   const tagLabel = healthCfg?.label ?? statusCfg.label;
 
@@ -56,10 +60,10 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
       navigator.clipboard
         .writeText(provider.apiKey)
         .then(() => {
-          toast('API Key 已复制', 'success');
+          toast(t('providers.apiKeyCopied'), 'success');
         })
         .catch(() => {
-          toast('复制失败', 'error');
+          toast(t('providers.copyFailed'), 'error');
         });
     }
   };
@@ -149,7 +153,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
               }}
             >
               <Loader2 size={10} style={{ animation: 'spin 0.6s linear infinite' }} />
-              测试中
+              {t('providers.status.testing')}
             </span>
           ) : (
             <Tag variant={tagVariant} style={{ border: 'none' }}>
@@ -192,8 +196,8 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
           </button>
           <button
             className="mc-icon-btn"
-            aria-label="编辑提供商"
-            title="编辑"
+            aria-label={t('models.edit')}
+            title={t('models.edit')}
             onClick={(e) => {
               e.stopPropagation();
               navigate(`/providers/${provider.id}/edit`);
@@ -224,8 +228,8 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
           </button>
           <button
             className="mc-icon-btn"
-            aria-label="删除提供商"
-            title="删除"
+            aria-label={t('models.delete')}
+            title={t('models.delete')}
             onClick={(e) => {
               e.stopPropagation();
               setConfirmDelete(true);
@@ -303,7 +307,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
                 {provider.apiKey ? `${provider.apiKey.slice(0, 8)}...` : ''}
               </span>
               <button
-                title="复制 API Key"
+                title={t('providers.apiKeyCopied')}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleCopyKey();
@@ -347,7 +351,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
                 textUnderlineOffset: 2,
               }}
             >
-              点击配置
+              {t('models.clickToConfig')}
             </span>
           )}
         </div>
@@ -375,7 +379,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
               marginTop: 'var(--spacer-4)',
             }}
           >
-            <span>连接异常，请检查 API Key 和 Base URL 是否正确</span>
+            <span>{t('providers.connectError')}</span>
           </div>
         )}
 
@@ -394,7 +398,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
               marginTop: 'var(--spacer-4)',
             }}
           >
-            <span>尚未配置 API Key，点击编辑完成配置</span>
+            <span>{t('providers.noApiKey')}</span>
           </div>
         )}
       </div>
@@ -437,7 +441,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
         >
           <ChevronRight size={12} />
         </span>
-        <span>{expanded ? '收起模型列表' : '展开模型列表'}</span>
+        <span>{expanded ? t('providers.collapseModels') : t('providers.expandModels')}</span>
       </div>
 
       {/* Model list */}
@@ -457,7 +461,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
         }}
       >
         {provider.models.map((model) => {
-          const capabilityTags = describeModelCapabilities(model);
+          const capabilityTags = describeModelCapabilities(model, t);
           return (
             <div
               key={model.id}
@@ -499,7 +503,7 @@ export const ProviderCard: React.FC<{ providerId: string; health?: ProviderHealt
       {/* Confirm Delete Dialog */}
       <ConfirmDialog
         open={confirmDelete}
-        title="删除提供商"
+        title={t('providers.deleteTitle')}
         message={`确定删除提供商「${provider.name}」？此操作不可撤销。`}
         confirmLabel="删除"
         variant="danger"

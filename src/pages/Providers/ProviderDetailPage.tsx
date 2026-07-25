@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProviderStore } from '../../store/providerStore';
 import { useStatsStore } from '../../store/statsStore';
+import { useT } from '../../i18n';
 import { desktopApi, type ProviderHealthSnapshot } from '../../lib/desktopApi';
 import type { Model } from '../../types/provider';
 import { Card, Tag, ConfirmDialog, ProviderLogo, toast } from '../../components/ui';
@@ -29,15 +30,15 @@ import {
 
 // ── Helpers ─────────────────────────────────────────────────
 
-const describeModelCapabilities = (model: Model) => {
+const describeModelCapabilities = (model: Model, t: ReturnType<typeof useT>) => {
   const tags: string[] = [];
   if (model.contextWindow) tags.push(`${model.contextWindow.toLocaleString()} ctx`);
   if (model.maxOutputTokens) tags.push(`${model.maxOutputTokens.toLocaleString()} out`);
-  if (model.supportsVision) tags.push('视觉');
-  if (model.supportsReasoning) tags.push('思考');
-  if (model.supportsReasoningEffort) tags.push('强度');
-  if (model.supportsToolCalls) tags.push('工具');
-  if (model.supportsJsonMode) tags.push('JSON');
+  if (model.supportsVision) tags.push(t('capability.vision'));
+  if (model.supportsReasoning) tags.push(t('capability.reasoning'));
+  if (model.supportsReasoningEffort) tags.push(t('capability.effort'));
+  if (model.supportsToolCalls) tags.push(t('capability.tools'));
+  if (model.supportsJsonMode) tags.push(t('capability.json'));
   return tags;
 };
 
@@ -48,23 +49,27 @@ const FLAVOR_LABELS: Record<string, string> = {
   responses: 'Responses API',
 };
 
-const HEALTH_STATUS_CONFIG: Record<
+const getHealthStatusConfig = (
+  t: ReturnType<typeof useT>,
+): Record<
   string,
   { variant: 'green' | 'orange' | 'danger'; label: string; icon: React.ReactNode }
-> = {
-  healthy: { variant: 'green', label: '健康', icon: <CheckCircle size={14} /> },
-  rate_limited: { variant: 'orange', label: '限流中', icon: <Clock size={14} /> },
-  unhealthy: { variant: 'danger', label: '熔断中', icon: <AlertTriangle size={14} /> },
-  auth_error: { variant: 'danger', label: '认证失败', icon: <XCircle size={14} /> },
-};
+> => ({
+  healthy: { variant: 'green', label: t('providers.status.healthy'), icon: <CheckCircle size={14} /> },
+  rate_limited: { variant: 'orange', label: t('providers.status.rateLimited'), icon: <Clock size={14} /> },
+  unhealthy: { variant: 'danger', label: t('providers.status.circuitOpen'), icon: <AlertTriangle size={14} /> },
+  auth_error: { variant: 'danger', label: t('providers.status.authFailed'), icon: <XCircle size={14} /> },
+});
 
-const STATUS_TAG_CONFIG: Record<string, { variant: 'green' | 'orange' | 'danger' | 'neutral'; label: string }> = {
-  connected: { variant: 'green', label: '已连接' },
-  configuring: { variant: 'orange', label: '配置中' },
-  error: { variant: 'danger', label: '连接失败' },
-  disabled: { variant: 'neutral', label: '已禁用' },
-  testing: { variant: 'orange', label: '测试中' },
-};
+const getStatusTagConfig = (
+  t: ReturnType<typeof useT>,
+): Record<string, { variant: 'green' | 'orange' | 'danger' | 'neutral'; label: string }> => ({
+  connected: { variant: 'green', label: t('providers.status.connected') },
+  configuring: { variant: 'orange', label: t('providers.status.configuring') },
+  error: { variant: 'danger', label: t('providers.status.error') },
+  disabled: { variant: 'neutral', label: t('providers.status.disabled') },
+  testing: { variant: 'orange', label: t('providers.status.testing') },
+});
 
 // ── Style constants ────────────────────────────────────────
 
@@ -159,6 +164,7 @@ const tagStyle: React.CSSProperties = {
 // ── Component ──────────────────────────────────────────────
 
 export const ProviderDetailPage: React.FC = () => {
+  const t = useT();
   const { providerId } = useParams<{ providerId: string }>();
   const navigate = useNavigate();
 
@@ -241,9 +247,9 @@ export const ProviderDetailPage: React.FC = () => {
     );
   }
 
-  const statusCfg = STATUS_TAG_CONFIG[provider.status] || STATUS_TAG_CONFIG.configuring;
+  const statusCfg = getStatusTagConfig(t)[provider.status] || getStatusTagConfig(t).configuring;
   const healthCfg =
-    health && health.status !== 'healthy' ? HEALTH_STATUS_CONFIG[health.status] : HEALTH_STATUS_CONFIG.healthy;
+    health && health.status !== 'healthy' ? getHealthStatusConfig(t)[health.status] : getHealthStatusConfig(t).healthy;
   const isDisabled = provider.status === 'disabled';
 
   const handleCopyKey = () => {
@@ -251,9 +257,9 @@ export const ProviderDetailPage: React.FC = () => {
       navigator.clipboard
         .writeText(provider.apiKey)
         .then(() => {
-          toast('API Key 已复制', 'success');
+          toast(t('providers.apiKeyCopied'), 'success');
         })
-        .catch(() => toast('复制失败', 'error'));
+        .catch(() => toast(t('providers.copyFailed'), 'error'));
     }
   };
 
@@ -323,7 +329,7 @@ export const ProviderDetailPage: React.FC = () => {
                 {isDisabled ? statusCfg.label : healthCfg.label}
               </Tag>
               <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)' }}>
-                {provider.models.length} 个模型
+                {provider.models.length} {t('models.modelCount')}
               </span>
             </div>
           </div>
@@ -622,7 +628,7 @@ export const ProviderDetailPage: React.FC = () => {
           </div>
         ) : (
           provider.models.map((model) => {
-            const caps = describeModelCapabilities(model);
+            const caps = describeModelCapabilities(model, t);
             return (
               <div key={model.id} style={modelRowStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-8)' }}>
@@ -632,7 +638,7 @@ export const ProviderDetailPage: React.FC = () => {
                   </span>
                   {model.alias && (
                     <Tag variant="neutral" style={tagStyle}>
-                      别名: {model.alias}
+                      {t('models.inventory.alias')}: {model.alias}
                     </Tag>
                   )}
                 </div>
@@ -660,10 +666,10 @@ export const ProviderDetailPage: React.FC = () => {
       {/* Delete confirmation */}
       <ConfirmDialog
         open={confirmDelete}
-        title="删除供应商"
+        title={t('providers.deleteTitle')}
         message={`确定要删除供应商「${provider.name}」吗？此操作不可撤销。`}
-        confirmLabel="删除"
-        cancelLabel="取消"
+        confirmLabel={t('models.delete')}
+        cancelLabel={t('common.cancel')}
         onConfirm={handleDelete}
         onCancel={() => setConfirmDelete(false)}
       />

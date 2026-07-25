@@ -9,6 +9,7 @@ import { Card, AnimatedContent } from '../../components/ui';
 import { toast } from '../../components/ui/Toast';
 import { ModelBulkEditPanel, type BulkEditValues } from './ModelBulkEditPanel';
 import { ModelSourcesTable, type SourceRow, type PendingEdits, type ModelPatch } from './ModelSourcesTable';
+import { useT } from '../../i18n';
 import {
   ArrowLeft,
   Bot,
@@ -559,13 +560,14 @@ const SpecItem: React.FC<{ icon: React.ReactNode; label: string; value: string }
 );
 
 const DirectDetailRow: React.FC<{ source: DirectMapping; pendingPatch?: ModelPatch }> = ({ source, pendingPatch }) => {
+  const t = useT();
   const effectiveModel = pendingPatch ? { ...source.model, ...pendingPatch } : source.model;
   const tags: string[] = [];
-  if (effectiveModel.supportsVision) tags.push('视觉');
-  if (effectiveModel.supportsReasoning) tags.push('思考');
-  if (effectiveModel.supportsReasoningEffort) tags.push('强度');
-  if (effectiveModel.supportsToolCalls) tags.push('工具');
-  if (effectiveModel.supportsJsonMode) tags.push('JSON');
+  if (effectiveModel.supportsVision) tags.push(t('capability.vision'));
+  if (effectiveModel.supportsReasoning) tags.push(t('capability.reasoning'));
+  if (effectiveModel.supportsReasoningEffort) tags.push(t('capability.effort'));
+  if (effectiveModel.supportsToolCalls) tags.push(t('capability.tools'));
+  if (effectiveModel.supportsJsonMode) tags.push(t('capability.json'));
 
   return (
     <div

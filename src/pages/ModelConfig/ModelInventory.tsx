@@ -5,6 +5,7 @@ import { useAggregationStore } from '../../store/aggregationStore';
 import type { Aggregation } from '../../types/aggregation';
 import type { Model } from '../../types/provider';
 import { SpotlightCard } from '../../components/ui';
+import { useT } from '../../i18n';
 import { Bot, ChevronRight, Eye, Brain, SlidersHorizontal, Wrench, Braces } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────
@@ -36,26 +37,25 @@ interface ExposedEntry {
   sources: MappingSource[];
 }
 
-// ── Helpers ────────────────────────────────────────────────
-
-const kindLabel = (sources: MappingSource[]): string => {
-  const hasDirect = sources.some((s) => s.kind === 'direct');
-  const hasAlias = sources.some((s) => s.kind === 'alias');
-  const hasAgg = sources.some((s) => s.kind === 'aggregation');
-  const parts: string[] = [];
-  if (hasDirect) parts.push('直接');
-  if (hasAlias) parts.push('别名');
-  if (hasAgg) parts.push('聚合');
-  return parts.join(' / ');
-};
-
 // ── Component ──────────────────────────────────────────────
 
 export const ModelInventory: React.FC = () => {
   const navigate = useNavigate();
+  const t = useT();
   const providers = useProviderStore((s) => s.providers);
   const aggregations = useAggregationStore((s) => s.aggregations);
   const [showAll, setShowAll] = useState(false);
+
+  const kindLabel = (sources: MappingSource[]): string => {
+    const hasDirect = sources.some((s) => s.kind === 'direct');
+    const hasAlias = sources.some((s) => s.kind === 'alias');
+    const hasAgg = sources.some((s) => s.kind === 'aggregation');
+    const parts: string[] = [];
+    if (hasDirect) parts.push(t('models.inventory.direct'));
+    if (hasAlias) parts.push(t('models.inventory.alias'));
+    if (hasAgg) parts.push(t('models.inventory.aggregation'));
+    return parts.join(' / ');
+  };
 
   // Build the full list of externally-exposed names by merging:
   //   1. Every model's `name` (direct exposure)
@@ -158,7 +158,7 @@ export const ModelInventory: React.FC = () => {
               margin: 0,
             }}
           >
-            对外暴露的模型
+            {t('models.inventory.title')}
           </h3>
           <p
             style={{
@@ -167,7 +167,7 @@ export const ModelInventory: React.FC = () => {
               margin: 'var(--spacer-4) 0 0',
             }}
           >
-            客户端可调用的所有模型入口 — 按名称分组，显示来源映射 · 共 {entries.length} 个
+            {t('models.inventory.desc')}
           </p>
         </div>
       </div>
@@ -193,11 +193,11 @@ export const ModelInventory: React.FC = () => {
           const maxOut = Math.max(0, ...paramSources.map((s) => s.model.maxOutputTokens || 0));
 
           const chips: { icon: React.ReactNode; label: string }[] = [];
-          if (allVision) chips.push({ icon: <Eye size={12} />, label: '视觉' });
-          if (allReasoning) chips.push({ icon: <Brain size={12} />, label: '思考' });
-          if (anyEffort) chips.push({ icon: <SlidersHorizontal size={12} />, label: '强度' });
-          if (allToolCalls) chips.push({ icon: <Wrench size={12} />, label: '工具' });
-          if (allJsonMode) chips.push({ icon: <Braces size={12} />, label: 'JSON' });
+          if (allVision) chips.push({ icon: <Eye size={12} />, label: t('capability.vision') });
+          if (allReasoning) chips.push({ icon: <Brain size={12} />, label: t('capability.reasoning') });
+          if (anyEffort) chips.push({ icon: <SlidersHorizontal size={12} />, label: t('capability.effort') });
+          if (allToolCalls) chips.push({ icon: <Wrench size={12} />, label: t('capability.tools') });
+          if (allJsonMode) chips.push({ icon: <Braces size={12} />, label: t('capability.json') });
           if (maxCtx > 0) chips.push({ icon: null, label: `${maxCtx.toLocaleString()} ctx` });
           if (maxOut > 0) chips.push({ icon: null, label: `${maxOut.toLocaleString()} out` });
 
@@ -264,7 +264,7 @@ export const ModelInventory: React.FC = () => {
                         {kindLabel(entry.sources)}
                       </span>
                       <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
-                        {entry.sources.length} 个来源
+                        {t('models.inventory.sourceCount', { n: entry.sources.length })}
                       </span>
                       {maxCtx > 0 && (
                         <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
@@ -347,7 +347,7 @@ export const ModelInventory: React.FC = () => {
               e.currentTarget.style.background = 'transparent';
             }}
           >
-            {showAll ? `收起，仅显示 ${MAX_VISIBLE} 个` : `展开全部（共 ${entries.length} 个）`}
+            {showAll ? `${t('models.inventory.collapseShow')} ${MAX_VISIBLE} 个` : `${t('models.inventory.expandAll')} ${entries.length} 个${t('models.inventory.expandAllSuffix')}`}
           </button>
         </div>
       )}

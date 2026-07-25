@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Dropdown, Switch, toast } from '../../components/ui';
 import type { Model, Provider } from '../../types/provider';
 import { Plus, Trash2, Eye, Brain, SlidersHorizontal, Check, Loader2 } from 'lucide-react';
+import { useT, t as staticT } from '../../i18n';
 
 const API_FLAVOR_OPTIONS = [
   { value: 'openai-compatible', label: 'OpenAI 兼容' },
@@ -50,11 +51,12 @@ export const ProviderForm: React.FC<ProviderFormProps> = ({
   onChange,
   onSubmit,
   onCancel,
-  submitLabel = '保存',
+  submitLabel = staticT('common.save'),
   loading = false,
   showCredentials = false,
   showActions = true,
 }) => {
+  const t = useT();
   const [urlError, setUrlError] = useState('');
   const [manualModelName, setManualModelName] = useState('');
 
@@ -167,7 +169,7 @@ export const ProviderForm: React.FC<ProviderFormProps> = ({
       {showCredentials && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-16)' }}>
           <div style={fieldStyle}>
-            <label style={labelStyle}>提供商名称</label>
+            <label style={labelStyle}>{t('providers.form.name')}</label>
             <input
               type="text"
               value={values.name}
@@ -242,7 +244,7 @@ export const ProviderForm: React.FC<ProviderFormProps> = ({
           }}
         >
           <div style={fieldStyle}>
-            <label style={labelStyle}>手动添加模型</label>
+            <label style={labelStyle}>{t('providers.form.manualAddModel')}</label>
             <input
               type="text"
               placeholder="例如: gpt-4o, claude-3-5-sonnet-20241022"
@@ -272,14 +274,14 @@ export const ProviderForm: React.FC<ProviderFormProps> = ({
             }}
           >
             <Plus size={14} />
-            添加
+            {t('providers.form.add')}
           </button>
         </div>
 
         {/* Model list */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-8)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={labelStyle}>已添加模型</span>
+            <span style={labelStyle}>{t('providers.form.addedModels')}</span>
             <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
               {values.models.length > 0 ? `${values.models.length} 个模型` : '暂无模型'}
             </span>
@@ -403,7 +405,7 @@ export const ProviderForm: React.FC<ProviderFormProps> = ({
                       }}
                     >
                       <Eye size={14} style={{ color: 'var(--icon-tertiary)' }} />
-                      <span>视觉</span>
+                      <span>{t('capability.vision')}</span>
                       <Switch
                         checked={Boolean(model.supportsVision)}
                         onChange={(checked) => updateModel(index, { supportsVision: checked })}
@@ -419,7 +421,7 @@ export const ProviderForm: React.FC<ProviderFormProps> = ({
                       }}
                     >
                       <Brain size={14} style={{ color: 'var(--icon-tertiary)' }} />
-                      <span>思考</span>
+                      <span>{t('capability.reasoning')}</span>
                       <Switch
                         checked={Boolean(model.supportsReasoning)}
                         onChange={(checked) => updateModel(index, { supportsReasoning: checked })}
@@ -496,7 +498,7 @@ export const ProviderForm: React.FC<ProviderFormProps> = ({
                 e.currentTarget.style.background = 'transparent';
               }}
             >
-              取消
+              {t('common.cancel')}
             </button>
           )}
           <button

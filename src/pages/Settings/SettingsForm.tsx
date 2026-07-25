@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { getVersion } from '@tauri-apps/api/app';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { useSettingsStore } from '../../store/settingsStore';
+import { useT, t } from '../../i18n';
 import { Button, Input, Switch, Card, toast, AnimatedContent, SegmentedControl } from '../../components/ui';
 import type { SegmentOption } from '../../components/ui/SegmentedControl';
 import { desktopApi, onUpdateAvailable, type UpdateMetadata } from '../../lib/desktopApi';
@@ -51,12 +52,6 @@ const languageOptions: SegmentOption[] = [
   { value: 'en', label: 'English' },
 ];
 
-const themeOptions: SegmentOption[] = [
-  { value: 'light', label: '浅色', icon: <Sun size={15} /> },
-  { value: 'dark', label: '深色', icon: <Moon size={15} /> },
-  { value: 'system', label: '系统', icon: <Monitor size={15} /> },
-];
-
 const concurrencyOptions: SegmentOption[] = [
   { value: '1', label: '1' },
   { value: '5', label: '5' },
@@ -75,20 +70,6 @@ const pageSizeOptions: SegmentOption[] = [
 const proxyProtocolOptions: SegmentOption[] = [
   { value: 'http', label: 'HTTP' },
   { value: 'socks5', label: 'SOCKS5' },
-];
-
-const rateLimitOptions: SegmentOption[] = [
-  { value: '0', label: '不限' },
-  { value: '60', label: '60/分' },
-  { value: '30', label: '30/分' },
-  { value: '10', label: '10/分' },
-];
-
-const retryOptions: SegmentOption[] = [
-  { value: '0', label: '不重试' },
-  { value: '1', label: '1次' },
-  { value: '3', label: '3次' },
-  { value: '5', label: '5次' },
 ];
 
 const COLOR_PRESETS = ['#00B95C', '#2F74FF', '#7C3AED', '#E8463A', '#F2A90C', '#E91E8C', '#00B6F5', '#171717'];
@@ -240,6 +221,28 @@ const TextInput: React.FC<{
 );
 
 export const SettingsForm: React.FC = () => {
+  const translate = useT();
+
+  const themeOptions: SegmentOption[] = [
+    { value: 'light', label: translate('settings.theme.light'), icon: <Sun size={15} /> },
+    { value: 'dark', label: translate('settings.theme.dark'), icon: <Moon size={15} /> },
+    { value: 'system', label: translate('settings.theme.system'), icon: <Monitor size={15} /> },
+  ];
+
+  const rateLimitOptions: SegmentOption[] = [
+    { value: '0', label: translate('settings.rateLimit.none') },
+    { value: '60', label: translate('settings.rateLimit.perMin', { n: 60 }) },
+    { value: '30', label: translate('settings.rateLimit.perMin', { n: 30 }) },
+    { value: '10', label: translate('settings.rateLimit.perMin', { n: 10 }) },
+  ];
+
+  const retryOptions: SegmentOption[] = [
+    { value: '0', label: translate('settings.retry.none') },
+    { value: '1', label: translate('settings.retry.times', { n: 1 }) },
+    { value: '3', label: translate('settings.retry.times', { n: 3 }) },
+    { value: '5', label: translate('settings.retry.times', { n: 5 }) },
+  ];
+
   const { settings, activeCategory, loaded, loadSettings, updateSettings, error, clearError } = useSettingsStore();
   const [exporting, setExporting] = useState(false);
   const [openingDir, setOpeningDir] = useState(false);
@@ -289,7 +292,7 @@ export const SettingsForm: React.FC = () => {
     let unlisten: (() => void) | null = null;
     onUpdateAvailable((meta) => {
       setPendingUpdate(meta);
-      toast(`发现新版本 v${meta.version}，请到「关于」页面查看`, 'info');
+      toast(t('settings.update.toast', { version: meta.version }), 'info');
     })
       .then((fn) => {
         unlisten = fn;
@@ -307,7 +310,7 @@ export const SettingsForm: React.FC = () => {
     try {
       const meta = await desktopApi.checkForUpdates();
       if (!meta) {
-        toast('当前已是最新版本', 'success');
+        toast(t('settings.update.latest'), 'success');
         setPendingUpdate(null);
       } else {
         setPendingUpdate(meta);
@@ -360,7 +363,7 @@ export const SettingsForm: React.FC = () => {
           });
         }
       });
-      toast('更新已安装，应用即将重启', 'success');
+      toast(t('settings.update.installed'), 'success');
       setTimeout(() => {
         desktopApi.exitApp();
       }, 800);
@@ -382,9 +385,9 @@ export const SettingsForm: React.FC = () => {
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     try {
       const path = await desktopApi.exportLogs();
-      toast(`日志已导出到: ${path}`, 'success');
+      toast(t('settings.update.logExported', { path }), 'success');
     } catch (e: unknown) {
-      toast(errorMessage(e, '导出失败'), 'error');
+      toast(errorMessage(e, t('settings.update.logExportFailed')), 'error');
     } finally {
       setExporting(false);
     }
@@ -394,9 +397,9 @@ export const SettingsForm: React.FC = () => {
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     try {
       await desktopApi.openLogDir();
-      toast('已打开日志目录', 'info');
+      toast(t('settings.update.logDirOpened'), 'info');
     } catch (e: unknown) {
-      toast(errorMessage(e, '打开失败'), 'error');
+      toast(errorMessage(e, t('settings.update.logDirOpenFailed')), 'error');
     } finally {
       setOpeningDir(false);
     }
@@ -404,11 +407,11 @@ export const SettingsForm: React.FC = () => {
 
   const handleRefreshToken = () => {
     const msg = settings.authToken
-      ? '刷新令牌后旧令牌将失效，所有使用旧令牌的请求需要更新，确定继续？'
-      : '将生成一个新的随机认证令牌，确定继续？';
+      ? t('settings.update.tokenRefreshConfirm')
+      : t('settings.update.tokenRegenerateConfirm');
     if (window.confirm(msg)) {
       updateSettings({ authToken: generateAuthToken() });
-      toast('令牌已刷新', 'success');
+      toast(t('settings.update.tokenRefreshed'), 'success');
     }
   };
 
@@ -417,10 +420,10 @@ export const SettingsForm: React.FC = () => {
     try {
       await navigator.clipboard.writeText(settings.authToken);
       setCopied(true);
-      toast('令牌已复制到剪贴板', 'success');
+      toast(t('settings.update.tokenCopied'), 'success');
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast('复制失败', 'error');
+      toast(t('settings.update.copyFailed'), 'error');
     }
   };
 
@@ -429,22 +432,22 @@ export const SettingsForm: React.FC = () => {
       {/* ═══════════════════════════════════════════════════ 通用设置 */}
       {activeCategory === 'general' && (
         <AnimatedContent>
-          <SettingsGroup title="显示设置">
-            <SettingsRow label="语言">
+          <SettingsGroup title={translate('settings.appearance')}>
+            <SettingsRow label={translate('settings.appearanceLang')}>
               <SegmentedControl
                 options={languageOptions}
                 value={settings.language}
                 onChange={(v) => updateSettings({ language: v })}
               />
             </SettingsRow>
-            <SettingsRow label="主题">
+            <SettingsRow label={translate('settings.appearanceTheme')}>
               <SegmentedControl
                 options={themeOptions}
                 value={settings.theme}
                 onChange={(v) => updateSettings({ theme: v })}
               />
             </SettingsRow>
-            <SettingsRow label="主题色">
+            <SettingsRow label={translate('settings.appearanceAccent')}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ display: 'flex', gap: 6 }}>
                   {COLOR_PRESETS.map((color) => {
@@ -467,7 +470,7 @@ export const SettingsForm: React.FC = () => {
                           padding: 0,
                           transition: 'box-shadow 0.15s ease',
                         }}
-                        aria-label={`选择主题色 ${color}`}
+                        aria-label={translate('settings.appearanceAccentAria', { color })}
                       />
                     );
                   })}
@@ -498,7 +501,7 @@ export const SettingsForm: React.FC = () => {
                 />
               </div>
             </SettingsRow>
-            <SettingsRow label="每页条数" isLast>
+            <SettingsRow label={translate('settings.appearancePageSize')} isLast>
               <SegmentedControl
                 options={pageSizeOptions}
                 value={settings.pageSize.toString()}
@@ -508,17 +511,17 @@ export const SettingsForm: React.FC = () => {
             </SettingsRow>
           </SettingsGroup>
 
-          <SettingsGroup title="基础配置">
-            <SettingsRow label="服务地址">
+          <SettingsGroup title={translate('settings.basic')}>
+            <SettingsRow label={translate('settings.basicHost')}>
               <TextInput value={settings.host} onChange={(v) => updateSettings({ host: v })} />
             </SettingsRow>
-            <SettingsRow label="代理端口">
+            <SettingsRow label={translate('settings.proxyPort')}>
               <NumberInput value={settings.port} onChange={(v) => updateSettings({ port: v })} min={1} />
             </SettingsRow>
-            <SettingsRow label="自动启动" hint="应用启动时自动运行代理服务">
+            <SettingsRow label={translate('settings.basicAutoStart')} hint={translate('settings.basicAutoStartHint')}>
               <Switch checked={settings.autoStart} onChange={(v) => updateSettings({ autoStart: v })} />
             </SettingsRow>
-            <SettingsRow label="最大并发" isLast>
+            <SettingsRow label={translate('settings.basicMaxConcurrency')} isLast>
               <SegmentedControl
                 options={concurrencyOptions}
                 value={settings.maxConcurrency.toString()}
@@ -528,11 +531,11 @@ export const SettingsForm: React.FC = () => {
             </SettingsRow>
           </SettingsGroup>
 
-          <SettingsGroup title="应用设置" isNew>
-            <SettingsRow label="开机启动" hint="系统启动时自动运行 Melody Hub">
+          <SettingsGroup title={translate('settings.appStartup')} isNew>
+            <SettingsRow label={translate('settings.appStartupLaunch')} hint={translate('settings.appStartupLaunchHint')}>
               <Switch checked={settings.launchAtLogin} onChange={(v) => updateSettings({ launchAtLogin: v })} />
             </SettingsRow>
-            <SettingsRow label="启动时最小化到托盘" hint="下次启动生效" isLast>
+            <SettingsRow label={translate('settings.appStartupMinimized')} hint={translate('settings.appStartupMinimizedHint')} isLast>
               <Switch checked={settings.startMinimized} onChange={(v) => updateSettings({ startMinimized: v })} />
             </SettingsRow>
           </SettingsGroup>
@@ -542,14 +545,14 @@ export const SettingsForm: React.FC = () => {
       {/* ═══════════════════════════════════════════════════ 安全与认证 */}
       {activeCategory === 'security' && (
         <AnimatedContent>
-          <SettingsGroup title="安全与认证">
-            <SettingsRow label="本地认证令牌">
+          <SettingsGroup title={translate('settings.security.title')}>
+            <SettingsRow label={translate('settings.security.token')}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <Input
                   type={showToken ? 'text' : 'password'}
                   value={settings.authToken}
                   onChange={(e) => updateSettings({ authToken: e.target.value })}
-                  placeholder="点击右侧按钮生成随机令牌"
+                  placeholder={translate('settings.security.tokenPlaceholder')}
                   wrapperStyle={{
                     width: 280,
                     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
@@ -561,8 +564,8 @@ export const SettingsForm: React.FC = () => {
                   type="button"
                   className="icon-action-btn"
                   onClick={() => setShowToken((v) => !v)}
-                  aria-label={showToken ? '隐藏令牌' : '显示令牌'}
-                  title={showToken ? '隐藏令牌' : '显示令牌'}
+                  aria-label={showToken ? translate('settings.security.hideToken') : translate('settings.security.showToken')}
+                  title={showToken ? translate('settings.security.hideToken') : translate('settings.security.showToken')}
                 >
                   {showToken ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -571,8 +574,8 @@ export const SettingsForm: React.FC = () => {
                   className="icon-action-btn"
                   onClick={handleCopyToken}
                   disabled={!settings.authToken}
-                  aria-label="复制令牌"
-                  title="复制令牌"
+                  aria-label={translate('settings.security.copyTokenAria')}
+                  title={translate('settings.security.copyTokenAria')}
                 >
                   {copied ? <Check size={18} /> : <Copy size={18} />}
                 </button>
@@ -580,24 +583,24 @@ export const SettingsForm: React.FC = () => {
                   type="button"
                   className="icon-action-btn"
                   onClick={handleRefreshToken}
-                  aria-label="刷新令牌"
-                  title="生成新令牌"
+                  aria-label={translate('settings.security.refreshTokenAria')}
+                  title={translate('settings.security.refreshTokenTitle')}
                 >
                   <RefreshCw size={18} />
                 </button>
               </div>
             </SettingsRow>
-            <SettingsRow label="IP 白名单">
+            <SettingsRow label={translate('settings.security.ipWhitelist')}>
               <TextInput
                 value={settings.ipWhitelist}
                 onChange={(v) => updateSettings({ ipWhitelist: v })}
-                placeholder="127.0.0.1, 192.168.1.*"
+                placeholder={translate('settings.security.ipPlaceholder')}
               />
             </SettingsRow>
-            <SettingsRow label="启用 CORS">
+            <SettingsRow label={translate('settings.security.cors')}>
               <Switch checked={settings.corsEnabled} onChange={(v) => updateSettings({ corsEnabled: v })} />
             </SettingsRow>
-            <SettingsRow label="请求速率限制" isLast>
+            <SettingsRow label={translate('settings.security.rateLimit')} isLast>
               <SegmentedControl
                 options={rateLimitOptions}
                 value={settings.rateLimit}
@@ -612,21 +615,21 @@ export const SettingsForm: React.FC = () => {
       {/* ═══════════════════════════════════════════════════ 网络代理 */}
       {activeCategory === 'proxy' && (
         <AnimatedContent>
-          <SettingsGroup title="网络代理配置">
-            <SettingsRow label="启用代理">
+          <SettingsGroup title={translate('settings.proxyConfig')}>
+            <SettingsRow label={translate('settings.proxyConfigEnable')}>
               <Switch checked={settings.proxyEnabled} onChange={(v) => updateSettings({ proxyEnabled: v })} />
             </SettingsRow>
-            <SettingsRow label="代理主机">
+            <SettingsRow label={translate('settings.proxyConfigHost')}>
               <TextInput
                 value={settings.proxyHost}
                 onChange={(v) => updateSettings({ proxyHost: v })}
                 placeholder="127.0.0.1"
               />
             </SettingsRow>
-            <SettingsRow label="代理端口">
+            <SettingsRow label={translate('settings.proxyConfigPort')}>
               <NumberInput value={settings.proxyPort} onChange={(v) => updateSettings({ proxyPort: v })} min={1} />
             </SettingsRow>
-            <SettingsRow label="代理协议">
+            <SettingsRow label={translate('settings.proxyConfigProtocol')}>
               <SegmentedControl
                 options={proxyProtocolOptions}
                 value={settings.proxyProtocol}
@@ -634,18 +637,18 @@ export const SettingsForm: React.FC = () => {
                 size="sm"
               />
             </SettingsRow>
-            <SettingsRow label="用户名">
+            <SettingsRow label={translate('settings.proxyConfigUsername')}>
               <TextInput
                 value={settings.proxyUsername}
                 onChange={(v) => updateSettings({ proxyUsername: v })}
-                placeholder="可选"
+                placeholder={translate('common.placeholder')}
               />
             </SettingsRow>
-            <SettingsRow label="密码" isLast>
+            <SettingsRow label={translate('settings.proxyConfigPassword')} isLast>
               <TextInput
                 value={settings.proxyPassword}
                 onChange={(v) => updateSettings({ proxyPassword: v })}
-                placeholder="可选"
+                placeholder={translate('common.placeholder')}
                 type="password"
               />
             </SettingsRow>
@@ -656,11 +659,11 @@ export const SettingsForm: React.FC = () => {
       {/* ═══════════════════════════════════════════════════ 高级选项 */}
       {activeCategory === 'advanced' && (
         <AnimatedContent>
-          <SettingsGroup title="高级选项">
-            <SettingsRow label="API 超时(秒)">
+          <SettingsGroup title={translate('settings.advanced.title')}>
+            <SettingsRow label={translate('settings.advanced.timeout')}>
               <NumberInput value={settings.apiTimeout} onChange={(v) => updateSettings({ apiTimeout: v })} min={1} />
             </SettingsRow>
-            <SettingsRow label="最大重试次数" isLast>
+            <SettingsRow label={translate('settings.advanced.retries')} isLast>
               <SegmentedControl
                 options={retryOptions}
                 value={settings.maxRetries}
@@ -670,23 +673,23 @@ export const SettingsForm: React.FC = () => {
             </SettingsRow>
           </SettingsGroup>
 
-          <SettingsGroup title="日志与监控">
-            <SettingsRow label="日志保留天数">
+          <SettingsGroup title={translate('settings.logging.title')}>
+            <SettingsRow label={translate('settings.logging.retention')}>
               <NumberInput
                 value={settings.logRetentionDays}
                 onChange={(v) => updateSettings({ logRetentionDays: v })}
                 min={1}
               />
             </SettingsRow>
-            <SettingsRow label="自动清理日志">
+            <SettingsRow label={translate('settings.logging.autoClean')}>
               <Switch checked={settings.logAutoClean} onChange={(v) => updateSettings({ logAutoClean: v })} />
             </SettingsRow>
             <SettingsRow label="" isLast>
               <Button disabled={exporting} onClick={handleExportLogs}>
-                {exporting ? '导出中...' : '导出日志'}
+                {exporting ? translate('settings.logging.exporting') : translate('settings.logging.export')}
               </Button>
               <Button disabled={openingDir} variant="secondary" onClick={handleOpenLogDir}>
-                {openingDir ? '打开中...' : '打开日志目录'}
+                {openingDir ? translate('settings.logging.opening') : translate('settings.logging.openDir')}
               </Button>
             </SettingsRow>
           </SettingsGroup>
@@ -715,12 +718,12 @@ export const SettingsForm: React.FC = () => {
                   color: 'var(--text-default)',
                 }}
               >
-                关于我们
+                {translate('settings.about.title')}
               </span>
               <button
                 type="button"
                 onClick={() => openUrl('https://github.com/Lhy723/MelodyHub').catch(() => {})}
-                title="在浏览器中打开 GitHub 仓库"
+                title={translate('settings.about.githubTitle')}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -792,7 +795,7 @@ export const SettingsForm: React.FC = () => {
                     marginTop: 2,
                   }}
                 >
-                  一款面向开发者的本地 LLM 代理服务
+                  {translate('settings.about.slogan')}
                 </div>
                 <div style={{ marginTop: 8, display: 'inline-flex' }}>
                   <span
@@ -819,7 +822,7 @@ export const SettingsForm: React.FC = () => {
                 disabled={installing}
                 size="md"
               >
-                {checking ? '检查中...' : '检查更新'}
+                {checking ? translate('settings.about.checking') : translate('settings.about.checkUpdate')}
               </Button>
             </div>
 
@@ -827,7 +830,7 @@ export const SettingsForm: React.FC = () => {
             <div style={{ height: 1, background: 'var(--border-neutral-l1)' }} />
 
             {/* Auto-update row */}
-            <SettingsRow label="自动更新" isLast>
+            <SettingsRow label={translate('settings.about.autoUpdate')} isLast>
               <Switch
                 checked={settings.checkUpdatesOnStart}
                 onChange={(v) => updateSettings({ checkUpdatesOnStart: v })}
@@ -839,47 +842,47 @@ export const SettingsForm: React.FC = () => {
           <SettingsGroup>
             <AboutLinkRow
               icon={<HelpCircle size={20} />}
-              label="帮助文档"
-              actionLabel="查看"
+              label={translate('settings.about.helpDocs')}
+              actionLabel={translate('settings.about.view')}
               onClick={() => openUrl('https://github.com/Lhy723/MelodyHub#readme').catch(() => {})}
             />
             <AboutLinkRow
               icon={<Rss size={20} />}
-              label="更新日志"
-              actionLabel="查看"
+              label={translate('settings.about.changelog')}
+              actionLabel={translate('settings.about.view')}
               onClick={() => openUrl('https://github.com/Lhy723/MelodyHub/releases').catch(() => {})}
             />
             <AboutLinkRow
               icon={<Globe size={20} />}
-              label="官方网站"
-              actionLabel="查看"
+              label={translate('settings.about.website')}
+              actionLabel={translate('settings.about.view')}
               onClick={() => openUrl('https://github.com/Lhy723/MelodyHub').catch(() => {})}
             />
             <AboutLinkRow
               icon={<MessageSquare size={20} />}
-              label="意见反馈"
-              actionLabel="反馈"
+              label={translate('settings.about.feedback')}
+              actionLabel={translate('settings.about.submit')}
               onClick={() => openUrl('https://github.com/Lhy723/MelodyHub/issues').catch(() => {})}
               isLast
             />
           </SettingsGroup>
 
           {/* ── Data management (kept but de-emphasized) ─── */}
-          <SettingsGroup title="数据管理">
+          <SettingsGroup title={translate('settings.dataManagement.title')}>
             <SettingsRow label="" isLast>
-              <Button onClick={() => toast('配置导出功能开发中', 'info')}>导出配置</Button>
-              <Button variant="secondary" onClick={() => toast('配置导入功能开发中', 'info')}>
-                导入配置
+              <Button onClick={() => toast(t('settings.dataManagement.exportToast'), 'info')}>{translate('settings.dataManagement.export')}</Button>
+              <Button variant="secondary" onClick={() => toast(t('settings.dataManagement.importToast'), 'info')}>
+                {translate('settings.dataManagement.import')}
               </Button>
               <Button
                 variant="secondary"
                 onClick={() => {
-                  if (window.confirm('确定重置所有数据？此操作不可撤销。')) {
-                    toast('重置功能开发中', 'info');
+                  if (window.confirm(t('settings.dataManagement.resetConfirm'))) {
+                    toast(t('settings.dataManagement.resetToast'), 'info');
                   }
                 }}
               >
-                重置所有数据
+                {translate('settings.dataManagement.reset')}
               </Button>
             </SettingsRow>
           </SettingsGroup>
@@ -957,7 +960,7 @@ export const SettingsForm: React.FC = () => {
                       color: 'var(--text-default)',
                     }}
                   >
-                    发现新版本
+                    {translate('settings.update.title')}
                   </div>
                   <div
                     style={{
@@ -1064,7 +1067,7 @@ export const SettingsForm: React.FC = () => {
                         color: 'var(--text-tertiary)',
                       }}
                     >
-                      {installProgress >= 1 ? '% · 正在安装...' : '%'}
+                      {installProgress >= 1 ? translate('settings.update.installingTip') : '%'}
                     </span>
                   </div>
                 </div>
@@ -1078,7 +1081,7 @@ export const SettingsForm: React.FC = () => {
                 }}
               >
                 <Button variant="secondary" onClick={handleDismissUpdate} disabled={installing}>
-                  稍后
+                  {translate('settings.update.later')}
                 </Button>
                 <Button
                   variant="brand"
@@ -1087,7 +1090,7 @@ export const SettingsForm: React.FC = () => {
                   onClick={handleInstallUpdate}
                   disabled={checking}
                 >
-                  {installing ? '安装中...' : '下载并安装'}
+                  {installing ? translate('settings.update.installing') : translate('settings.update.downloadInstall')}
                 </Button>
               </div>
             </motion.div>

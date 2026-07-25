@@ -3,6 +3,7 @@ import { useStatsStore } from '../../store/statsStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { Card, Tag, FlexBetween, Skeleton } from '../../components/ui';
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { useT } from '../../i18n';
 
 const modelTagStyle: Record<string, { variant: 'brand' | 'green' | 'danger'; customColor?: string }> = {
   'GPT-4o': { variant: 'brand' },
@@ -12,6 +13,7 @@ const modelTagStyle: Record<string, { variant: 'brand' | 'green' | 'danger'; cus
 };
 
 export const RecentRequests: React.FC = () => {
+  const t = useT();
   const recentRequests = useStatsStore((s) => s.recentRequests);
   const loading = useStatsStore((s) => s.requestsLoading);
   const error = useStatsStore((s) => s.requestsError);
@@ -75,11 +77,11 @@ export const RecentRequests: React.FC = () => {
               color: 'var(--text-default)',
             }}
           >
-            近期调用记录
+            {t('dashboard.table.title')}
           </span>
         </FlexBetween>
         <div style={{ padding: 'var(--spacer-32) 0', textAlign: 'center', color: 'var(--text-tertiary)' }}>
-          <span style={{ color: 'var(--status-error-default)', fontSize: 'var(--body-base-font-size)' }}>加载失败</span>
+          <span style={{ color: 'var(--status-error-default)', fontSize: 'var(--body-base-font-size)' }}>{t('dashboard.loadFailed')}</span>
           <div style={{ marginTop: 'var(--spacer-8)' }}>
             <button
               onClick={fetchRequests}
@@ -93,7 +95,7 @@ export const RecentRequests: React.FC = () => {
               }}
             >
               <RefreshCw size={12} style={{ marginRight: 4, display: 'inline' }} />
-              重试
+                {t('dashboard.retry')}
             </button>
           </div>
         </div>
@@ -112,7 +114,7 @@ export const RecentRequests: React.FC = () => {
             lineHeight: 'var(--heading-xs-line-height)',
           }}
         >
-          近期调用记录
+          {t('dashboard.table.title')}
           {recentRequests.length > 0 && (
             <span
               style={{
@@ -122,7 +124,7 @@ export const RecentRequests: React.FC = () => {
                 fontWeight: 400,
               }}
             >
-              ({recentRequests.length} 条)
+              ({recentRequests.length} {t('dashboard.table.count')})
             </span>
           )}
         </div>
@@ -137,7 +139,7 @@ export const RecentRequests: React.FC = () => {
             fontSize: 'var(--body-base-font-size)',
           }}
         >
-          暂无调用记录。启动代理并发送请求后将在此显示。
+          {t('dashboard.table.noData')}
         </div>
       ) : (
         <>
@@ -157,7 +159,7 @@ export const RecentRequests: React.FC = () => {
                       letterSpacing: 'var(--body-md-letter-spacing)',
                     }}
                   >
-                    时间
+                    {t('dashboard.table.time')}
                   </th>
                   <th
                     style={{
@@ -171,7 +173,7 @@ export const RecentRequests: React.FC = () => {
                       letterSpacing: 'var(--body-md-letter-spacing)',
                     }}
                   >
-                    模型
+                    {t('dashboard.table.model')}
                   </th>
                   <th
                     style={{
@@ -185,7 +187,7 @@ export const RecentRequests: React.FC = () => {
                       letterSpacing: 'var(--body-md-letter-spacing)',
                     }}
                   >
-                    提供商
+                    {t('dashboard.table.provider')}
                   </th>
                   <th
                     style={{
@@ -199,7 +201,7 @@ export const RecentRequests: React.FC = () => {
                       letterSpacing: 'var(--body-md-letter-spacing)',
                     }}
                   >
-                    请求类型
+                    {t('dashboard.table.type')}
                   </th>
                   <th
                     style={{
@@ -213,7 +215,7 @@ export const RecentRequests: React.FC = () => {
                       letterSpacing: 'var(--body-md-letter-spacing)',
                     }}
                   >
-                    Token用量
+                    {t('dashboard.table.tokens')}
                   </th>
                   <th
                     style={{
@@ -227,7 +229,7 @@ export const RecentRequests: React.FC = () => {
                       letterSpacing: 'var(--body-md-letter-spacing)',
                     }}
                   >
-                    状态
+                    {t('dashboard.table.status')}
                   </th>
                   <th
                     style={{
@@ -241,7 +243,7 @@ export const RecentRequests: React.FC = () => {
                       letterSpacing: 'var(--body-md-letter-spacing)',
                     }}
                   >
-                    延迟
+                    {t('dashboard.table.latency')}
                   </th>
                 </tr>
               </thead>
@@ -344,7 +346,7 @@ export const RecentRequests: React.FC = () => {
                           variant={req.status === 'success' || req.status === 'streaming' ? 'success' : 'danger'}
                           style={{ border: 'none' }}
                         >
-                          {req.status === 'success' || req.status === 'streaming' ? '成功' : '失败'}
+                        {req.status === 'success' || req.status === 'streaming' ? t('dashboard.table.success') : t('dashboard.table.failed')}
                         </Tag>
                       </td>
                       <td

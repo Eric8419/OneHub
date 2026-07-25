@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { X } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import { t as i18n } from '../../i18n';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -94,7 +95,7 @@ export const ToastContainer: React.FC = () => {
           >
             <span style={{ flex: 1 }}>{t.message}</span>
             <button
-              aria-label="关闭通知"
+              aria-label={i18n('common.closeNotification')}
               onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
               style={{
                 background: 'transparent',

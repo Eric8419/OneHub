@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useStatsStore } from '../../store/statsStore';
 import { Card, EChart, getCssVar, useThemeVersion } from '../../components/ui';
 import type { EChartsOption } from '../../components/ui';
+import { useT, t as tFn } from '../../i18n';
 
 const MONTH_NAMES = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
@@ -20,6 +21,7 @@ function formatDateLocal(d: Date): string {
 }
 
 export const UsageHeatmap: React.FC = () => {
+  const t = useT();
   const dailyUsage = useStatsStore((s) => s.dailyUsage);
   const themeVersion = useThemeVersion();
 
@@ -85,7 +87,7 @@ export const UsageHeatmap: React.FC = () => {
 
     return {
       title: {
-        text: '调用热力图 — 近一年',
+        text: tFn('dashboard.heatmap.title'),
         left: 0,
         top: 0,
         textStyle: {
@@ -103,7 +105,7 @@ export const UsageHeatmap: React.FC = () => {
           const [dateStr] = (p as { value: [string, number] }).value;
           const count = countByDate.get(dateStr) ?? 0;
           const [, m, d] = dateStr.split('-');
-          return `${parseInt(m, 10)}月${parseInt(d, 10)}日<br/>${count} 次请求`;
+          return `${parseInt(m, 10)}月${parseInt(d, 10)}日<br/>${count} ${tFn('dashboard.chart.requests')}`;
         },
       },
       visualMap: {
@@ -124,8 +126,8 @@ export const UsageHeatmap: React.FC = () => {
         // Show "多"/"少" at the ends instead of raw numbers.
         formatter: (v: unknown) => {
           const n = Number(v);
-          if (n <= 0) return '少';
-          if (n >= maxCount) return '多';
+          if (n <= 0) return tFn('dashboard.heatmap.less');
+          if (n >= maxCount) return tFn('dashboard.heatmap.more');
           return '';
         },
       },
@@ -195,7 +197,7 @@ export const UsageHeatmap: React.FC = () => {
             fontSize: 'var(--body-sm-font-size)',
           }}
         >
-          暂无数据
+          {t('dashboard.heatmap.noData')}
         </div>
       )}
     </Card>

@@ -10,8 +10,10 @@ import { UsageHeatmap } from './UsageHeatmap';
 import { RecentRequests } from './RecentRequests';
 import { ProxyControl } from './ProxyControl';
 import { TriangleAlert, RefreshCw } from 'lucide-react';
+import { useT } from '../../i18n';
 
 export const Dashboard: React.FC = () => {
+  const t = useT();
   const fetchStats = useStatsStore((s) => s.fetchStats);
   const fetchRequests = useStatsStore((s) => s.fetchRequests);
   const fetchDailyUsage = useStatsStore((s) => s.fetchDailyUsage);
@@ -100,7 +102,7 @@ export const Dashboard: React.FC = () => {
           }}
         >
           <TriangleAlert size={16} />
-          <span style={{ flex: 1 }}>数据加载失败：{loadError}</span>
+          <span style={{ flex: 1 }}>{t('dashboard.loadError')}{loadError}</span>
           <button
             onClick={handleRetry}
             style={{
@@ -119,7 +121,7 @@ export const Dashboard: React.FC = () => {
             }}
           >
             <RefreshCw size={12} />
-            重试
+            {t('dashboard.retry')}
           </button>
         </div>
       )}

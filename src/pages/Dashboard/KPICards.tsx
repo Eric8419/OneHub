@@ -3,6 +3,7 @@ import { useStatsStore } from '../../store/statsStore';
 import type { UsageStats } from '../../types/stats';
 import { Counter, FlexBetween, FlexRow, ShinyText, SpotlightCard, Skeleton } from '../../components/ui';
 import { Coins, Activity, Box, Clock, RefreshCw } from 'lucide-react';
+import { useT } from '../../i18n';
 
 interface KpiCardConfig {
   key: string;
@@ -14,46 +15,48 @@ interface KpiCardConfig {
   changeLabel: string;
 }
 
-const cards: KpiCardConfig[] = [
+const makeCards = (t: ReturnType<typeof useT>): KpiCardConfig[] => [
   {
     key: 'tokens',
-    label: 'Token 总用量',
+    label: t('dashboard.kpi.tokens'),
     icon: Coins,
     formatter: (v: number) => v.toLocaleString(),
     getValue: (s) => s.totalTokens,
     getChange: (s) => s.tokenChange,
-    changeLabel: '较上一周期',
+    changeLabel: t('dashboard.kpi.vs'),
   },
   {
     key: 'requests',
-    label: '请求总数',
+    label: t('dashboard.kpi.requests'),
     icon: Activity,
     formatter: (v: number) => v.toLocaleString(),
     getValue: (s) => s.totalRequests,
     getChange: (s) => s.requestChange,
-    changeLabel: '较上一周期',
+    changeLabel: t('dashboard.kpi.vs'),
   },
   {
     key: 'models',
-    label: '活跃模型',
+    label: t('dashboard.kpi.models'),
     icon: Box,
     formatter: (v: number) => v.toString(),
     getValue: (s) => s.activeModels,
     getChange: () => null,
-    changeLabel: '全部模型运行正常',
+    changeLabel: t('dashboard.kpi.allOk'),
   },
   {
     key: 'response',
-    label: '平均响应时间',
+    label: t('dashboard.kpi.response'),
     icon: Clock,
     formatter: (v: number) => `${v}s`,
     getValue: (s) => s.avgResponseTime,
     getChange: (s) => s.responseTimeChange,
-    changeLabel: '较上一周期',
+    changeLabel: t('dashboard.kpi.vs'),
   },
 ];
 
 export const KPICards: React.FC = () => {
+  const t = useT();
+  const cards = makeCards(t);
   const stats = useStatsStore((s) => s.stats);
   const error = useStatsStore((s) => s.statsError);
   const fetchStats = useStatsStore((s) => s.fetchStats);
@@ -102,7 +105,7 @@ export const KPICards: React.FC = () => {
           <SpotlightCard key={card.key} delay={idx * 70} variant="danger">
             <div style={{ textAlign: 'center', padding: 'var(--spacer-12) 0' }}>
               <card.icon size={20} style={{ color: 'var(--status-error-default)', marginBottom: 'var(--spacer-8)' }} />
-              <div style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)' }}>加载失败</div>
+              <div style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)' }}>{t('dashboard.loadFailed')}</div>
               <button
                 onClick={fetchStats}
                 style={{
@@ -116,7 +119,7 @@ export const KPICards: React.FC = () => {
                 }}
               >
                 <RefreshCw size={12} style={{ marginRight: 4, display: 'inline' }} />
-                重试
+                {t('dashboard.retry')}
               </button>
             </div>
           </SpotlightCard>

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useStatsStore } from '../../store/statsStore';
 import { Card, Counter, EChart, getCssVar, useThemeVersion } from '../../components/ui';
 import type { EChartsOption } from '../../components/ui';
+import { useT } from '../../i18n';
 
 /** Resolve a `var(--token)` string to its computed value; pass through raw colors. */
 function resolveColor(input: string): string {
@@ -11,6 +12,7 @@ function resolveColor(input: string): string {
 }
 
 export const ModelDonutChart: React.FC = () => {
+  const t = useT();
   const modelBreakdown = useStatsStore((s) => s.modelBreakdown);
   const totalRequests = useStatsStore((s) => s.stats.totalRequests);
   const [hiddenModels, setHiddenModels] = useState<Set<string>>(new Set());
@@ -91,7 +93,7 @@ export const ModelDonutChart: React.FC = () => {
           marginBottom: 'var(--spacer-20)',
         }}
       >
-        模型调用分布
+        {t('dashboard.chart.modelDistribution')}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -103,7 +105,7 @@ export const ModelDonutChart: React.FC = () => {
               fontSize: 'var(--body-sm-font-size)',
             }}
           >
-            暂无数据
+            {t('dashboard.chart.noData')}
           </div>
         ) : (
           <>
@@ -150,7 +152,7 @@ export const ModelDonutChart: React.FC = () => {
                     lineHeight: 'var(--body-xs-line-height)',
                   }}
                 >
-                  总请求
+                  {t('dashboard.chart.totalRequests')}
                 </div>
               </div>
             </div>
@@ -241,7 +243,7 @@ export const ModelDonutChart: React.FC = () => {
                     e.currentTarget.style.opacity = '1';
                   }}
                 >
-                  显示全部
+                  {t('dashboard.chart.showAll')}
                 </div>
               )}
             </div>

@@ -3,6 +3,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useSettingsStore } from '../../store/settingsStore';
 import { desktopApi } from '../../lib/desktopApi';
 import { toast, Counter, StarBorder } from '../../components/ui';
+import { useT, t as tFn } from '../../i18n';
 import Prism from '../../components/ui/Prism';
 import { Play, Square, Copy, Check, Loader2, Cpu } from 'lucide-react';
 
@@ -41,6 +42,7 @@ const DURATION_SLOW = { duration: 0.4, ease: [0.22, 1, 0.36, 1] as const };
 const DURATION_FAST = { duration: 0.25, ease: [0.22, 1, 0.36, 1] as const };
 
 export const ProxyControl: React.FC = () => {
+  const t = useT();
   const shouldReduceMotion = useReducedMotion();
   const [status, setStatus] = useState<ProxyStatus | null>(null);
   const [toggling, setToggling] = useState(false);
@@ -97,10 +99,10 @@ export const ProxyControl: React.FC = () => {
     try {
       if (running) {
         await desktopApi.stopProxy();
-        toast('代理已停止', 'info');
+        toast(tFn('proxy.stoppedAgent'), 'info');
       } else {
         await desktopApi.startProxy(settings.host, settings.port);
-        toast('代理已启动', 'success');
+        toast(tFn('proxy.startedAgent'), 'success');
       }
       await desktopApi
         .getProxyStatus()
@@ -118,7 +120,7 @@ export const ProxyControl: React.FC = () => {
       await navigator.clipboard.writeText(endpoints[index].url);
       setCopiedEndpoint(index);
       setTimeout(() => setCopiedEndpoint(null), 2000);
-      toast('端点地址已复制', 'success');
+      toast(tFn('proxy.endpointCopied'), 'success');
     } catch {
       /* ignore */
     }
@@ -130,7 +132,7 @@ export const ProxyControl: React.FC = () => {
       await navigator.clipboard.writeText(authToken);
       setCopiedToken(true);
       setTimeout(() => setCopiedToken(false), 2000);
-      toast('认证令牌已复制', 'success');
+      toast(tFn('proxy.tokenCopied'), 'success');
     } catch {
       /* ignore */
     }
@@ -162,7 +164,7 @@ export const ProxyControl: React.FC = () => {
     {
       kind: 'token' as const,
       key: 'token',
-      label: '令牌',
+      label: tFn('proxy.token'),
       value: authToken,
       copied: copiedToken,
       onCopy: () => void copyToken(),
@@ -295,7 +297,7 @@ export const ProxyControl: React.FC = () => {
                       color: 'var(--text-default)',
                     }}
                   >
-                    本地代理
+                    {t('proxy.label')}
                     <motion.span
                       layout
                       initial={false}
@@ -361,7 +363,7 @@ export const ProxyControl: React.FC = () => {
                           exit={{ opacity: 0, y: 4 }}
                           transition={DURATION_FAST}
                         >
-                          {running ? '运行中' : '已停止'}
+                          {running ? t('proxy.running') : t('proxy.stopped')}
                         </motion.span>
                       </AnimatePresence>
                     </motion.span>
@@ -384,19 +386,19 @@ export const ProxyControl: React.FC = () => {
                           transition={DURATION_FAST}
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}
                         >
-                          已运行
+                          {t('proxy.uptime')}
                           {uptimeParts.hours > 0 && (
                             <>
                               <Counter value={uptimeParts.hours} {...counterProps} />
-                              <span>时</span>
+                              <span>{t('proxy.uptimeHours')}</span>
                             </>
                           )}
                           <Counter value={uptimeParts.mins} {...counterProps} />
-                          <span>分</span>
+                          <span>{t('proxy.uptimeMins')}</span>
                           {uptimeParts.hours === 0 && (
                             <>
                               <Counter value={uptimeParts.secs} {...counterProps} />
-                              <span>秒</span>
+                              <span>{t('proxy.uptimeSecs')}</span>
                             </>
                           )}
                         </motion.span>
@@ -408,7 +410,7 @@ export const ProxyControl: React.FC = () => {
                           exit={{ opacity: 0, y: -6 }}
                           transition={DURATION_FAST}
                         >
-                          其他应用可通过代理地址访问本服务
+                          {t('proxy.endpointHint')}
                         </motion.span>
                       )}
                     </AnimatePresence>
@@ -516,7 +518,7 @@ export const ProxyControl: React.FC = () => {
                     exit={{ opacity: 0, x: running ? 8 : -8 }}
                     transition={DURATION_FAST}
                   >
-                    {running ? '停止代理' : '启动代理'}
+                    {running ? t('proxy.stop') : t('proxy.start')}
                   </motion.span>
                 )}
               </AnimatePresence>
@@ -647,7 +649,7 @@ export const ProxyControl: React.FC = () => {
                       fontStyle: 'italic',
                     }}
                   >
-                    未设置（无需认证即可连接）
+                    {t('proxy.tokenUnset')}
                   </span>
                 )}
               </motion.div>

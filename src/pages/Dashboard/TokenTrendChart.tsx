@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Card, EChart, getCssVar, useThemeVersion } from '../../components/ui';
 import type { EChartsOption } from '../../components/ui';
 import { useStatsStore } from '../../store/statsStore';
+import { useT } from '../../i18n';
 
 interface TrendPoint {
   day: string;
@@ -40,6 +41,7 @@ function formatTokens(v: number): string {
 }
 
 export const TokenTrendChart: React.FC = () => {
+  const t = useT();
   const dailyUsage = useStatsStore((s) => s.dailyUsage);
   const timeRange = useStatsStore((s) => s.timeRange);
   const days = rangeToDays(timeRange);
@@ -144,7 +146,7 @@ export const TokenTrendChart: React.FC = () => {
           marginBottom: 'var(--spacer-20)',
         }}
       >
-        Token 用量趋势
+        {t('dashboard.chart.tokenTrend')}
         <span
           style={{
             fontSize: 'var(--body-sm-font-size)',
@@ -153,7 +155,7 @@ export const TokenTrendChart: React.FC = () => {
             fontWeight: 400,
           }}
         >
-          (近{days}日)
+          {t('dashboard.chart.tokenTrendPeriod', { days })}
         </span>
       </div>
       <div style={{ height: 220, position: 'relative' }}>
@@ -168,7 +170,7 @@ export const TokenTrendChart: React.FC = () => {
               fontSize: 'var(--body-sm-font-size)',
             }}
           >
-            暂无数据 — 启动代理并发送请求后将显示趋势
+            {t('dashboard.chart.tokenTrendEmpty')}
           </div>
         ) : (
           <EChart option={option} />
