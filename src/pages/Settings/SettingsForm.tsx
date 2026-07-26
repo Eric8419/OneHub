@@ -903,9 +903,9 @@ export const SettingsForm: React.FC = () => {
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0, 0, 0, 0.5)',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
+              background: 'rgba(0, 0, 0, 0.6)',
+              backdropFilter: 'blur(4px)',
+              WebkitBackdropFilter: 'blur(4px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -921,13 +921,13 @@ export const SettingsForm: React.FC = () => {
               exit={{ scale: 0.95, y: 8 }}
               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
               style={{
-                background: 'var(--bg-overlay-l2)',
-                border: '1px solid var(--border-subtle)',
+                background: 'var(--bg-base-default)',
+                border: '1px solid var(--border-neutral-l1)',
                 borderRadius: 'var(--radius-12)',
                 padding: 'var(--spacer-24)',
-                width: 420,
+                width: 440,
                 maxWidth: '90vw',
-                boxShadow: 'var(--shadow-floating)',
+                boxShadow: '0 24px 48px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08)',
               }}
             >
               <div
@@ -935,27 +935,28 @@ export const SettingsForm: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 'var(--spacer-12)',
-                  marginBottom: 'var(--spacer-16)',
+                  marginBottom: 'var(--spacer-20)',
                 }}
               >
                 <div
                   style={{
-                    width: 36,
-                    height: 36,
+                    width: 40,
+                    height: 40,
                     borderRadius: 'var(--radius-10)',
                     background: 'var(--bg-brand)',
                     color: 'var(--text-onbrand)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    flexShrink: 0,
                   }}
                 >
-                  <Download size={18} />
+                  <Download size={20} />
                 </div>
                 <div>
                   <div
                     style={{
-                      fontSize: 'var(--heading-xs-font-size)',
+                      fontSize: 'var(--body-lg-font-size)',
                       fontWeight: 'var(--font-weight-strong)',
                       color: 'var(--text-default)',
                     }}
@@ -964,8 +965,9 @@ export const SettingsForm: React.FC = () => {
                   </div>
                   <div
                     style={{
-                      fontSize: 'var(--body-xs-font-size)',
+                      fontSize: 'var(--body-sm-font-size)',
                       color: 'var(--text-tertiary)',
+                      marginTop: 2,
                     }}
                   >
                     v{pendingUpdate.currentVersion} → v{pendingUpdate.version}
@@ -976,16 +978,17 @@ export const SettingsForm: React.FC = () => {
               {pendingUpdate.body && (
                 <div
                   style={{
-                    marginBottom: 'var(--spacer-16)',
-                    padding: 'var(--spacer-12)',
-                    background: 'var(--bg-overlay-l1)',
+                    marginBottom: 'var(--spacer-20)',
+                    padding: 'var(--spacer-14)',
+                    background: 'var(--bg-base-secondary)',
+                    border: '1px solid var(--border-neutral-l1)',
                     borderRadius: 'var(--radius-8)',
                     maxHeight: 160,
                     overflowY: 'auto',
                     fontSize: 'var(--body-sm-font-size)',
-                    color: 'var(--text-secondary)',
+                    color: 'var(--text-default)',
                     whiteSpace: 'pre-wrap',
-                    lineHeight: 1.5,
+                    lineHeight: 1.6,
                   }}
                 >
                   {pendingUpdate.body}
