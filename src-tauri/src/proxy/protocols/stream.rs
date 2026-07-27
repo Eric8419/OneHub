@@ -8,7 +8,7 @@
 use super::ConversionError;
 use super::ProtocolKind;
 use serde_json::{json, Value};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SseFrame {
@@ -53,6 +53,20 @@ pub struct StreamConverter {
     responses_reasoning_index: u64,
     /// Responses 目标协议下累积的文本内容（用于完成事件）。
     responses_text_buf: String,
+    /// Responses 目标协议下累积的推理内容（用于完成事件中填充空消息）。
+    responses_reasoning_buf: String,
+    /// Responses 目标协议下 tool call 参数累积（output_index → arguments 字符串）。
+    responses_tool_args: HashMap<u64, String>,
+    /// Responses 目标协议下 tool call 的 item_id（output_index → item_id）。
+    responses_tool_ids: HashMap<u64, String>,
+    /// Responses 目标协议下 tool call 的 call_id（上游 tool index → call_id）。
+    responses_tool_call_ids: HashMap<u64, String>,
+    /// Responses 目标协议下 tool call 的名称（上游 tool index → name）。
+    responses_tool_names: HashMap<u64, String>,
+    /// 上游 tool index 到 Responses output_index 的映射。
+    responses_tool_output_indices: HashMap<u64, u64>,
+    /// 已完成的 Responses 输出项，按 output_index 保持原始顺序。
+    responses_completed_items: BTreeMap<u64, Value>,
     /// Anthropic → Responses 转换中，content_block index 到 item_id 的映射。
     anthropic_tool_item_ids: HashMap<u64, String>,
 }
@@ -93,6 +107,13 @@ impl StreamConverter {
             responses_msg_index: 0,
             responses_reasoning_index: 0,
             responses_text_buf: String::new(),
+            responses_reasoning_buf: String::new(),
+            responses_tool_args: HashMap::new(),
+            responses_tool_ids: HashMap::new(),
+            responses_tool_call_ids: HashMap::new(),
+            responses_tool_names: HashMap::new(),
+            responses_tool_output_indices: HashMap::new(),
+            responses_completed_items: BTreeMap::new(),
             anthropic_tool_item_ids: HashMap::new(),
         }
     }
@@ -136,6 +157,13 @@ impl StreamConverter {
             return Ok(Vec::new());
         }
         let frames = self.decoder.finish()?;
+        eprintln!(
+            "[stream] finish() called: source={:?} target={:?} completed={} content_started={} msg_started={} reasoning_started={} text_buf_len={} reasoning_buf_len={} leftover_frames={}",
+            self.source, self.target, self.completed, self.content_started,
+            self.responses_msg_started, self.responses_reasoning_started,
+            self.responses_text_buf.len(), self.responses_reasoning_buf.len(),
+            frames.len()
+        );
         let mut output = Vec::new();
         for frame in frames {
             match (self.source, self.target) {
@@ -160,6 +188,29 @@ impl StreamConverter {
                 _ => {}
             }
         }
+        // If the stream ended without a proper terminal event
+        // (some providers omit finish_reason), ensure the client
+        // receives a clean lifecycle completion.
+        if !self.completed
+            && (self.content_started
+                || self.responses_msg_started
+                || self.responses_reasoning_started)
+        {
+            eprintln!(
+                "[stream] finish() synthesizing terminal event for {:?}",
+                self.target
+            );
+            match self.target {
+                ProtocolKind::OpenAiResponses => {
+                    self.finish_responses("completed", &mut output)?;
+                }
+                ProtocolKind::AnthropicMessages => {
+                    self.finish_anthropic("end_turn", &mut output)?;
+                }
+                _ => {}
+            }
+        }
+        eprintln!("[stream] finish() done, output_len={}", output.len());
         Ok(output)
     }
 
@@ -333,87 +384,228 @@ impl StreamConverter {
         Ok(())
     }
 
-    /// 关闭 Responses 协议下所有已开启的输出项。
-    fn close_responses_items(
+    /// Finalise the Responses message output item (text).
+    /// If no text content was streamed, the accumulated reasoning
+    /// text is used as fallback so the client always sees content.
+    fn finalize_responses_text(
         &mut self,
         output: &mut Vec<u8>,
     ) -> Result<(), ConversionError> {
-        if self.responses_msg_started {
-            let idx = self.responses_msg_index;
-            let text = std::mem::take(&mut self.responses_text_buf);
+        let mut text = std::mem::take(&mut self.responses_text_buf);
+        // Fall back to reasoning text when the model only emitted
+        // thinking content and no visible text (DeepSeek, etc.).
+        if text.is_empty() && !self.responses_reasoning_buf.is_empty() {
+            text = std::mem::take(&mut self.responses_reasoning_buf);
+        }
+        if !self.responses_msg_started {
+            let index = self.next_block;
+            self.next_block += 1;
+            self.responses_msg_index = index;
             append_event(
                 output,
-                "response.output_text.done",
+                "response.output_item.added",
                 &json!({
-                    "type": "response.output_text.done",
-                    "item_id": "msg_melody",
-                    "output_index": idx,
-                    "content_index": 0,
-                    "text": text
-                }),
-            )?;
-            append_event(
-                output,
-                "response.content_part.done",
-                &json!({
-                    "type": "response.content_part.done",
-                    "item_id": "msg_melody",
-                    "output_index": idx,
-                    "content_index": 0,
-                    "part": {
-                        "type": "output_text",
-                        "text": text
-                    }
-                }),
-            )?;
-            append_event(
-                output,
-                "response.output_item.done",
-                &json!({
-                    "type": "response.output_item.done",
-                    "output_index": idx,
+                    "type": "response.output_item.added",
+                    "output_index": index,
                     "item": {
                         "type": "message",
                         "id": "msg_melody",
                         "role": "assistant",
-                        "status": "completed",
-                        "content": [{
-                            "type": "output_text",
-                            "text": text
-                        }]
+                        "status": "in_progress",
+                        "content": []
                     }
                 }),
             )?;
-            self.responses_msg_started = false;
-        }
-        if self.responses_reasoning_started {
-            let idx = self.responses_reasoning_index;
             append_event(
                 output,
-                "response.reasoning_summary_part.done",
+                "response.content_part.added",
                 &json!({
-                    "type": "response.reasoning_summary_part.done",
-                    "item_id": "rs_melody",
-                    "output_index": idx,
-                    "summary_index": 0
+                    "type": "response.content_part.added",
+                    "item_id": "msg_melody",
+                    "output_index": index,
+                    "content_index": 0,
+                    "part": {
+                        "type": "output_text",
+                        "text": ""
+                    }
                 }),
             )?;
+            self.responses_msg_started = true;
+        }
+        let idx = self.responses_msg_index;
+        append_event(
+            output,
+            "response.output_text.done",
+            &json!({
+                "type": "response.output_text.done",
+                "item_id": "msg_melody",
+                "output_index": idx,
+                "content_index": 0,
+                "text": text
+            }),
+        )?;
+        append_event(
+            output,
+            "response.content_part.done",
+            &json!({
+                "type": "response.content_part.done",
+                "item_id": "msg_melody",
+                "output_index": idx,
+                "content_index": 0,
+                "part": {
+                    "type": "output_text",
+                    "text": text
+                }
+            }),
+        )?;
+        let item = json!({
+            "type": "message",
+            "id": "msg_melody",
+            "role": "assistant",
+            "status": "completed",
+            "content": [{
+                "type": "output_text",
+                "text": text
+            }]
+        });
+        append_event(
+            output,
+            "response.output_item.done",
+            &json!({
+                "type": "response.output_item.done",
+                "output_index": idx,
+                "item": item
+            }),
+        )?;
+        self.responses_completed_items.insert(idx, item);
+        self.responses_msg_started = false;
+        Ok(())
+    }
+
+    /// Finalise the Responses reasoning output item.
+    fn finalize_responses_reasoning(
+        &mut self,
+        output: &mut Vec<u8>,
+    ) -> Result<(), ConversionError> {
+        if !self.responses_reasoning_started {
+            return Ok(());
+        }
+        let idx = self.responses_reasoning_index;
+        let text = std::mem::take(&mut self.responses_reasoning_buf);
+        append_event(
+            output,
+            "response.reasoning_summary_part.done",
+            &json!({
+                "type": "response.reasoning_summary_part.done",
+                "item_id": "rs_melody",
+                "output_index": idx,
+                "summary_index": 0
+            }),
+        )?;
+        let item = json!({
+            "type": "reasoning",
+            "id": "rs_melody",
+            "summary": [
+                {"type": "summary_text", "text": text}
+            ],
+            "status": "completed"
+        });
+        append_event(
+            output,
+            "response.output_item.done",
+            &json!({
+                "type": "response.output_item.done",
+                "output_index": idx,
+                "item": item
+            }),
+        )?;
+        self.responses_completed_items.insert(idx, item);
+        self.responses_reasoning_started = false;
+        Ok(())
+    }
+
+    /// Close all open Responses output items (text + reasoning + tools).
+    fn close_responses_items(
+        &mut self,
+        output: &mut Vec<u8>,
+    ) -> Result<(), ConversionError> {
+        // A tool-only response must not gain a fabricated empty message.
+        // Reasoning-only responses still get a text fallback so clients
+        // that do not render reasoning have something visible.
+        if self.responses_msg_started
+            || (!self.responses_reasoning_buf.is_empty()
+                && self.started_tools.is_empty())
+        {
+            self.finalize_responses_text(output)?;
+        }
+        self.finalize_responses_reasoning(output)?;
+        self.close_tool_call_items(output)?;
+        Ok(())
+    }
+
+    /// Close all open function_call output items by sending
+    /// `response.function_call_arguments.done` and `response.output_item.done`.
+    /// The AI SDK requires explicit closure of every output item
+    /// before `response.completed`.
+    fn close_tool_call_items(
+        &mut self,
+        output: &mut Vec<u8>,
+    ) -> Result<(), ConversionError> {
+        let mut indices: Vec<u64> = self.started_tools.iter().copied().collect();
+        indices.sort_unstable_by_key(|index| {
+            self.responses_tool_output_indices
+                .get(index)
+                .copied()
+                .unwrap_or(u64::MAX)
+        });
+        for index in indices {
+            let args = self.responses_tool_args.remove(&index).unwrap_or_default();
+            let item_id = self
+                .responses_tool_ids
+                .remove(&index)
+                .unwrap_or_else(|| format!("fc_call_melody_{index}"));
+            let call_id = self
+                .responses_tool_call_ids
+                .remove(&index)
+                .unwrap_or_else(|| format!("call_melody_{index}"));
+            let name = self
+                .responses_tool_names
+                .remove(&index)
+                .unwrap_or_else(|| "tool".to_string());
+            let output_index = self
+                .responses_tool_output_indices
+                .remove(&index)
+                .unwrap_or(index);
+            append_event(
+                output,
+                "response.function_call_arguments.done",
+                &json!({
+                    "type": "response.function_call_arguments.done",
+                    "item_id": item_id,
+                    "output_index": output_index,
+                    "arguments": args
+                }),
+            )?;
+            let item = json!({
+                "type": "function_call",
+                "id": item_id,
+                "call_id": call_id,
+                "name": name,
+                "arguments": args,
+                "status": "completed"
+            });
             append_event(
                 output,
                 "response.output_item.done",
                 &json!({
                     "type": "response.output_item.done",
-                    "output_index": idx,
-                    "item": {
-                        "type": "reasoning",
-                        "id": "rs_melody",
-                        "summary": [],
-                        "status": "completed"
-                    }
+                    "output_index": output_index,
+                    "item": item
                 }),
             )?;
-            self.responses_reasoning_started = false;
+            self.responses_completed_items.insert(output_index, item);
         }
+        self.started_tools.clear();
         Ok(())
     }
 
@@ -728,6 +920,10 @@ impl StreamConverter {
         output: &mut Vec<u8>,
     ) -> Result<(), ConversionError> {
         if frame.data == "[DONE]" {
+            eprintln!(
+                "[stream] OpenAI Chat → Responses: received [DONE], completed={}",
+                self.completed
+            );
             if !self.completed {
                 self.finish_responses("completed", output)?;
             }
@@ -736,6 +932,25 @@ impl StreamConverter {
         let value = parse_json_frame(&frame, "OpenAI Chat")?;
         self.capture_openai_metadata(&value);
         self.start_responses(output)?;
+        let has_text = value
+            .pointer("/choices/0/delta/content")
+            .and_then(Value::as_str)
+            .is_some();
+        let has_reasoning = value
+            .pointer("/choices/0/delta/reasoning_content")
+            .or_else(|| value.pointer("/choices/0/delta/reasoning"))
+            .and_then(Value::as_str)
+            .is_some();
+        let has_finish = value
+            .pointer("/choices/0/finish_reason")
+            .and_then(Value::as_str)
+            .is_some();
+        let has_tools = value
+            .pointer("/choices/0/delta/tool_calls")
+            .and_then(Value::as_array)
+            .is_some();
+        eprintln!("[stream] OpenAI Chat → Responses: text={}, reasoning={}, finish={}, tools={}, output_len={}",
+            has_text, has_reasoning, has_finish, has_tools, output.len());
         if let Some(text) = value
             .pointer("/choices/0/delta/content")
             .and_then(Value::as_str)
@@ -755,6 +970,7 @@ impl StreamConverter {
             .and_then(Value::as_str)
         {
             self.ensure_responses_reasoning(output)?;
+            self.responses_reasoning_buf.push_str(reasoning);
             let idx = self.responses_reasoning_index;
             append_event(
                 output,
@@ -768,15 +984,29 @@ impl StreamConverter {
         {
             for tool_call in tool_calls {
                 let index = tool_call.get("index").and_then(Value::as_u64).unwrap_or(0);
-                let call_id = tool_call
-                    .get("id")
-                    .and_then(Value::as_str)
-                    .unwrap_or("call_melody");
                 if self.started_tools.insert(index) {
+                    let call_id = tool_call
+                        .get("id")
+                        .and_then(Value::as_str)
+                        .unwrap_or("call_melody")
+                        .to_string();
+                    let name = tool_call
+                        .pointer("/function/name")
+                        .and_then(Value::as_str)
+                        .unwrap_or("tool")
+                        .to_string();
+                    let item_id = format!("fc_{call_id}");
+                    let output_index = self.next_block;
+                    self.next_block += 1;
+                    self.responses_tool_ids.insert(index, item_id.clone());
+                    self.responses_tool_call_ids.insert(index, call_id.clone());
+                    self.responses_tool_names.insert(index, name.clone());
+                    self.responses_tool_output_indices
+                        .insert(index, output_index);
                     append_event(
                         output,
                         "response.output_item.added",
-                        &json!({"type":"response.output_item.added","output_index":index,"item":{"type":"function_call","id":format!("fc_{call_id}"),"call_id":call_id,"name":tool_call.pointer("/function/name").and_then(Value::as_str).unwrap_or("tool"),"arguments":"","status":"in_progress"}}),
+                        &json!({"type":"response.output_item.added","output_index":output_index,"item":{"type":"function_call","id":item_id,"call_id":call_id,"name":name,"arguments":"","status":"in_progress"}}),
                     )?;
                 }
                 if let Some(arguments) = tool_call
@@ -784,21 +1014,32 @@ impl StreamConverter {
                     .and_then(Value::as_str)
                     .filter(|arguments| !arguments.is_empty())
                 {
+                    self.responses_tool_args
+                        .entry(index)
+                        .or_default()
+                        .push_str(arguments);
+                    let item_id = self
+                        .responses_tool_ids
+                        .get(&index)
+                        .cloned()
+                        .unwrap_or_else(|| "fc_call_melody".to_string());
+                    let output_index = self
+                        .responses_tool_output_indices
+                        .get(&index)
+                        .copied()
+                        .unwrap_or(index);
                     append_event(
                         output,
                         "response.function_call_arguments.delta",
-                        &json!({"type":"response.function_call_arguments.delta","item_id":format!("fc_{call_id}"),"output_index":index,"delta":arguments}),
+                        &json!({"type":"response.function_call_arguments.delta","item_id":item_id,"output_index":output_index,"delta":arguments}),
                     )?;
                 }
             }
         }
-        if value
-            .pointer("/choices/0/finish_reason")
-            .and_then(Value::as_str)
-            .is_some()
-        {
-            self.finish_responses("completed", output)?;
-        }
+        // Do not complete the Responses lifecycle from finish_reason alone.
+        // Some OpenAI-compatible providers repeat a non-null finish_reason
+        // on every streamed chunk. Completing here makes clients disconnect
+        // after the first token. [DONE] or EOF is the authoritative boundary.
         Ok(())
     }
 
@@ -853,11 +1094,16 @@ impl StreamConverter {
                     == Some("thinking_delta") =>
             {
                 self.ensure_responses_reasoning(output)?;
+                let thinking = value
+                    .pointer("/delta/thinking")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                self.responses_reasoning_buf.push_str(thinking);
                 let idx = self.responses_reasoning_index;
                 append_event(
                     output,
                     "response.reasoning_summary_text.delta",
-                    &json!({"type":"response.reasoning_summary_text.delta","item_id":"rs_melody","output_index":idx,"summary_index":0,"delta":value.pointer("/delta/thinking").and_then(Value::as_str).unwrap_or_default()}),
+                    &json!({"type":"response.reasoning_summary_text.delta","item_id":"rs_melody","output_index":idx,"summary_index":0,"delta":thinking}),
                 )?;
             }
             "content_block_start"
@@ -870,11 +1116,25 @@ impl StreamConverter {
                     .and_then(Value::as_str)
                     .unwrap_or("call_melody");
                 let item_id = format!("fc_{call_id}");
+                let name = value
+                    .pointer("/content_block/name")
+                    .and_then(Value::as_str)
+                    .unwrap_or("tool")
+                    .to_string();
+                let output_index = self.next_block;
+                self.next_block += 1;
                 self.anthropic_tool_item_ids.insert(index, item_id.clone());
+                self.started_tools.insert(index);
+                self.responses_tool_ids.insert(index, item_id.clone());
+                self.responses_tool_call_ids
+                    .insert(index, call_id.to_string());
+                self.responses_tool_names.insert(index, name.clone());
+                self.responses_tool_output_indices
+                    .insert(index, output_index);
                 append_event(
                     output,
                     "response.output_item.added",
-                    &json!({"type":"response.output_item.added","output_index":index,"item":{"type":"function_call","id":item_id,"call_id":call_id,"name":value.pointer("/content_block/name").and_then(Value::as_str).unwrap_or("tool"),"arguments":"","status":"in_progress"}}),
+                    &json!({"type":"response.output_item.added","output_index":output_index,"item":{"type":"function_call","id":item_id,"call_id":call_id,"name":name,"arguments":"","status":"in_progress"}}),
                 )?;
             }
             "content_block_delta"
@@ -888,10 +1148,23 @@ impl StreamConverter {
                     .get(&block_index)
                     .cloned()
                     .unwrap_or_else(|| "fc_call_melody".to_string());
+                let output_index = self
+                    .responses_tool_output_indices
+                    .get(&block_index)
+                    .copied()
+                    .unwrap_or(block_index);
+                let partial = value
+                    .pointer("/delta/partial_json")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                self.responses_tool_args
+                    .entry(block_index)
+                    .or_default()
+                    .push_str(partial);
                 append_event(
                     output,
                     "response.function_call_arguments.delta",
-                    &json!({"type":"response.function_call_arguments.delta","item_id":item_id,"output_index":block_index,"delta":value.pointer("/delta/partial_json").and_then(Value::as_str).unwrap_or_default()}),
+                    &json!({"type":"response.function_call_arguments.delta","item_id":item_id,"output_index":output_index,"delta":partial}),
                 )?;
             }
             "message_delta" => {
@@ -1153,11 +1426,18 @@ impl StreamConverter {
         if self.completed {
             return Ok(());
         }
+        // Ensure response.created has been sent (cc-switch pattern:
+        // always emit the lifecycle start before terminal events).
+        if !self.content_started {
+            self.start_responses(output)?;
+        }
         self.close_responses_items(output)?;
+        let completed_output: Vec<Value> =
+            self.responses_completed_items.values().cloned().collect();
         append_event(
             output,
             "response.completed",
-            &json!({"type":"response.completed","response":{"id":non_empty(&self.id,"resp_melody"),"object":"response","status":status,"model":non_empty(&self.model,"unknown"),"output":[],"usage":{"input_tokens":self.input_tokens,"output_tokens":self.output_tokens,"total_tokens":self.input_tokens+self.output_tokens}}}),
+            &json!({"type":"response.completed","response":{"id":non_empty(&self.id,"resp_melody"),"object":"response","status":status,"model":non_empty(&self.model,"unknown"),"output":completed_output,"usage":{"input_tokens":self.input_tokens,"output_tokens":self.output_tokens,"total_tokens":self.input_tokens+self.output_tokens}}}),
         )?;
         self.completed = true;
         Ok(())
@@ -1610,6 +1890,65 @@ mod tests {
         assert!(output.contains("\"type\":\"response.content_part.done\""));
         assert!(output.contains("\"type\":\"response.output_item.done\""));
         assert!(output.contains("\"type\":\"response.completed\""));
+    }
+
+    #[test]
+    fn does_not_complete_responses_when_provider_repeats_finish_reason() {
+        let mut converter = StreamConverter::new(
+            ProtocolKind::OpenAiChat,
+            ProtocolKind::OpenAiResponses,
+        );
+
+        let first = concat!(
+            "data: {\"id\":\"chat_1\",\"model\":\"deepseek-v4\",\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"The\"},\"finish_reason\":\"stop\"}]}\n\n"
+        );
+        let first_output =
+            String::from_utf8(converter.push(first.as_bytes()).unwrap()).unwrap();
+        assert!(first_output.contains("\"delta\":\"The\""));
+        assert!(!first_output.contains("\"type\":\"response.completed\""));
+
+        let remaining = concat!(
+            "data: {\"id\":\"chat_1\",\"model\":\"deepseek-v4\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"你好！\"},\"finish_reason\":\"stop\"}]}\n\n",
+            "data: [DONE]\n\n"
+        );
+        let remaining_output =
+            String::from_utf8(converter.push(remaining.as_bytes()).unwrap()).unwrap();
+        assert!(remaining_output.contains("\"delta\":\"你好！\""));
+        assert!(remaining_output.contains("\"type\":\"response.completed\""));
+    }
+
+    #[test]
+    fn converts_chat_tool_call_to_distinct_complete_responses_item() {
+        let mut converter = StreamConverter::new(
+            ProtocolKind::OpenAiChat,
+            ProtocolKind::OpenAiResponses,
+        );
+        let input = concat!(
+            "data: {\"id\":\"chat_1\",\"model\":\"deepseek-v4\",\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"Need a command\"},\"finish_reason\":\"stop\"}]}\n\n",
+            "data: {\"id\":\"chat_1\",\"model\":\"deepseek-v4\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_123\",\"type\":\"function\",\"function\":{\"name\":\"exec_command\",\"arguments\":\"{\\\"cmd\\\":\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\n",
+            "data: {\"id\":\"chat_1\",\"model\":\"deepseek-v4\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"pwd\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\n",
+            "data: [DONE]\n\n"
+        );
+
+        let output =
+            String::from_utf8(converter.push(input.as_bytes()).unwrap()).unwrap();
+        assert!(output.contains("\"call_id\":\"call_123\""));
+        assert!(output.contains("\"name\":\"exec_command\""));
+        assert!(output.contains("\"arguments\":\"{\\\"cmd\\\":\\\"pwd\\\"}\""));
+        assert!(output.contains("\"output_index\":0"));
+        assert!(output.contains("\"output_index\":1"));
+        assert!(!output.contains("\"name\":\"tool\""));
+        assert!(!output.contains("\"type\":\"message\""));
+        assert!(output.contains("\"type\":\"response.completed\""));
+
+        let completed = output
+            .rsplit_once("event: response.completed")
+            .map(|(_, event)| event)
+            .unwrap();
+        assert!(!completed.contains("\"output\":[]"));
+        let reasoning_pos = completed.find("\"type\":\"reasoning\"").unwrap();
+        let tool_pos = completed.find("\"type\":\"function_call\"").unwrap();
+        assert!(reasoning_pos < tool_pos);
     }
 
     #[test]

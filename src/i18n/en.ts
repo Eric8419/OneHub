@@ -341,6 +341,13 @@ const en: Record<string, string> = {
   'window.maximize': 'Maximize',
   'window.restore': 'Restore',
   'window.close': 'Close',
+
+  // Routing mode labels
+  'routing.mode.label': 'Calling Mode',
+  'routing.mode.roundRobin': 'Round Robin',
+  'routing.mode.roundRobinDesc': 'Distribute requests evenly across upstreams',
+  'routing.mode.failover': 'Failover',
+  'routing.mode.failoverDesc': 'Stick to first available upstream, auto-switch on failure',
 };
 
 export default en;

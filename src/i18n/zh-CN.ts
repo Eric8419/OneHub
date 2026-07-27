@@ -346,6 +346,13 @@ const zh: Record<string, string> = {
   'window.maximize': '最大化',
   'window.restore': '还原',
   'window.close': '关闭',
+
+  // Routing mode labels
+  'routing.mode.label': '调用模式',
+  'routing.mode.roundRobin': '轮询',
+  'routing.mode.roundRobinDesc': '请求均匀分发到各上游',
+  'routing.mode.failover': '粘性',
+  'routing.mode.failoverDesc': '优先使用第一个可用上游，不可用时自动切换',
 };
 
 export default zh;

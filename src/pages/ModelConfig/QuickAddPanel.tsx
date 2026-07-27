@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useAggregationStore } from '../../store/aggregationStore';
 import { useProviderStore } from '../../store/providerStore';
-import { Card, SectionTitle, toast, Dropdown } from '../../components/ui';
-import { STRATEGY_OPTIONS, normalizeStrategyKey } from '../../types/aggregation';
+import { Card, SectionTitle, toast, Dropdown, Switch, FlexRow } from '../../components/ui';
+import { Shuffle, Pin } from 'lucide-react';
 import type { RouteTarget } from '../../types/aggregation';
+import { useT } from '../../i18n';
 
 const priorityOptions = [
   { value: 'P0', label: 'P0' },
@@ -18,9 +19,9 @@ const protocolForFlavor = (flavor?: string): NonNullable<RouteTarget['protocol']
 };
 
 export const QuickAddPanel: React.FC = () => {
+  const t = useT();
   const [name, setName] = useState('');
-  // Store the stable enum key, not a localized label.
-  const [strategy, setStrategy] = useState('round-robin');
+  const [roundRobin, setRoundRobin] = useState(true);
   const [priority, setPriority] = useState('P0');
   const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
   const [nameError, setNameError] = useState(false);
@@ -71,7 +72,7 @@ export const QuickAddPanel: React.FC = () => {
             enabled: true,
           })),
         // Persist the normalized enum key.
-        strategy: normalizeStrategyKey(strategy),
+        strategy: roundRobin ? 'round-robin' : 'sequential',
         priority,
         enabled: true,
       });
@@ -141,7 +142,7 @@ export const QuickAddPanel: React.FC = () => {
           </div>
           <div
             className="mc-quick-add__field"
-            style={{ flex: 1, minWidth: 140, display: 'flex', flexDirection: 'column', gap: 'var(--spacer-6)' }}
+            style={{ flex: 1, minWidth: 180, display: 'flex', flexDirection: 'column', gap: 'var(--spacer-6)' }}
           >
             <label
               style={{
@@ -150,9 +151,21 @@ export const QuickAddPanel: React.FC = () => {
                 color: 'var(--text-tertiary)',
               }}
             >
-              路由策略
+              {t('routing.mode.label')}
             </label>
-            <Dropdown options={STRATEGY_OPTIONS} value={strategy} onChange={setStrategy} className="mc-select" />
+            <FlexRow gap="var(--spacer-10)" style={{ height: 36, alignItems: 'center' }}>
+              <Switch checked={roundRobin} onChange={setRoundRobin} />
+              <FlexRow gap="var(--spacer-6)" style={{ alignItems: 'center' }}>
+                {roundRobin ? (
+                  <Shuffle size={14} style={{ color: 'var(--icon-tertiary)', flexShrink: 0 }} />
+                ) : (
+                  <Pin size={14} style={{ color: 'var(--icon-tertiary)', flexShrink: 0 }} />
+                )}
+                <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)' }}>
+                  {roundRobin ? t('routing.mode.roundRobin') : t('routing.mode.failover')}
+                </span>
+              </FlexRow>
+            </FlexRow>
           </div>
           <div
             className="mc-quick-add__field"

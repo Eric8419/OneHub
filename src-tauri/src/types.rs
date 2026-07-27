@@ -138,6 +138,16 @@ pub struct Provider {
     /// disabled, the global upstream proxy setting is used.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub proxy_config: Option<ProviderProxyConfig>,
+    /// When `false`, system prompts are merged into the first user
+    /// message for OpenAI Chat / OpenAI-compatible upstreams instead
+    /// of being sent as `role: "system"`. This is needed for
+    /// providers that reject the `system` role.
+    #[serde(default = "default_supports_system_role")]
+    pub supports_system_role: bool,
+}
+
+fn default_supports_system_role() -> bool {
+    true
 }
 
 fn default_flavor() -> String {

@@ -1,9 +1,10 @@
 import { Fragment, useState } from 'react';
 import { useAggregationStore } from '../../store/aggregationStore';
-import { Card, SectionTitle, Tag, Switch, ConfirmDialog, Dropdown } from '../../components/ui';
-import { Pencil, Trash2, List } from 'lucide-react';
-import { STRATEGY_OPTIONS, strategyLabel, normalizeStrategyKey } from '../../types/aggregation';
+import { Card, SectionTitle, Tag, Switch, ConfirmDialog, FlexRow } from '../../components/ui';
+import { Pencil, Trash2, List, Shuffle, Pin } from 'lucide-react';
+import { normalizeStrategyKey } from '../../types/aggregation';
 import type { RouteTarget } from '../../types/aggregation';
+import { useT } from '../../i18n';
 
 const priorityTag: Record<string, 'brand' | 'blue' | 'neutral'> = {
   P0: 'brand',
@@ -12,10 +13,11 @@ const priorityTag: Record<string, 'brand' | 'blue' | 'neutral'> = {
 };
 
 export const AggregationTable: React.FC = () => {
+  const t = useT();
   const { aggregations, updateAggregation, removeAggregation } = useAggregationStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
-  const [editStrategy, setEditStrategy] = useState('');
+  const [editRoundRobin, setEditRoundRobin] = useState(true);
   const [editTargets, setEditTargets] = useState<RouteTarget[]>([]);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
@@ -24,8 +26,8 @@ export const AggregationTable: React.FC = () => {
     if (agg) {
       setEditingId(id);
       setEditName(agg.name);
-      // Edit using the stable enum key (normalized for legacy data).
-      setEditStrategy(normalizeStrategyKey(agg.strategy));
+      // ON = round-robin, OFF = sequential (failover).
+      setEditRoundRobin(normalizeStrategyKey(agg.strategy) !== 'sequential');
       setEditTargets(agg.targets?.map((target) => ({ ...target })) ?? []);
     }
   };
@@ -33,10 +35,9 @@ export const AggregationTable: React.FC = () => {
   const saveEdit = async () => {
     if (editingId) {
       try {
-        // Persist the normalized enum key.
         await updateAggregation(editingId, {
           name: editName,
-          strategy: normalizeStrategyKey(editStrategy),
+          strategy: editRoundRobin ? 'round-robin' : 'sequential',
           targets: editTargets,
         });
         setEditingId(null);
@@ -142,7 +143,7 @@ export const AggregationTable: React.FC = () => {
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  路由策略
+                  {t('routing.mode.label')}
                 </th>
                 <th
                   style={{
@@ -258,14 +259,38 @@ export const AggregationTable: React.FC = () => {
                       }}
                     >
                       {editingId === a.id ? (
-                        <Dropdown
-                          options={STRATEGY_OPTIONS}
-                          value={editStrategy}
-                          onChange={setEditStrategy}
-                          size="sm"
-                        />
+                        <FlexRow gap="var(--spacer-10)">
+                          <Switch
+                            checked={editRoundRobin}
+                            onChange={setEditRoundRobin}
+                          />
+                          <span
+                            style={{
+                              fontSize: 'var(--body-sm-font-size)',
+                              color: 'var(--text-secondary)',
+                            }}
+                          >
+                            {editRoundRobin ? t('routing.mode.roundRobin') : t('routing.mode.failover')}
+                          </span>
+                        </FlexRow>
                       ) : (
-                        <span style={{ color: 'var(--text-secondary)' }}>{strategyLabel(a.strategy)}</span>
+                        <FlexRow gap="var(--spacer-8)">
+                          {normalizeStrategyKey(a.strategy) !== 'sequential' ? (
+                            <>
+                              <Shuffle size={14} style={{ color: 'var(--icon-tertiary)', flexShrink: 0 }} />
+                              <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--body-sm-font-size)' }}>
+                                {t('routing.mode.roundRobin')}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <Pin size={14} style={{ color: 'var(--icon-tertiary)', flexShrink: 0 }} />
+                              <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--body-sm-font-size)' }}>
+                                {t('routing.mode.failover')}
+                              </span>
+                            </>
+                          )}
+                        </FlexRow>
                       )}
                     </td>
                     <td

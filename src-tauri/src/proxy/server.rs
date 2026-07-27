@@ -65,6 +65,12 @@ pub async fn start(
         .await
         .map_err(|e| format!("Failed to bind proxy on {}:{}: {}", host, port, e))?;
 
+    // A manual stop/start is an explicit recovery action. Runtime health
+    // state belongs to the old server session and otherwise leaves every
+    // matching provider filtered out even after a successful restart.
+    crate::proxy::routing::reset_provider_health(&state.routing).await;
+    eprintln!("[proxy] Provider health state reset for new server session");
+
     let (tx, rx) = tokio::sync::oneshot::channel::<()>();
 
     let task_host = host.clone();
@@ -685,11 +691,26 @@ async fn proxy_request(
     ));
     let mut source_body = body.clone();
     source_body["model"] = json!(upstream_model);
-    let upstream_body = crate::proxy::protocols::convert_request(
-        &source_body,
-        inbound_protocol,
-        outbound_protocol,
-    )
+
+    // Some providers reject the `system` role in OpenAI Chat format.
+    // When the outbound target doesn't support it, convert system content
+    // into a user message instead.
+    let system_to_user = outbound_protocol
+        == crate::proxy::protocols::ProtocolKind::OpenAiChat
+        && !route.provider.supports_system_role;
+    let upstream_body = if system_to_user {
+        crate::proxy::protocols::convert_request_with_system_to_user(
+            &source_body,
+            inbound_protocol,
+            outbound_protocol,
+        )
+    } else {
+        crate::proxy::protocols::convert_request(
+            &source_body,
+            inbound_protocol,
+            outbound_protocol,
+        )
+    }
     .map_err(|error| {
         (
             StatusCode::UNPROCESSABLE_ENTITY,
@@ -732,6 +753,61 @@ async fn proxy_request(
     }
     req_builder = req_builder.json(&upstream_body);
 
+    // Log the upstream request for debugging stream truncation issues.
+    // Mask the messages content to avoid leaking sensitive data.
+    if is_streaming {
+        let mut debug_body = upstream_body.clone();
+        if let Some(messages) = debug_body
+            .get_mut("messages")
+            .and_then(|m| m.as_array_mut())
+        {
+            for msg in messages.iter_mut() {
+                if let Some(content) = msg.get_mut("content") {
+                    if content.is_string() {
+                        let s = content.as_str().unwrap_or("");
+                        *content = json!(format!("<{} chars>", s.len()));
+                    } else if content.is_array() {
+                        *content = json!(format!(
+                            "<{} content blocks>",
+                            content.as_array().unwrap().len()
+                        ));
+                    }
+                }
+                if let Some(input) = msg.get_mut("input") {
+                    *input = json!("<input omitted>");
+                }
+            }
+        }
+        if let Some(input) = debug_body.get_mut("input") {
+            if input.is_string() {
+                let s = input.as_str().unwrap_or("");
+                *input = json!(format!("<{} chars>", s.len()));
+            } else if input.is_array() {
+                *input =
+                    json!(format!("<{} input items>", input.as_array().unwrap().len()));
+            }
+        }
+        let has_max_tokens = debug_body
+            .get("max_tokens")
+            .or_else(|| debug_body.get("max_output_tokens"))
+            .is_some();
+        let has_stop = debug_body.get("stop").is_some();
+        let tools_count = debug_body
+            .get("tools")
+            .and_then(|t| t.as_array())
+            .map(|a| a.len())
+            .unwrap_or(0);
+        eprintln!(
+            "[proxy] upstream request: model={} stream={} tools={} max_tokens_set={} stop_set={} body={}",
+            upstream_model,
+            debug_body.get("stream").and_then(|s| s.as_bool()).unwrap_or(false),
+            tools_count,
+            has_max_tokens,
+            has_stop,
+            serde_json::to_string(&debug_body).unwrap_or_default()
+        );
+    }
+
     let request_type = adapter.request_type().to_string();
     let request_type_streaming = format!("{} (streaming)", request_type);
 
@@ -739,6 +815,12 @@ async fn proxy_request(
         Ok(r) => r,
         Err(e) => {
             let err_msg = format!("Upstream request failed: {}", e);
+            eprintln!(
+                "[proxy] {} request to provider '{}' failed before response: {}",
+                request_id,
+                provider_name,
+                sanitize_error(&err_msg)
+            );
             finalize_record(
                 &state.metrics,
                 &state.routing,
@@ -837,7 +919,15 @@ async fn proxy_request(
             let mut buffer: Vec<u8> = Vec::new();
             let mut stream = upstream_resp.bytes_stream();
             let mut had_error = false;
-            let mut converter = if stream_source != stream_target {
+            let mut total_upstream_bytes: usize = 0;
+            let mut total_sent_bytes: usize = 0;
+            let mut chunk_count: usize = 0;
+            let has_converter = stream_source != stream_target;
+            eprintln!(
+                "[proxy] streaming task started: source={:?} target={:?} has_converter={}",
+                stream_source, stream_target, has_converter
+            );
+            let mut converter = if has_converter {
                 Some(crate::proxy::protocols::stream::StreamConverter::new(
                     stream_source,
                     stream_target,
@@ -849,11 +939,18 @@ async fn proxy_request(
             while let Some(chunk) = stream.next().await {
                 match chunk {
                     Ok(bytes) => {
+                        chunk_count += 1;
+                        total_upstream_bytes += bytes.len();
                         buffer.extend_from_slice(&bytes);
                         let outgoing = if let Some(converter) = converter.as_mut() {
                             match converter.push(&bytes) {
-                                Ok(converted) => axum::body::Bytes::from(converted),
+                                Ok(converted) => {
+                                    let b = axum::body::Bytes::from(converted);
+                                    total_sent_bytes += b.len();
+                                    b
+                                }
                                 Err(error) => {
+                                    eprintln!("[proxy] converter.push error: {}", error);
                                     let _ = tx
                                         .send(Err(std::io::Error::other(
                                             error.to_string(),
@@ -864,17 +961,20 @@ async fn proxy_request(
                                 }
                             }
                         } else {
+                            total_sent_bytes += bytes.len();
                             bytes
                         };
                         if outgoing.is_empty() {
                             continue;
                         }
                         if tx.send(Ok(outgoing)).await.is_err() {
+                            eprintln!("[proxy] client disconnected, stopping read");
                             // Client disconnected — stop reading.
                             break;
                         }
                     }
                     Err(e) => {
+                        eprintln!("[proxy] upstream chunk error: {}", e);
                         let io_err = std::io::Error::other(e);
                         let _ = tx.send(Err(io_err)).await;
                         had_error = true;
@@ -882,20 +982,32 @@ async fn proxy_request(
                     }
                 }
             }
+            eprintln!(
+                "[proxy] upstream stream ended: had_error={} total_upstream_bytes={} total_sent_bytes={} chunk_count={}",
+                had_error, total_upstream_bytes, total_sent_bytes, chunk_count
+            );
             if !had_error {
                 if let Some(converter) = converter.as_mut() {
                     match converter.finish() {
                         Ok(remaining) if !remaining.is_empty() => {
+                            eprintln!(
+                                "[proxy] converter.finish() produced {} bytes",
+                                remaining.len()
+                            );
                             if tx
                                 .send(Ok(axum::body::Bytes::from(remaining)))
                                 .await
                                 .is_err()
                             {
+                                eprintln!(
+                                    "[proxy] client disconnected during finish() send"
+                                );
                                 had_error = true;
                             }
                         }
                         Ok(_) => {}
                         Err(error) => {
+                            eprintln!("[proxy] converter.finish() error: {}", error);
                             let _ = tx
                                 .send(Err(std::io::Error::other(error.to_string())))
                                 .await;
@@ -1674,6 +1786,7 @@ mod tests {
             api_flavor: "openai-compatible".into(),
             model_mapping: None,
             proxy_config: None,
+            supports_system_role: true,
             models: vec![
                 crate::types::Model {
                     id: "gpt-4".into(),
@@ -1773,6 +1886,7 @@ mod tests {
             api_flavor: "openai-compatible".into(),
             model_mapping: None,
             proxy_config: None,
+            supports_system_role: true,
             models: vec![
                 crate::types::Model {
                     id: "m1".into(),

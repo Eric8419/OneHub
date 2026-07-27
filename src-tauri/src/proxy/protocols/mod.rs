@@ -64,6 +64,27 @@ pub fn convert_request(
     source: ProtocolKind,
     target: ProtocolKind,
 ) -> Result<Value, ConversionError> {
+    convert_request_inner(body, source, target, false)
+}
+
+/// Like [`convert_request`], but when `system_to_user` is `true`,
+/// system content is merged into the first user message instead of
+/// being sent as a `system` role.  This is needed for providers
+/// that reject the `system` role in OpenAI Chat format.
+pub fn convert_request_with_system_to_user(
+    body: &Value,
+    source: ProtocolKind,
+    target: ProtocolKind,
+) -> Result<Value, ConversionError> {
+    convert_request_inner(body, source, target, true)
+}
+
+fn convert_request_inner(
+    body: &Value,
+    source: ProtocolKind,
+    target: ProtocolKind,
+    system_to_user: bool,
+) -> Result<Value, ConversionError> {
     if source == target {
         return Ok(body.clone());
     }
@@ -76,7 +97,9 @@ pub fn convert_request(
 
     match target {
         ProtocolKind::AnthropicMessages => encode_anthropic_request(&canonical),
-        ProtocolKind::OpenAiChat => encode_openai_chat_request(&canonical),
+        ProtocolKind::OpenAiChat => {
+            encode_openai_chat_request_inner(&canonical, system_to_user)
+        }
         ProtocolKind::OpenAiResponses => encode_responses_request(&canonical),
     }
 }
@@ -1106,14 +1129,18 @@ fn decode_openai_chat_request(
             tools
                 .iter()
                 .enumerate()
-                .map(|(index, tool)| {
-                    if tool.get("type").and_then(Value::as_str) != Some("function") {
-                        return Err(ConversionError::invalid(
-                            "tools",
-                            format!("$.tools[{index}].type"),
-                            "only function tools are supported",
-                        ));
+                .filter(|(index, tool)| {
+                    let is_fn =
+                        tool.get("type").and_then(Value::as_str) == Some("function");
+                    if !is_fn {
+                        eprintln!(
+                            "skipping non-function tool at $.tools[{index}]: {:?}",
+                            tool.get("type").and_then(Value::as_str)
+                        );
                     }
+                    is_fn
+                })
+                .map(|(index, tool)| {
                     let function = tool.get("function").ok_or_else(|| {
                         ConversionError::invalid(
                             "tools",
@@ -1446,7 +1473,7 @@ fn decode_anthropic_request(body: &Value) -> Result<CanonicalRequest, Conversion
 
 fn decode_responses_request(body: &Value) -> Result<CanonicalRequest, ConversionError> {
     let model = required_string(body, "model")?;
-    let system = match body.get("instructions") {
+    let mut system = match body.get("instructions") {
         None => vec![],
         Some(value) => text_blocks(value, "$.instructions")?,
     };
@@ -1476,9 +1503,50 @@ fn decode_responses_request(body: &Value) -> Result<CanonicalRequest, Conversion
                 });
             match item_type.as_str() {
                 "message" => {
-                    let role = match item.get("role").and_then(Value::as_str) {
-                        Some("user") => Role::User,
-                        Some("assistant") => Role::Assistant,
+                    let role_str = item.get("role").and_then(Value::as_str);
+                    match role_str {
+                        Some("user") => {
+                            messages.push(Message {
+                                role: Role::User,
+                                content: text_blocks(
+                                    item.get("content").ok_or_else(|| {
+                                        ConversionError::invalid(
+                                            "input",
+                                            format!("$.input[{index}].content"),
+                                            "content is required",
+                                        )
+                                    })?,
+                                    &format!("$.input[{index}].content"),
+                                )?,
+                            });
+                        }
+                        Some("assistant") => {
+                            messages.push(Message {
+                                role: Role::Assistant,
+                                content: text_blocks(
+                                    item.get("content").ok_or_else(|| {
+                                        ConversionError::invalid(
+                                            "input",
+                                            format!("$.input[{index}].content"),
+                                            "content is required",
+                                        )
+                                    })?,
+                                    &format!("$.input[{index}].content"),
+                                )?,
+                            });
+                        }
+                        Some("developer") => {
+                            // Developer messages carry system-level
+                            // instructions with higher priority than
+                            // the top-level `instructions` field.
+                            let blocks = text_blocks(
+                                item.get("content")
+                                    .unwrap_or(&Value::String(String::new())),
+                                &format!("$.input[{index}].content"),
+                            )
+                            .unwrap_or_default();
+                            system.extend(blocks);
+                        }
                         other => {
                             return Err(ConversionError::invalid(
                                 "input",
@@ -1487,19 +1555,6 @@ fn decode_responses_request(body: &Value) -> Result<CanonicalRequest, Conversion
                             ))
                         }
                     };
-                    messages.push(Message {
-                        role,
-                        content: text_blocks(
-                            item.get("content").ok_or_else(|| {
-                                ConversionError::invalid(
-                                    "input",
-                                    format!("$.input[{index}].content"),
-                                    "content is required",
-                                )
-                            })?,
-                            &format!("$.input[{index}].content"),
-                        )?,
-                    });
                 }
                 "function_call" => {
                     let arguments_text = item
@@ -1512,37 +1567,49 @@ fn decode_responses_request(body: &Value) -> Result<CanonicalRequest, Conversion
                             "expected a JSON string",
                         )
                     })?;
-                    messages.push(Message {
-                        role: Role::Assistant,
-                        content: vec![ContentBlock::ToolCall {
-                            id: item
-                                .get("call_id")
-                                .or_else(|| item.get("id"))
-                                .and_then(Value::as_str)
-                                .unwrap_or("call_melody")
-                                .to_string(),
-                            name: item
-                                .get("name")
-                                .and_then(Value::as_str)
-                                .ok_or_else(|| {
-                                    ConversionError::invalid(
-                                        "tool_calls",
-                                        format!("$.input[{index}].name"),
-                                        "expected a string",
-                                    )
-                                })?
-                                .to_string(),
-                            arguments: serde_json::from_str(arguments_text).map_err(
-                                |error| {
-                                    ConversionError::invalid(
-                                        "tool_calls",
-                                        format!("$.input[{index}].arguments"),
-                                        format!("invalid JSON arguments: {error}"),
-                                    )
-                                },
-                            )?,
-                        }],
-                    });
+                    let tool_call = ContentBlock::ToolCall {
+                        id: item
+                            .get("call_id")
+                            .or_else(|| item.get("id"))
+                            .and_then(Value::as_str)
+                            .unwrap_or("call_melody")
+                            .to_string(),
+                        name: item
+                            .get("name")
+                            .and_then(Value::as_str)
+                            .ok_or_else(|| {
+                                ConversionError::invalid(
+                                    "tool_calls",
+                                    format!("$.input[{index}].name"),
+                                    "expected a string",
+                                )
+                            })?
+                            .to_string(),
+                        arguments: serde_json::from_str(arguments_text).map_err(
+                            |error| {
+                                ConversionError::invalid(
+                                    "tool_calls",
+                                    format!("$.input[{index}].arguments"),
+                                    format!("invalid JSON arguments: {error}"),
+                                )
+                            },
+                        )?,
+                    };
+                    // Responses emits reasoning and function calls as sibling
+                    // output items. They belong to one OpenAI Chat assistant
+                    // turn and DeepSeek requires them to be passed back
+                    // together on the tool-result continuation.
+                    if let Some(message) = messages
+                        .last_mut()
+                        .filter(|message| message.role == Role::Assistant)
+                    {
+                        message.content.push(tool_call);
+                    } else {
+                        messages.push(Message {
+                            role: Role::Assistant,
+                            content: vec![tool_call],
+                        });
+                    }
                 }
                 "function_call_output" => {
                     messages.push(Message {
@@ -1566,6 +1633,54 @@ fn decode_responses_request(body: &Value) -> Result<CanonicalRequest, Conversion
                             is_error: false,
                         }],
                     });
+                }
+                "reasoning" => {
+                    // Reasoning items preserve the model's thinking
+                    // from previous turns.  Attach to the last
+                    // assistant message.
+                    let summary = item
+                        .get("summary")
+                        .and_then(Value::as_array)
+                        .map(|parts| {
+                            parts
+                                .iter()
+                                .filter_map(|p| {
+                                    if p.get("type").and_then(Value::as_str)
+                                        == Some("summary_text")
+                                    {
+                                        p.get("text")
+                                            .and_then(Value::as_str)
+                                            .map(|s| s.to_string())
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect::<Vec<_>>()
+                                .join("\n")
+                        })
+                        .unwrap_or_default();
+                    if !summary.is_empty() {
+                        let is_prev_assistant = messages
+                            .last()
+                            .map(|m| m.role == Role::Assistant)
+                            .unwrap_or(false);
+                        if is_prev_assistant {
+                            messages.last_mut().unwrap().content.push(
+                                ContentBlock::Reasoning {
+                                    text: summary,
+                                    signature: None,
+                                },
+                            );
+                        } else {
+                            messages.push(Message {
+                                role: Role::Assistant,
+                                content: vec![ContentBlock::Reasoning {
+                                    text: summary,
+                                    signature: None,
+                                }],
+                            });
+                        }
+                    }
                 }
                 other => {
                     return Err(ConversionError::invalid(
@@ -1592,14 +1707,18 @@ fn decode_responses_request(body: &Value) -> Result<CanonicalRequest, Conversion
             tools
                 .iter()
                 .enumerate()
-                .map(|(index, tool)| {
-                    if tool.get("type").and_then(Value::as_str) != Some("function") {
-                        return Err(ConversionError::invalid(
-                            "tools",
-                            format!("$.tools[{index}].type"),
-                            "only function tools are supported across protocols",
-                        ));
+                .filter(|(index, tool)| {
+                    let is_fn =
+                        tool.get("type").and_then(Value::as_str) == Some("function");
+                    if !is_fn {
+                        eprintln!(
+                            "skipping non-function tool at $.tools[{index}]: {:?}",
+                            tool.get("type").and_then(Value::as_str)
+                        );
                     }
+                    is_fn
+                })
+                .map(|(index, tool)| {
                     Ok(ToolDefinition {
                         name: tool
                             .get("name")
@@ -1801,26 +1920,37 @@ fn canonical_blocks_to_plain_text(
         .map(|parts| parts.join("\n"))
 }
 
-fn encode_openai_chat_request(
+fn encode_openai_chat_request_inner(
     request: &CanonicalRequest,
+    system_to_user: bool,
 ) -> Result<Value, ConversionError> {
     let mut body = Map::new();
     body.insert("model".into(), Value::String(request.model.clone()));
     let mut messages = Vec::new();
     if !request.system.is_empty() {
-        messages.push(serde_json::json!({
-            "role": "system",
-            "content": canonical_blocks_to_openai_chat(
-                &request.system,
-                "$.system",
-            )?
-        }));
+        let system_content =
+            canonical_blocks_to_openai_chat(&request.system, "$.system")?;
+        if system_to_user {
+            // Prepend system content as a user message — required
+            // for providers (e.g. DeepSeek) that reject the `system`
+            // role.
+            messages.push(serde_json::json!({
+                "role": "user",
+                "content": system_content,
+            }));
+        } else {
+            messages.push(serde_json::json!({
+                "role": "system",
+                "content": system_content,
+            }));
+        }
     }
     for (index, message) in request.messages.iter().enumerate() {
         match message.role {
             Role::Assistant => {
                 let mut normal_blocks = Vec::new();
                 let mut tool_calls = Vec::new();
+                let mut reasoning_content = Vec::new();
                 for (block_index, block) in message.content.iter().enumerate() {
                     match block {
                         ContentBlock::ToolCall {
@@ -1840,6 +1970,9 @@ fn encode_openai_chat_request(
                                     ))?,
                             }
                         })),
+                        ContentBlock::Reasoning { text, .. } => {
+                            reasoning_content.push(text.clone())
+                        }
                         other => normal_blocks.push(other.clone()),
                     }
                 }
@@ -1857,6 +1990,10 @@ fn encode_openai_chat_request(
                 });
                 if !tool_calls.is_empty() {
                     encoded["tool_calls"] = Value::Array(tool_calls);
+                }
+                if !reasoning_content.is_empty() {
+                    encoded["reasoning_content"] =
+                        Value::String(reasoning_content.join("\n"));
                 }
                 messages.push(encoded);
             }
@@ -1929,18 +2066,23 @@ fn encode_openai_chat_request(
         );
     }
     if let Some(tool_choice) = &request.tool_choice {
-        body.insert(
-            "tool_choice".into(),
-            match tool_choice {
-                ToolChoice::Auto => Value::String("auto".into()),
-                ToolChoice::None => Value::String("none".into()),
-                ToolChoice::Required => Value::String("required".into()),
-                ToolChoice::Tool { name } => serde_json::json!({
-                    "type": "function",
-                    "function": {"name": name},
-                }),
-            },
-        );
+        // Only include tool_choice when tools are actually present.
+        // A tool_choice without tools causes undefined behaviour
+        // (some providers try to force tool use with no tools available).
+        if !request.tools.is_empty() {
+            body.insert(
+                "tool_choice".into(),
+                match tool_choice {
+                    ToolChoice::Auto => Value::String("auto".into()),
+                    ToolChoice::None => Value::String("none".into()),
+                    ToolChoice::Required => Value::String("required".into()),
+                    ToolChoice::Tool { name } => serde_json::json!({
+                        "type": "function",
+                        "function": {"name": name},
+                    }),
+                },
+            );
+        }
     }
     if let Some(output_format) = &request.output_format {
         body.insert(
@@ -2129,15 +2271,18 @@ fn encode_anthropic_request(
         );
     }
     if let Some(tool_choice) = &request.tool_choice {
-        let value = match tool_choice {
-            ToolChoice::Auto => serde_json::json!({"type": "auto"}),
-            ToolChoice::Required => serde_json::json!({"type": "any"}),
-            ToolChoice::Tool { name } => {
-                serde_json::json!({"type": "tool", "name": name})
-            }
-            ToolChoice::None => serde_json::json!({"type": "none"}),
-        };
-        body.insert("tool_choice".into(), value);
+        // Only include tool_choice when tools are actually present.
+        if !request.tools.is_empty() {
+            let value = match tool_choice {
+                ToolChoice::Auto => serde_json::json!({"type": "auto"}),
+                ToolChoice::Required => serde_json::json!({"type": "any"}),
+                ToolChoice::Tool { name } => {
+                    serde_json::json!({"type": "tool", "name": name})
+                }
+                ToolChoice::None => serde_json::json!({"type": "none"}),
+            };
+            body.insert("tool_choice".into(), value);
+        }
     }
     if let Some(output_format) = &request.output_format {
         match output_format {
@@ -2526,6 +2671,66 @@ mod tests {
             .unwrap()
             .iter()
             .any(|item| item["type"] == "function_call_output"));
+    }
+
+    #[test]
+    fn responses_tool_continuation_preserves_deepseek_reasoning_content() {
+        let input = json!({
+            "model": "deepseek-v4-flash",
+            "input": [
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "List files"}]
+                },
+                {
+                    "type": "reasoning",
+                    "summary": [{
+                        "type": "summary_text",
+                        "text": "I need to inspect the directory."
+                    }]
+                },
+                {
+                    "type": "function_call",
+                    "id": "fc_call_1",
+                    "call_id": "call_1",
+                    "name": "exec_command",
+                    "arguments": "{\"cmd\":\"ls\"}"
+                },
+                {
+                    "type": "function_call_output",
+                    "call_id": "call_1",
+                    "output": "Cargo.toml"
+                }
+            ],
+            "tools": [{
+                "type": "function",
+                "name": "exec_command",
+                "description": "Run a command",
+                "parameters": {"type": "object"}
+            }]
+        });
+
+        let converted = convert_request(
+            &input,
+            ProtocolKind::OpenAiResponses,
+            ProtocolKind::OpenAiChat,
+        )
+        .expect("tool continuation should be representable");
+        let messages = converted["messages"].as_array().unwrap();
+
+        assert_eq!(messages.len(), 3);
+        assert_eq!(messages[1]["role"], "assistant");
+        assert_eq!(
+            messages[1]["reasoning_content"],
+            "I need to inspect the directory."
+        );
+        assert_eq!(
+            messages[1]["tool_calls"][0]["function"]["name"],
+            "exec_command"
+        );
+        assert_eq!(messages[2]["role"], "tool");
+        assert_eq!(messages[2]["tool_call_id"], "call_1");
     }
 
     #[test]

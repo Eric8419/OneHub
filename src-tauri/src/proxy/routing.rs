@@ -216,6 +216,13 @@ pub async fn mark_provider_unhealthy(
         .entry(provider_id.to_string())
         .or_default();
     health.mark_unhealthy(kind);
+    eprintln!(
+        "[proxy] Provider {} health degraded: kind={:?} consecutive_failures={} available={}",
+        provider_id,
+        kind,
+        health.consecutive_failures,
+        health.is_available()
+    );
 }
 
 /// Mark a provider as healthy after a successful request.
@@ -244,6 +251,15 @@ pub async fn release_provider_slot(state: &SharedRouting, provider_id: &str) {
     if let Some(health) = cfg.provider_health.get_mut(provider_id) {
         health.release_slot();
     }
+}
+
+/// Clear all transient provider health state.
+///
+/// Provider health is intentionally kept only in memory. A manual proxy
+/// restart is an explicit recovery action, so stale cooldowns, failure
+/// counters, and in-flight counts must not survive it.
+pub async fn reset_provider_health(state: &SharedRouting) {
+    state.write().await.provider_health.clear();
 }
 
 /// Split an aggregation's comma-separated model list into trimmed names.
@@ -324,20 +340,69 @@ pub async fn route_request(
     //    across all providers that offer the same model.
     //    Filter out excluded, unhealthy, protocol-incompatible,
     //    and capability-mismatched.
-    let direct_hits: Vec<_> = cfg
+    let mut model_exists = false;
+    let mut excluded_by_health = false;
+    let mut excluded_by_protocol = false;
+    let mut excluded_by_capability = false;
+
+    let direct_matches: Vec<_> = cfg
         .providers
         .iter()
         .flat_map(|p| p.models.iter().map(move |m| (p, m)))
         .filter(|(_, m)| {
-            m.name == model_or_agg || m.alias.as_deref() == Some(model_or_agg)
+            let hit = m.name == model_or_agg || m.alias.as_deref() == Some(model_or_agg);
+            if hit {
+                model_exists = true;
+            }
+            hit
         })
-        .filter(|(p, _)| is_provider_available(&cfg, &p.id, excluded_providers))
-        .filter(|(p, _)| {
-            crate::proxy::adapter::is_protocol_compatible(inbound_flavor, &p.api_flavor)
-        })
-        .filter(|(_, m)| capabilities.is_satisfied_by(m))
-        .map(|(p, m)| (p.clone(), m.name.clone()))
         .collect();
+
+    let mut direct_hits = Vec::new();
+    let mut health_fallback_hits = Vec::new();
+    for (provider, model) in direct_matches {
+        if !crate::proxy::adapter::is_protocol_compatible(
+            inbound_flavor,
+            &provider.api_flavor,
+        ) {
+            excluded_by_protocol = true;
+            continue;
+        }
+        if !capabilities.is_satisfied_by(model) {
+            excluded_by_capability = true;
+            continue;
+        }
+        // An explicit per-request exclusion means this provider already
+        // failed during the current failover loop and must not be retried.
+        if excluded_providers.contains(&provider.id) {
+            excluded_by_health = true;
+            continue;
+        }
+        let hit = (provider.clone(), model.name.clone());
+        if cfg
+            .provider_health
+            .get(&provider.id)
+            .map(|health| health.is_available())
+            .unwrap_or(true)
+        {
+            direct_hits.push(hit);
+        } else {
+            excluded_by_health = true;
+            health_fallback_hits.push(hit);
+        }
+    }
+
+    // Fail open when health cooldown is the only thing preventing a direct
+    // model route. Circuit breaking should prefer another healthy provider,
+    // but it must not turn a recoverable upstream failure into a permanent
+    // local "filtered out" error when every matching provider is cooling down.
+    if direct_hits.is_empty() && !health_fallback_hits.is_empty() {
+        eprintln!(
+            "[proxy] All providers for model '{}' are in cooldown; attempting a health fallback",
+            model_or_agg
+        );
+        direct_hits = health_fallback_hits;
+    }
 
     if !direct_hits.is_empty() {
         let rr_key = format!("direct:{}", model_or_agg);
@@ -526,7 +591,27 @@ pub async fn route_request(
                 picked
             ))
         }
-        None => Err(format!("Unknown model or aggregation: '{}'", model_or_agg)),
+        None => {
+            if model_exists {
+                let mut reasons: Vec<&str> = Vec::new();
+                if excluded_by_health {
+                    reasons.push("provider unhealthy or excluded");
+                }
+                if excluded_by_protocol {
+                    reasons.push("protocol incompatible");
+                }
+                if excluded_by_capability {
+                    reasons.push("model capability mismatch");
+                }
+                Err(format!(
+                    "Model '{}' was found but all matching providers were filtered out: {}",
+                    model_or_agg,
+                    reasons.join(", ")
+                ))
+            } else {
+                Err(format!("Unknown model or aggregation: '{}'", model_or_agg))
+            }
+        }
     }
 }
 
@@ -657,6 +742,93 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn reset_provider_health_clears_cooldowns_and_in_flight_counts() {
+        let state = make_state();
+        mark_provider_unhealthy(&state, "p1", HealthErrorKind::AuthError).await;
+        acquire_provider_slot(&state, "p1").await;
+
+        {
+            let cfg = state.read().await;
+            let health = cfg.provider_health.get("p1").unwrap();
+            assert!(!health.is_available());
+            assert_eq!(health.in_flight, 1);
+        }
+
+        reset_provider_health(&state).await;
+
+        let cfg = state.read().await;
+        assert!(cfg.provider_health.is_empty());
+        assert!(is_provider_available(
+            &cfg,
+            "p1",
+            &std::collections::HashSet::new()
+        ));
+    }
+
+    #[tokio::test]
+    async fn direct_route_fails_open_when_cooldown_is_the_only_filter() {
+        let state = make_state();
+        {
+            let mut cfg = state.write().await;
+            cfg.providers.push(Provider {
+                id: "p1".into(),
+                name: "Cooling Down".into(),
+                api_base: "https://example.com".into(),
+                api_key: "key".into(),
+                status: "active".into(),
+                models: vec![Model {
+                    id: "m1".into(),
+                    name: "gpt-4".into(),
+                    alias: None,
+                    context_window: None,
+                    max_output_tokens: None,
+                    supports_vision: false,
+                    supports_reasoning: false,
+                    supports_reasoning_effort: false,
+                    default_reasoning_effort: None,
+                    supports_tool_calls: true,
+                    supports_json_mode: false,
+                }],
+                api_flavor: "openai".into(),
+                api_key_encrypted: false,
+                model_mapping: None,
+                proxy_config: None,
+                supports_system_role: true,
+            });
+        }
+        mark_provider_unhealthy(&state, "p1", HealthErrorKind::AuthError).await;
+
+        let route = route_request(
+            &state,
+            "gpt-4",
+            &std::collections::HashSet::new(),
+            &RequestCapabilities {
+                needs_tools: true,
+                ..Default::default()
+            },
+            "openai",
+        )
+        .await
+        .expect("health cooldown alone should not block the only route");
+        assert_eq!(route.provider.id, "p1");
+
+        let excluded = std::collections::HashSet::from(["p1".to_string()]);
+        let error = match route_request(
+            &state,
+            "gpt-4",
+            &excluded,
+            &RequestCapabilities::default(),
+            "openai",
+        )
+        .await
+        {
+            Ok(_) => panic!("explicitly excluded provider must not be retried"),
+            Err(error) => error,
+        };
+        assert!(error.contains("provider unhealthy or excluded"));
+    }
+
+    #[tokio::test]
     async fn direct_model_match_advances_direct_rr() {
         let state = make_state();
         {
@@ -712,6 +884,7 @@ mod tests {
                     api_key_encrypted: false,
                     model_mapping: None,
                     proxy_config: None,
+                    supports_system_role: true,
                 });
             }
         }
@@ -769,6 +942,7 @@ mod tests {
                 api_key_encrypted: false,
                 model_mapping: None,
                 proxy_config: None,
+                supports_system_role: true,
             });
             cfg.aggregations.push(Aggregation {
                 id: "unified-id".into(),
@@ -901,6 +1075,7 @@ mod tests {
             api_key_encrypted: false,
             model_mapping: mapping,
             proxy_config: None,
+            supports_system_role: true,
         }
     }
 
@@ -1008,6 +1183,7 @@ mod tests {
                 api_key_encrypted: false,
                 model_mapping: None,
                 proxy_config: None,
+                supports_system_role: true,
             });
             // Provider 2: model does NOT support tools.
             cfg.providers.push(Provider {
@@ -1033,6 +1209,7 @@ mod tests {
                 api_key_encrypted: false,
                 model_mapping: None,
                 proxy_config: None,
+                supports_system_role: true,
             });
         }
 
@@ -1077,6 +1254,7 @@ mod tests {
                 api_key_encrypted: false,
                 model_mapping: None,
                 proxy_config: None,
+                supports_system_role: true,
             });
         }
 
