@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.8 (2026-07-28)
+
+### 修复
+- 修复 Codex 通过 Responses API 使用 OpenAI Chat 兼容上游时，流式响应被过早截断的问题
+- 修复 function call 的生命周期、参数分片、工具名称和输出顺序，支持 Codex 连续调用工具
+- 修复 DeepSeek thinking mode 工具续轮缺少 `reasoning_content` 的问题
+- 修复所有匹配 Provider 进入健康冷却后无法恢复路由的问题
+- 修复 Windows 应用与任务栏图标缺少圆角和透明边距的问题
+
+### 变更
+- Responses 完成事件现在携带按 `output_index` 排序的完整输出项
+- 代理重启时重置临时 Provider 健康状态，并增强上游连接错误诊断日志
+
 ## 0.1.6 (2026-07-25)
 
 ### 新增
