@@ -484,15 +484,19 @@ fn status_to_health_kind(status: u16) -> crate::proxy::routing::HealthErrorKind 
     }
 }
 
+struct OrchestrationRequestContext<'a> {
+    is_streaming: bool,
+    request_id: String,
+    inbound_flavor: &'a str,
+    attempt: u32,
+    original_provider: String,
+}
+
 async fn execute_orchestration_route(
     state: &SharedAppState,
     route: RouteResult,
     body: Value,
-    is_streaming: bool,
-    request_id: String,
-    inbound_flavor: &str,
-    attempt: u32,
-    original_provider: String,
+    context: OrchestrationRequestContext<'_>,
 ) -> Result<Response, (StatusCode, Json<Value>)> {
     let provider_id = route.provider.id.clone();
     let adapter = crate::proxy::adapter::resolve(&route.outbound_flavor);
@@ -500,13 +504,13 @@ async fn execute_orchestration_route(
         state,
         route,
         body,
-        is_streaming,
+        context.is_streaming,
         adapter.as_ref(),
         ProxyRequestContext {
-            request_id: &request_id,
-            inbound_flavor,
-            failover_count: attempt,
-            original_provider: &original_provider,
+            request_id: &context.request_id,
+            inbound_flavor: context.inbound_flavor,
+            failover_count: context.attempt,
+            original_provider: &context.original_provider,
         },
     )
     .await;
@@ -598,11 +602,13 @@ async fn orchestrate_routes(
                 state,
                 route,
                 threaded_body.clone(),
-                is_last && is_streaming,
-                format!("{request_id}:pipeline:{index}"),
-                inbound_flavor,
-                index as u32,
-                original_provider.clone(),
+                OrchestrationRequestContext {
+                    is_streaming: is_last && is_streaming,
+                    request_id: format!("{request_id}:pipeline:{index}"),
+                    inbound_flavor,
+                    attempt: index as u32,
+                    original_provider: original_provider.clone(),
+                },
             )
             .await?;
             if is_last {
@@ -641,11 +647,13 @@ async fn orchestrate_routes(
                 state,
                 route,
                 panel_body.clone(),
-                false,
-                format!("{request_id}:fusion:{index}"),
-                inbound_flavor,
-                index as u32,
-                original_provider.clone(),
+                OrchestrationRequestContext {
+                    is_streaming: false,
+                    request_id: format!("{request_id}:fusion:{index}"),
+                    inbound_flavor,
+                    attempt: index as u32,
+                    original_provider: original_provider.clone(),
+                },
             )
         });
     let panel_results = futures::future::join_all(panel_calls).await;
@@ -680,11 +688,13 @@ async fn orchestrate_routes(
         state,
         judge,
         judge_body,
-        is_streaming,
-        format!("{request_id}:fusion:judge"),
-        inbound_flavor,
-        answers.len() as u32,
-        original_provider,
+        OrchestrationRequestContext {
+            is_streaming,
+            request_id: format!("{request_id}:fusion:judge"),
+            inbound_flavor,
+            attempt: answers.len() as u32,
+            original_provider,
+        },
     )
     .await
 }
