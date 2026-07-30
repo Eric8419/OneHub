@@ -2,13 +2,14 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProviderStore } from '../../store/providerStore';
 import { useAggregationStore } from '../../store/aggregationStore';
-import { strategyLabel } from '../../types/aggregation';
-import type { Aggregation } from '../../types/aggregation';
+import { normalizeStrategyKey, strategyLabel } from '../../types/aggregation';
+import type { Aggregation, RouteTarget, RoutingStrategy } from '../../types/aggregation';
 import type { Model, Provider } from '../../types/provider';
-import { Card, AnimatedContent } from '../../components/ui';
+import { Card, AnimatedContent, Button } from '../../components/ui';
 import { toast } from '../../components/ui/Toast';
 import { ModelBulkEditPanel, type BulkEditValues } from './ModelBulkEditPanel';
 import { ModelSourcesTable, type SourceRow, type PendingEdits, type ModelPatch } from './ModelSourcesTable';
+import { RoutingStrategySelect } from './RoutingStrategySelect';
 import { useT } from '../../i18n';
 import {
   ArrowLeft,
@@ -23,6 +24,8 @@ import {
   FileText,
   Wrench,
   Braces,
+  Route,
+  Save,
 } from 'lucide-react';
 
 interface DirectMapping {
@@ -46,16 +49,34 @@ interface AggMapping {
 
 type MappingSource = DirectMapping | AggMapping;
 
+const protocolForFlavor = (flavor?: string): NonNullable<RouteTarget['protocol']> => {
+  if (flavor === 'anthropic' || flavor === 'anthropic-messages') return 'anthropic-messages';
+  if (flavor === 'responses' || flavor === 'openai-responses') return 'openai-responses';
+  return 'openai-chat';
+};
+
+const createId = (prefix: string) =>
+  `${prefix}-${crypto.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2)}`;
+
 export const ModelDetailPage: React.FC = () => {
+  const t = useT();
   const { modelName } = useParams<{ modelName: string }>();
   const navigate = useNavigate();
   const { providers, updateProvider } = useProviderStore();
-  const aggregations = useAggregationStore((s) => s.aggregations);
+  const { aggregations, addAggregation, updateAggregation } = useAggregationStore();
 
   const decodedName = decodeURIComponent(modelName || '');
 
   const [pendingEdits, setPendingEdits] = useState<PendingEdits>(new Map());
   const [saving, setSaving] = useState(false);
+  const currentRouting = useMemo(
+    () => aggregations.find((aggregation) => aggregation.name === decodedName),
+    [aggregations, decodedName],
+  );
+  const [routingStrategy, setRoutingStrategy] = useState<RoutingStrategy>(
+    normalizeStrategyKey(currentRouting?.strategy ?? 'round-robin') as RoutingStrategy,
+  );
+  const [routingSaving, setRoutingSaving] = useState(false);
 
   const sources = useMemo<MappingSource[]>(() => {
     const result: MappingSource[] = [];
@@ -179,6 +200,27 @@ export const ModelDetailPage: React.FC = () => {
   }, [aggregations, decodedName]);
 
   const allRows = useMemo(() => [...directSources, ...aggSources], [directSources, aggSources]);
+  const routingTargetCount =
+    currentRouting?.targets?.filter((target) => target.enabled).length ||
+    currentRouting?.models
+      .split(',')
+      .map((model) => model.trim())
+      .filter(Boolean).length ||
+    directSources.length;
+
+  const generatedRoutingTargets = useMemo<RouteTarget[]>(
+    () =>
+      directSources.map((row, index) => ({
+        id: createId(`model-route-target-${index}`),
+        providerId: row.providerId,
+        model: row.model.name,
+        protocol: protocolForFlavor(row.provider.apiFlavor),
+        priority: 0,
+        weight: 1,
+        enabled: true,
+      })),
+    [directSources],
+  );
 
   const bulkInitialValues: BulkEditValues = useMemo(() => {
     const ms = directSources.map((r) => r.model);
@@ -295,6 +337,49 @@ export const ModelDetailPage: React.FC = () => {
     }
   }, [pendingEdits, providers, decodedName, updateProvider]);
 
+  const handleSaveRouting = useCallback(async () => {
+    if (!currentRouting && generatedRoutingTargets.length === 0) {
+      toast(t('models.routing.noSources'), 'error');
+      return;
+    }
+
+    setRoutingSaving(true);
+    try {
+      if (currentRouting) {
+        await updateAggregation(currentRouting.id, {
+          strategy: routingStrategy,
+          enabled: true,
+        });
+      } else {
+        await addAggregation({
+          id: createId('model-route'),
+          name: decodedName,
+          models: generatedRoutingTargets.map((target) => target.model).join(', '),
+          targets: generatedRoutingTargets,
+          strategy: routingStrategy,
+          priority: 'P0',
+          enabled: true,
+        });
+      }
+      toast(t('models.routing.saved'), 'success');
+    } catch (error) {
+      toast(
+        `${t('models.routing.saveFailed')}: ${error instanceof Error ? error.message : String(error)}`,
+        'error',
+      );
+    } finally {
+      setRoutingSaving(false);
+    }
+  }, [
+    addAggregation,
+    currentRouting,
+    decodedName,
+    generatedRoutingTargets,
+    routingStrategy,
+    t,
+    updateAggregation,
+  ]);
+
   const handleRemoveModel = useCallback(
     async (providerId: string) => {
       const provider = providers.find((p) => p.id === providerId);
@@ -314,6 +399,12 @@ export const ModelDetailPage: React.FC = () => {
   useEffect(() => {
     setPendingEdits(new Map());
   }, [decodedName]);
+
+  useEffect(() => {
+    setRoutingStrategy(
+      normalizeStrategyKey(currentRouting?.strategy ?? 'round-robin') as RoutingStrategy,
+    );
+  }, [currentRouting?.id, currentRouting?.strategy, decodedName]);
 
   if (sources.length === 0) {
     return (
@@ -413,6 +504,132 @@ export const ModelDetailPage: React.FC = () => {
 
       <AnimatedContent delay={60}>
         <Card style={{ marginBottom: 'var(--spacer-24)' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: 'var(--spacer-24)',
+              paddingBottom: 'var(--spacer-16)',
+              marginBottom: 'var(--spacer-16)',
+              borderBottom: '1px solid var(--border-neutral-l1)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--spacer-10)' }}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 32,
+                  height: 32,
+                  flexShrink: 0,
+                  borderRadius: 'var(--radius-8)',
+                  background: 'var(--brand-100)',
+                  color: 'var(--icon-brand)',
+                }}
+              >
+                <Route size={17} />
+              </span>
+              <div>
+                <h2
+                  style={{
+                    fontSize: 'var(--heading-xs-font-size)',
+                    fontWeight: 'var(--heading-xs-font-weight)',
+                    color: 'var(--text-default)',
+                    margin: 0,
+                  }}
+                >
+                  {t('models.routing.title')}
+                </h2>
+                <p
+                  style={{
+                    fontSize: 'var(--body-sm-font-size)',
+                    lineHeight: 1.5,
+                    color: 'var(--text-tertiary)',
+                    margin: 'var(--spacer-4) 0 0',
+                  }}
+                >
+                  {t('models.routing.desc').replace('{model}', decodedName)}
+                </p>
+              </div>
+            </div>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                flexShrink: 0,
+                minHeight: 24,
+                padding: '0 var(--spacer-8)',
+                borderRadius: 'var(--radius-6)',
+                background: 'var(--bg-overlay-l1)',
+                color: 'var(--text-tertiary)',
+                fontSize: 'var(--body-xs-font-size)',
+              }}
+            >
+              {t('models.routing.upstreams').replace('{n}', String(routingTargetCount))}
+            </span>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(240px, 420px) minmax(0, 1fr)',
+              gap: 'var(--spacer-24)',
+              alignItems: 'end',
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  marginBottom: 'var(--spacer-8)',
+                  color: 'var(--text-secondary)',
+                  fontSize: 'var(--body-sm-font-size)',
+                  fontWeight: 'var(--font-weight-medium)',
+                }}
+              >
+                {t('routing.strategy.label')}
+              </div>
+              <RoutingStrategySelect value={routingStrategy} onChange={setRoutingStrategy} />
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 'var(--spacer-12)',
+                minWidth: 0,
+              }}
+            >
+              {routingTargetCount < 2 && (
+                <span
+                  style={{
+                    color: 'var(--text-tertiary)',
+                    fontSize: 'var(--body-xs-font-size)',
+                    lineHeight: 1.45,
+                    textAlign: 'right',
+                  }}
+                >
+                  {t('models.routing.singleSourceHint')}
+                </span>
+              )}
+              <Button
+                variant="brand"
+                size="lg"
+                icon={Save}
+                loading={routingSaving}
+                disabled={!currentRouting && generatedRoutingTargets.length === 0}
+                onClick={handleSaveRouting}
+              >
+                {t('models.routing.save')}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </AnimatedContent>
+
+      <AnimatedContent delay={90}>
+        <Card style={{ marginBottom: 'var(--spacer-24)' }}>
           <h2
             style={{
               fontSize: 'var(--heading-xs-font-size)',
@@ -451,7 +668,7 @@ export const ModelDetailPage: React.FC = () => {
             <ModelBulkEditPanel initialValues={bulkInitialValues} onApply={handleBulkApply} />
           </div>
 
-          <AnimatedContent delay={90}>
+          <AnimatedContent delay={120}>
             <div style={{ marginBottom: 'var(--spacer-24)' }}>
               <ModelSourcesTable
                 rows={allRows}
@@ -468,7 +685,7 @@ export const ModelDetailPage: React.FC = () => {
         </>
       )}
 
-      <AnimatedContent delay={120}>
+      <AnimatedContent delay={150}>
         <Card>
           <h2
             style={{
@@ -687,6 +904,7 @@ const DirectDetailRow: React.FC<{ source: DirectMapping; pendingPatch?: ModelPat
 };
 
 const AggregationDetailRow: React.FC<{ source: AggMapping }> = ({ source }) => {
+  const t = useT();
   const { aggregation, resolvedModels } = source;
   return (
     <div
@@ -737,7 +955,7 @@ const AggregationDetailRow: React.FC<{ source: AggMapping }> = ({ source }) => {
             fontSize: 'var(--body-xs-font-size)',
           }}
         >
-          {strategyLabel(aggregation.strategy)}
+          {strategyLabel(aggregation.strategy, t)}
         </span>
         <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
           {resolvedModels.length} 个模型

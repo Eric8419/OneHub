@@ -27,8 +27,10 @@ use tauri::Emitter;
 
 use crate::proxy::adapter::ProviderAdapter;
 use crate::proxy::metrics::SharedMetrics;
-use crate::proxy::routing::{route_request, RouteResult, SharedRouting};
-use crate::types::RequestRecord;
+use crate::proxy::routing::{
+    aggregation_route_plan, route_request, RouteResult, SharedRouting,
+};
+use crate::types::{RequestRecord, RoutingStrategy};
 
 use super::state::{AuthConfig, RuntimeLimits, SharedAppState};
 
@@ -412,6 +414,7 @@ fn parse_request_capabilities(
     body: &Value,
 ) -> crate::proxy::routing::RequestCapabilities {
     use crate::proxy::routing::RequestCapabilities;
+    use std::hash::{Hash, Hasher};
 
     fn contains_type(value: &Value, expected: &[&str]) -> bool {
         match value {
@@ -443,12 +446,27 @@ fn parse_request_capabilities(
     let needs_reasoning = body.get("reasoning_effort").is_some()
         || body.get("reasoning").is_some()
         || body.get("thinking").is_some();
+    let context_value = body
+        .get("messages")
+        .or_else(|| body.get("input"))
+        .or_else(|| body.get("contents"))
+        .unwrap_or(body);
+    let serialized_context = serde_json::to_string(context_value).unwrap_or_default();
+    let estimated_context_tokens = (serialized_context.len() as u64).div_ceil(4);
+    let affinity_prefix = serialized_context
+        .get(..serialized_context.len().min(4096))
+        .unwrap_or(&serialized_context);
+    let mut affinity_hasher = std::collections::hash_map::DefaultHasher::new();
+    affinity_prefix.hash(&mut affinity_hasher);
+    let affinity_key = affinity_hasher.finish();
 
     RequestCapabilities {
         needs_tools,
         needs_vision,
         needs_json_mode,
         needs_reasoning,
+        estimated_context_tokens,
+        affinity_key,
     }
 }
 
@@ -464,6 +482,211 @@ fn status_to_health_kind(status: u16) -> crate::proxy::routing::HealthErrorKind 
         401 | 403 => HealthErrorKind::AuthError,
         _ => HealthErrorKind::ServerError,
     }
+}
+
+async fn execute_orchestration_route(
+    state: &SharedAppState,
+    route: RouteResult,
+    body: Value,
+    is_streaming: bool,
+    request_id: String,
+    inbound_flavor: &str,
+    attempt: u32,
+    original_provider: String,
+) -> Result<Response, (StatusCode, Json<Value>)> {
+    let provider_id = route.provider.id.clone();
+    let adapter = crate::proxy::adapter::resolve(&route.outbound_flavor);
+    let result = proxy_request(
+        state,
+        route,
+        body,
+        is_streaming,
+        adapter.as_ref(),
+        ProxyRequestContext {
+            request_id: &request_id,
+            inbound_flavor,
+            failover_count: attempt,
+            original_provider: &original_provider,
+        },
+    )
+    .await;
+    crate::proxy::routing::release_provider_slot(&state.routing, &provider_id).await;
+    match &result {
+        Ok(_) => {
+            crate::proxy::routing::mark_provider_healthy(&state.routing, &provider_id)
+                .await;
+        }
+        Err((status, _)) if is_retryable_status(status.as_u16()) => {
+            crate::proxy::routing::mark_provider_unhealthy(
+                &state.routing,
+                &provider_id,
+                status_to_health_kind(status.as_u16()),
+            )
+            .await;
+        }
+        _ => {}
+    }
+    result
+}
+
+fn extract_orchestration_text(value: &Value) -> Option<String> {
+    if let Some(text) = value
+        .pointer("/choices/0/message/content")
+        .and_then(Value::as_str)
+    {
+        return Some(text.to_string());
+    }
+    if let Some(text) = value.pointer("/choices/0/text").and_then(Value::as_str) {
+        return Some(text.to_string());
+    }
+    for path in ["/content", "/output/0/content"] {
+        if let Some(blocks) = value.pointer(path).and_then(Value::as_array) {
+            let text = blocks
+                .iter()
+                .filter_map(|block| block.get("text").and_then(Value::as_str))
+                .collect::<Vec<_>>()
+                .join("");
+            if !text.trim().is_empty() {
+                return Some(text);
+            }
+        }
+    }
+    value
+        .pointer("/candidates/0/content/parts/0/text")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+async fn response_text(response: Response) -> Option<String> {
+    let (_, body) = response.into_parts();
+    let bytes = to_bytes(body, 16 * 1024 * 1024).await.ok()?;
+    let json: Value = serde_json::from_slice(&bytes).ok()?;
+    extract_orchestration_text(&json)
+}
+
+fn append_orchestration_turn(body: &mut Value, text: String) {
+    let message = json!({ "role": "user", "content": text });
+    if let Some(messages) = body.get_mut("messages").and_then(Value::as_array_mut) {
+        messages.push(message);
+    } else if let Some(input) = body.get_mut("input").and_then(Value::as_array_mut) {
+        input.push(message);
+    } else if let Some(contents) = body.get_mut("contents").and_then(Value::as_array_mut)
+    {
+        contents.push(json!({ "role": "user", "parts": [{ "text": text }] }));
+    } else {
+        body["messages"] = json!([message]);
+    }
+}
+
+async fn orchestrate_routes(
+    state: &SharedAppState,
+    strategy: RoutingStrategy,
+    routes: Vec<RouteResult>,
+    body: Value,
+    is_streaming: bool,
+    request_id: &str,
+    inbound_flavor: &str,
+) -> Result<Response, (StatusCode, Json<Value>)> {
+    let original_provider = routes[0].provider.name.clone();
+    if strategy == RoutingStrategy::Pipeline {
+        let mut threaded_body = body.clone();
+        let route_count = routes.len();
+        for (index, route) in routes.into_iter().enumerate() {
+            let is_last = index + 1 == route_count;
+            threaded_body["stream"] = json!(is_last && is_streaming);
+            let response = execute_orchestration_route(
+                state,
+                route,
+                threaded_body.clone(),
+                is_last && is_streaming,
+                format!("{request_id}:pipeline:{index}"),
+                inbound_flavor,
+                index as u32,
+                original_provider.clone(),
+            )
+            .await?;
+            if is_last {
+                return Ok(response);
+            }
+            let Some(text) = response_text(response).await else {
+                return Err((
+                    StatusCode::BAD_GATEWAY,
+                    Json(json!({"error":"Pipeline stage returned no text content"})),
+                ));
+            };
+            append_orchestration_turn(
+                &mut threaded_body,
+                format!(
+                    "Continue the original task using this previous pipeline stage result:\n\n{text}"
+                ),
+            );
+        }
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error":"Pipeline has no executable targets"})),
+        ));
+    }
+
+    // Fusion follows OmniRoute's panel + judge shape. The highest-priority
+    // target is the judge; panel calls are non-streaming and run in parallel.
+    let judge = routes[0].clone();
+    let mut panel_body = body.clone();
+    panel_body["stream"] = json!(false);
+    let panel_calls = routes
+        .into_iter()
+        .take(8)
+        .enumerate()
+        .map(|(index, route)| {
+            execute_orchestration_route(
+                state,
+                route,
+                panel_body.clone(),
+                false,
+                format!("{request_id}:fusion:{index}"),
+                inbound_flavor,
+                index as u32,
+                original_provider.clone(),
+            )
+        });
+    let panel_results = futures::future::join_all(panel_calls).await;
+    let mut answers = Vec::new();
+    for response in panel_results.into_iter().flatten() {
+        if let Some(text) = response_text(response).await {
+            if !text.trim().is_empty() {
+                answers.push(text);
+            }
+        }
+    }
+    if answers.is_empty() {
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            Json(json!({"error":"Fusion panel returned no usable answers"})),
+        ));
+    }
+    let sources = answers
+        .iter()
+        .enumerate()
+        .map(|(index, answer)| format!("[Source {}]\n{}", index + 1, answer))
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    let mut judge_body = body;
+    append_orchestration_turn(
+        &mut judge_body,
+        format!(
+            "You are the judge in a model-fusion panel. Synthesize one authoritative answer to the user's original request. Resolve contradictions with your own judgment, include unique useful insights, do not mention the panel or sources, and return only the final answer.\n\n{sources}"
+        ),
+    );
+    execute_orchestration_route(
+        state,
+        judge,
+        judge_body,
+        is_streaming,
+        format!("{request_id}:fusion:judge"),
+        inbound_flavor,
+        answers.len() as u32,
+        original_provider,
+    )
+    .await
 }
 
 /// Handle an upstream proxy request with automatic failover across
@@ -485,6 +708,25 @@ async fn proxy_request_with_failover(
     use std::collections::HashSet;
 
     let capabilities = parse_request_capabilities(&body);
+    if let Some((strategy, routes)) =
+        aggregation_route_plan(&state.routing, model_name, &capabilities, inbound_flavor)
+            .await
+    {
+        let should_orchestrate = routes.len() > 1
+            && !(strategy == RoutingStrategy::Fusion && capabilities.needs_tools);
+        if should_orchestrate {
+            return orchestrate_routes(
+                state,
+                strategy,
+                routes,
+                body,
+                is_streaming,
+                request_id,
+                inbound_flavor,
+            )
+            .await;
+        }
+    }
     let max_attempts = 5;
     let mut excluded: HashSet<String> = HashSet::new();
     let mut last_error: Option<(StatusCode, Json<Value>)> = None;
@@ -1945,5 +2187,40 @@ mod tests {
         assert!(result.is_err());
         let (status, _) = result.unwrap_err();
         assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn orchestration_text_supports_chat_anthropic_and_responses() {
+        assert_eq!(
+            extract_orchestration_text(
+                &json!({"choices":[{"message":{"content":"chat answer"}}]})
+            )
+            .as_deref(),
+            Some("chat answer")
+        );
+        assert_eq!(
+            extract_orchestration_text(
+                &json!({"content":[{"type":"text","text":"anthropic answer"}]})
+            )
+            .as_deref(),
+            Some("anthropic answer")
+        );
+        assert_eq!(
+            extract_orchestration_text(
+                &json!({"output":[{"content":[{"type":"output_text","text":"responses answer"}]}]})
+            )
+            .as_deref(),
+            Some("responses answer")
+        );
+    }
+
+    #[test]
+    fn orchestration_turn_preserves_existing_conversation() {
+        let mut body = json!({"messages":[{"role":"user","content":"original"}]});
+        append_orchestration_turn(&mut body, "stage output".into());
+        let messages = body["messages"].as_array().unwrap();
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[0]["content"], "original");
+        assert_eq!(messages[1]["content"], "stage output");
     }
 }

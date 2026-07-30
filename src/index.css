@@ -237,12 +237,21 @@
 .mc-target-policy {
   display: grid;
   gap: var(--spacer-6);
+  overflow-x: auto;
 }
 
 .mc-target-policy__header,
 .mc-target-policy__item {
   display: grid;
-  grid-template-columns: minmax(130px, 1.5fr) minmax(130px, 1.4fr) repeat(4, minmax(64px, 0.7fr)) 48px;
+  grid-template-columns:
+    minmax(130px, 1.5fr)
+    minmax(130px, 1.4fr)
+    repeat(4, minmax(64px, 0.7fr))
+    minmax(120px, 0.9fr)
+    minmax(96px, 0.8fr)
+    minmax(160px, 1.1fr)
+    48px;
+  min-width: 1120px;
   align-items: center;
   gap: var(--spacer-8);
 }
@@ -543,6 +552,18 @@ button {
   }
   100% {
     transform: translateX(220%);
+  }
+}
+
+/* Moving segment used when the update server does not provide a
+   Content-Length header. It keeps the download state visibly active
+   without displaying a misleading 0%. */
+@keyframes progressIndeterminate {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 104%;
   }
 }
 

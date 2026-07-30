@@ -9,6 +9,7 @@ import { Button, Input, Switch, Card, toast, AnimatedContent, SegmentedControl }
 import type { SegmentOption } from '../../components/ui/SegmentedControl';
 import { desktopApi, onUpdateAvailable, type UpdateMetadata } from '../../lib/desktopApi';
 import { isValidHex, normalizeHex } from '../../lib/colorUtils';
+import { scheduleLatestProgressFrame } from '../../lib/updateProgress';
 import {
   Sun,
   Moon,
@@ -257,10 +258,18 @@ export const SettingsForm: React.FC = () => {
   const [pendingUpdate, setPendingUpdate] = useState<UpdateMetadata | null>(null);
   const [installing, setInstalling] = useState(false);
   const [installProgress, setInstallProgress] = useState(0);
+  const [installTotalKnown, setInstallTotalKnown] = useState(false);
   const [appVersion, setAppVersion] = useState('0.0.0');
   const installContentLengthRef = useRef<number | null>(null);
   const installDownloadedRef = useRef<number>(0);
   const installRafRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (installRafRef.current !== null) cancelAnimationFrame(installRafRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!loaded) loadSettings();
@@ -326,6 +335,7 @@ export const SettingsForm: React.FC = () => {
     flushSync(() => {
       setInstalling(true);
       setInstallProgress(0);
+      setInstallTotalKnown(false);
     });
     installContentLengthRef.current = null;
     installDownloadedRef.current = 0;
@@ -339,28 +349,24 @@ export const SettingsForm: React.FC = () => {
         if (event.event === 'started') {
           installContentLengthRef.current = event.data.contentLength ?? null;
           installDownloadedRef.current = 0;
+          setInstallTotalKnown(Boolean(event.data.contentLength && event.data.contentLength > 0));
         } else if (event.event === 'progress') {
-          const total = installContentLengthRef.current;
           installDownloadedRef.current += event.data.chunkLength;
-          if (total && total > 0) {
-            const next = Math.min(installDownloadedRef.current / total, 1);
-            if (installRafRef.current === null) {
-              installRafRef.current = requestAnimationFrame(() => {
-                installRafRef.current = null;
-                flushSync(() => {
-                  setInstallProgress(next);
-                });
-              });
-            }
-          }
+          scheduleLatestProgressFrame(
+            installRafRef,
+            () => {
+              const total = installContentLengthRef.current;
+              return total && total > 0 ? Math.min(installDownloadedRef.current / total, 1) : null;
+            },
+            setInstallProgress,
+          );
         } else if (event.event === 'finished') {
           if (installRafRef.current !== null) {
             cancelAnimationFrame(installRafRef.current);
             installRafRef.current = null;
           }
-          flushSync(() => {
-            setInstallProgress(1);
-          });
+          setInstallTotalKnown(true);
+          setInstallProgress(1);
         }
       });
       toast(t('settings.update.installed'), 'success');
@@ -371,6 +377,7 @@ export const SettingsForm: React.FC = () => {
       toast(e instanceof Error ? e.message : String(e), 'error');
       setInstalling(false);
       setInstallProgress(0);
+      setInstallTotalKnown(false);
     }
   };
 
@@ -378,6 +385,7 @@ export const SettingsForm: React.FC = () => {
     if (installing) return;
     setPendingUpdate(null);
     setInstallProgress(0);
+    setInstallTotalKnown(false);
   };
 
   const handleExportLogs = async () => {
@@ -1006,39 +1014,46 @@ export const SettingsForm: React.FC = () => {
                       position: 'relative',
                     }}
                   >
-                    <motion.div
-                      animate={{ width: `${Math.round(installProgress * 100)}%` }}
-                      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                      style={{
-                        height: '100%',
-                        background: 'linear-gradient(90deg, var(--bg-brand), var(--bg-brand-hover))',
-                        borderRadius: 'var(--radius-full)',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        // Celebration pulse when the download completes:
-                        // the bar briefly radiates a brand-colored ring
-                        // before the installer takes over.
-                        animation: installProgress >= 1 ? 'progressDonePulse 0.9s ease-out' : 'none',
-                      }}
-                    >
-                      {/* Shimmer overlay — a soft highlight that sweeps
-                          across the filled portion while the download
-                          is still in progress. Paused at 100% so the
-                          done-pulse animation owns the spotlight. */}
-                      {installProgress < 1 && (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            inset: 0,
-                            background:
-                              'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.35) 50%, transparent 100%)',
-                            transform: 'translateX(-120%)',
-                            animation: 'progressShimmer 1.4s ease-in-out infinite',
-                            pointerEvents: 'none',
-                          }}
-                        />
-                      )}
-                    </motion.div>
+                    {installTotalKnown ? (
+                      <motion.div
+                        animate={{ width: `${Math.round(installProgress * 100)}%` }}
+                        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                        style={{
+                          height: '100%',
+                          background: 'linear-gradient(90deg, var(--bg-brand), var(--bg-brand-hover))',
+                          borderRadius: 'var(--radius-full)',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          animation: installProgress >= 1 ? 'progressDonePulse 0.9s ease-out' : 'none',
+                        }}
+                      >
+                        {installProgress < 1 && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              background:
+                                'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.35) 50%, transparent 100%)',
+                              transform: 'translateX(-120%)',
+                              animation: 'progressShimmer 1.4s ease-in-out infinite',
+                              pointerEvents: 'none',
+                            }}
+                          />
+                        )}
+                      </motion.div>
+                    ) : (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          bottom: 0,
+                          width: '36%',
+                          borderRadius: 'var(--radius-full)',
+                          background: 'linear-gradient(90deg, var(--bg-brand), var(--bg-brand-hover))',
+                          animation: 'progressIndeterminate 1.1s ease-in-out infinite',
+                        }}
+                      />
+                    )}
                   </div>
                   <div
                     style={{
@@ -1050,7 +1065,7 @@ export const SettingsForm: React.FC = () => {
                     }}
                   >
                     <motion.span
-                      key={Math.round(installProgress * 100)}
+                      key={installTotalKnown ? Math.round(installProgress * 100) : 'downloading'}
                       initial={{ opacity: 0.4, y: -2 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.18 }}
@@ -1062,16 +1077,18 @@ export const SettingsForm: React.FC = () => {
                         fontFeatureSettings: '"tnum"',
                       }}
                     >
-                      {Math.round(installProgress * 100)}
+                      {installTotalKnown ? Math.round(installProgress * 100) : translate('settings.update.downloading')}
                     </motion.span>
-                    <span
-                      style={{
-                        fontSize: 'var(--body-xs-font-size)',
-                        color: 'var(--text-tertiary)',
-                      }}
-                    >
-                      {installProgress >= 1 ? translate('settings.update.installingTip') : '%'}
-                    </span>
+                    {installTotalKnown && (
+                      <span
+                        style={{
+                          fontSize: 'var(--body-xs-font-size)',
+                          color: 'var(--text-tertiary)',
+                        }}
+                      >
+                        {installProgress >= 1 ? translate('settings.update.installingTip') : '%'}
+                      </span>
+                    )}
                   </div>
                 </div>
               )}

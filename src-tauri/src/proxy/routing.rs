@@ -13,7 +13,7 @@ use std::time::Instant;
 
 use tokio::sync::RwLock;
 
-use crate::types::{Aggregation, Model, Provider, RoutingStrategy};
+use crate::types::{Aggregation, Model, Provider, RouteTarget, RoutingStrategy};
 
 /// Capabilities a request needs from a model. Used by the router
 /// to skip providers whose models don't support the required
@@ -24,6 +24,10 @@ pub struct RequestCapabilities {
     pub needs_vision: bool,
     pub needs_json_mode: bool,
     pub needs_reasoning: bool,
+    /// Fast request-size estimate used by context-aware strategies.
+    pub estimated_context_tokens: u64,
+    /// Stable hash of the leading conversation content for sticky/cache routing.
+    pub affinity_key: u64,
 }
 
 impl RequestCapabilities {
@@ -50,6 +54,7 @@ impl RequestCapabilities {
 /// Result of routing a request: the target provider, the concrete
 /// model name, and (if matched via aggregation) the aggregation
 /// name so the caller can advance its round-robin cursor.
+#[derive(Clone)]
 pub struct RouteResult {
     pub provider: Provider,
     /// The original model name requested by the client (used for
@@ -170,6 +175,10 @@ pub struct RoutingState {
     pub latency_history: HashMap<String, Vec<f64>>,
     /// Per-provider health state, keyed by provider id.
     pub provider_health: HashMap<String, ProviderHealth>,
+    /// Successful request counts, keyed by concrete model name.
+    pub usage_counts: HashMap<String, u64>,
+    /// Last successful model for each aggregation.
+    pub last_good_model: HashMap<String, String>,
 }
 
 impl RoutingState {
@@ -180,6 +189,8 @@ impl RoutingState {
             round_robin_index: HashMap::new(),
             latency_history: HashMap::new(),
             provider_health: HashMap::new(),
+            usage_counts: HashMap::new(),
+            last_good_model: HashMap::new(),
         }
     }
 }
@@ -335,8 +346,13 @@ pub async fn route_request(
     inbound_flavor: &str,
 ) -> Result<RouteResult, String> {
     let cfg = state.read().await;
+    let has_model_routing_policy = cfg
+        .aggregations
+        .iter()
+        .any(|aggregation| aggregation.enabled && aggregation.name == model_or_agg);
 
-    // 1. Direct match by model name OR alias - round-robin
+    // 1. Direct match by model name OR alias - round-robin, unless an enabled
+    //    model-level routing policy with the same public name shadows it.
     //    across all providers that offer the same model.
     //    Filter out excluded, unhealthy, protocol-incompatible,
     //    and capability-mismatched.
@@ -404,7 +420,7 @@ pub async fn route_request(
         direct_hits = health_fallback_hits;
     }
 
-    if !direct_hits.is_empty() {
+    if !direct_hits.is_empty() && !has_model_routing_policy {
         let rr_key = format!("direct:{}", model_or_agg);
         let idx = cfg.round_robin_index.get(&rr_key).copied().unwrap_or(0);
         let (provider, model) = direct_hits[idx % direct_hits.len()].clone();
@@ -421,7 +437,7 @@ pub async fn route_request(
         });
     }
 
-    // 2. Aggregation match.
+    // 2. Model-level routing policy / aggregation match.
     let agg = cfg
         .aggregations
         .iter()
@@ -474,18 +490,12 @@ pub async fn route_request(
                     ));
                 }
 
-                let Some(highest_priority) = candidates
-                    .iter()
-                    .map(|(target, _, _, _)| target.priority)
-                    .max()
-                else {
+                if candidates.is_empty() {
                     return Err(format!(
                         "No available target for aggregation '{}'",
                         aggregation.name
                     ));
-                };
-                candidates
-                    .retain(|(target, _, _, _)| target.priority == highest_priority);
+                }
 
                 let weighted_indices: Vec<usize> = candidates
                     .iter()
@@ -494,31 +504,156 @@ pub async fn route_request(
                         std::iter::repeat_n(index, target.weight as usize)
                     })
                     .collect();
-                let picked_index = match aggregation.strategy_enum() {
-                    RoutingStrategy::Random => {
-                        let nanos = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .subsec_nanos() as usize;
-                        weighted_indices[nanos % weighted_indices.len()]
+                let strategy = aggregation.strategy_enum();
+                let time_seed = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .subsec_nanos() as usize;
+                let cursor = cfg
+                    .round_robin_index
+                    .get(&aggregation.name)
+                    .copied()
+                    .unwrap_or(0);
+                let highest_priority = candidates
+                    .iter()
+                    .map(|(target, _, _, _)| target.priority)
+                    .max()
+                    .unwrap_or_default();
+                let priority_first = || {
+                    candidates
+                        .iter()
+                        .position(|(target, _, _, _)| {
+                            target.priority == highest_priority
+                        })
+                        .unwrap_or(0)
+                };
+                let picked_index = match strategy {
+                    RoutingStrategy::Priority
+                    | RoutingStrategy::FillFirst
+                    | RoutingStrategy::Fusion
+                    | RoutingStrategy::Pipeline => priority_first(),
+                    RoutingStrategy::Weighted => {
+                        weighted_indices[time_seed % weighted_indices.len()]
                     }
-                    RoutingStrategy::LowestLatency => candidates
+                    RoutingStrategy::Random => time_seed % candidates.len(),
+                    RoutingStrategy::RoundRobin => {
+                        weighted_indices[cursor % weighted_indices.len()]
+                    }
+                    RoutingStrategy::StrictRandom => {
+                        let cycle = cursor / candidates.len();
+                        let mut deck: Vec<usize> = (0..candidates.len()).collect();
+                        deck.sort_by_key(|index| {
+                            stable_route_hash(
+                                &aggregation.name,
+                                &candidates[*index].0.id,
+                                cycle,
+                            )
+                        });
+                        deck[cursor % deck.len()]
+                    }
+                    RoutingStrategy::P2c => {
+                        let left = time_seed % candidates.len();
+                        let right = (time_seed.rotate_left(11).wrapping_add(1))
+                            % candidates.len();
+                        let load = |index: usize| {
+                            cfg.provider_health
+                                .get(&candidates[index].1.id)
+                                .map(|health| health.in_flight)
+                                .unwrap_or(0)
+                        };
+                        if load(left) <= load(right) {
+                            left
+                        } else {
+                            right
+                        }
+                    }
+                    RoutingStrategy::LeastUsed => candidates
                         .iter()
                         .enumerate()
-                        .min_by(|(_, (_, _, left, _)), (_, (_, _, right, _))| {
-                            average_latency(&cfg, &left.name)
-                                .total_cmp(&average_latency(&cfg, &right.name))
+                        .min_by_key(|(_, (_, _, model, _))| {
+                            cfg.usage_counts.get(&model.name).copied().unwrap_or(0)
                         })
                         .map(|(index, _)| index)
                         .unwrap_or(0),
-                    RoutingStrategy::Sequential => 0,
-                    RoutingStrategy::RoundRobin => {
-                        let cursor = cfg
-                            .round_robin_index
-                            .get(&aggregation.name)
-                            .copied()
-                            .unwrap_or(0);
-                        weighted_indices[cursor % weighted_indices.len()]
+                    RoutingStrategy::CostOptimized => candidates
+                        .iter()
+                        .enumerate()
+                        .min_by(|(_, (left, _, _, _)), (_, (right, _, _, _))| {
+                            left.cost_per_million_tokens.unwrap_or(f64::MAX).total_cmp(
+                                &right.cost_per_million_tokens.unwrap_or(f64::MAX),
+                            )
+                        })
+                        .map(|(index, _)| index)
+                        .unwrap_or_else(priority_first),
+                    RoutingStrategy::ResetWindow => candidates
+                        .iter()
+                        .enumerate()
+                        .min_by_key(|(_, (target, _, _, _))| {
+                            target.quota_reset_at.unwrap_or(i64::MAX)
+                        })
+                        .map(|(index, _)| index)
+                        .unwrap_or_else(priority_first),
+                    RoutingStrategy::Headroom => candidates
+                        .iter()
+                        .enumerate()
+                        .max_by(|(_, (left, _, _, _)), (_, (right, _, _, _))| {
+                            left.quota_remaining
+                                .unwrap_or(-1.0)
+                                .total_cmp(&right.quota_remaining.unwrap_or(-1.0))
+                        })
+                        .map(|(index, _)| index)
+                        .unwrap_or_else(priority_first),
+                    RoutingStrategy::ResetAware => candidates
+                        .iter()
+                        .enumerate()
+                        .max_by(|(_, (left, _, _, _)), (_, (right, _, _, _))| {
+                            reset_aware_score(left).total_cmp(&reset_aware_score(right))
+                        })
+                        .map(|(index, _)| index)
+                        .unwrap_or_else(priority_first),
+                    RoutingStrategy::Lkgp => cfg
+                        .last_good_model
+                        .get(&aggregation.name)
+                        .and_then(|last| {
+                            candidates
+                                .iter()
+                                .position(|(_, _, model, _)| model.name == *last)
+                        })
+                        .unwrap_or_else(priority_first),
+                    RoutingStrategy::ContextRelay | RoutingStrategy::CacheOptimized => {
+                        (capabilities.affinity_key as usize) % candidates.len()
+                    }
+                    RoutingStrategy::ContextOptimized => candidates
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, (_, _, model, _))| {
+                            model.context_window.unwrap_or(u32::MAX) as u64
+                                >= capabilities.estimated_context_tokens
+                        })
+                        .min_by_key(|(_, (_, _, model, _))| {
+                            model.context_window.unwrap_or(u32::MAX)
+                        })
+                        .map(|(index, _)| index)
+                        .unwrap_or_else(|| {
+                            candidates
+                                .iter()
+                                .enumerate()
+                                .max_by_key(|(_, (_, _, model, _))| {
+                                    model.context_window.unwrap_or_default()
+                                })
+                                .map(|(index, _)| index)
+                                .unwrap_or(0)
+                        }),
+                    RoutingStrategy::Auto => {
+                        candidates
+                            .iter()
+                            .enumerate()
+                            .max_by(|(_, left), (_, right)| {
+                                auto_score(&cfg, left, capabilities)
+                                    .total_cmp(&auto_score(&cfg, right, capabilities))
+                            })
+                            .map(|(index, _)| index)
+                            .unwrap_or(0)
                     }
                 };
                 let (target, provider, model, outbound_flavor) =
@@ -615,12 +750,169 @@ pub async fn route_request(
     }
 }
 
+/// Resolve every currently eligible explicit target for an aggregation.
+///
+/// Fusion and pipeline consume this ordered plan instead of selecting a
+/// single target. Normal routing continues to use [`route_request`].
+pub async fn aggregation_route_plan(
+    state: &SharedRouting,
+    aggregation_name: &str,
+    capabilities: &RequestCapabilities,
+    inbound_flavor: &str,
+) -> Option<(RoutingStrategy, Vec<RouteResult>)> {
+    let cfg = state.read().await;
+    let aggregation = cfg
+        .aggregations
+        .iter()
+        .find(|item| item.enabled && item.name == aggregation_name)?;
+    let strategy = aggregation.strategy_enum();
+    if !matches!(
+        strategy,
+        RoutingStrategy::Fusion | RoutingStrategy::Pipeline
+    ) || aggregation.targets.is_empty()
+    {
+        return None;
+    }
+
+    let mut targets = aggregation.targets.clone();
+    targets.sort_by(|left, right| right.priority.cmp(&left.priority));
+    let mut routes = Vec::new();
+    for target in targets
+        .iter()
+        .filter(|target| target.enabled && target.weight > 0)
+    {
+        let Some(provider) = cfg
+            .providers
+            .iter()
+            .find(|provider| provider.id == target.provider_id)
+        else {
+            continue;
+        };
+        if !cfg
+            .provider_health
+            .get(&provider.id)
+            .map(|health| health.is_available())
+            .unwrap_or(true)
+        {
+            continue;
+        }
+        let Some(model) = provider.models.iter().find(|model| {
+            model.name == target.model
+                || model.alias.as_deref() == Some(target.model.as_str())
+        }) else {
+            continue;
+        };
+        if !capabilities.is_satisfied_by(model) {
+            continue;
+        }
+        let outbound_flavor = target
+            .protocol
+            .clone()
+            .unwrap_or_else(|| provider.api_flavor.clone());
+        if !crate::proxy::adapter::is_protocol_compatible(
+            inbound_flavor,
+            &outbound_flavor,
+        ) {
+            continue;
+        }
+        routes.push(RouteResult {
+            provider: provider.clone(),
+            model: model.name.clone(),
+            upstream_model: target
+                .upstream_model
+                .clone()
+                .unwrap_or_else(|| resolve_model_mapping(provider, &model.name)),
+            aggregation_name: Some(aggregation.name.clone()),
+            outbound_flavor,
+            target_id: Some(target.id.clone()),
+            timeout_secs: target.timeout_secs,
+            max_retries: target.max_retries,
+        });
+    }
+    Some((strategy, routes))
+}
+
 fn average_latency(cfg: &RoutingState, model: &str) -> f64 {
     cfg.latency_history
         .get(model)
         .filter(|samples| !samples.is_empty())
         .map(|samples| samples.iter().sum::<f64>() / samples.len() as f64)
         .unwrap_or(f64::MAX)
+}
+
+fn stable_route_hash(aggregation: &str, target: &str, cycle: usize) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    aggregation.hash(&mut hasher);
+    target.hash(&mut hasher);
+    cycle.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn reset_aware_score(target: &RouteTarget) -> f64 {
+    let headroom = target.quota_remaining.unwrap_or(0.5).clamp(0.0, 1.0);
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64;
+    let hours_to_reset = target
+        .quota_reset_at
+        .map(|reset| ((reset - now_ms).max(0) as f64 / 3_600_000.0).max(0.25))
+        .unwrap_or(168.0);
+    // Spend fuller buckets that will reset soon, mirroring OmniRoute's
+    // reset-aware ordering while remaining useful when telemetry is partial.
+    headroom / hours_to_reset.sqrt()
+}
+
+fn auto_score(
+    cfg: &RoutingState,
+    candidate: &(RouteTarget, Provider, Model, String),
+    capabilities: &RequestCapabilities,
+) -> f64 {
+    let (target, provider, model, _) = candidate;
+    let health = cfg.provider_health.get(&provider.id);
+    let health_score = health
+        .map(|value| {
+            if value.is_available() {
+                1.0 / (1.0 + value.consecutive_failures as f64)
+            } else {
+                0.0
+            }
+        })
+        .unwrap_or(1.0);
+    let quota_score = target.quota_remaining.unwrap_or(0.5).clamp(0.0, 1.0);
+    let cost_score = target
+        .cost_per_million_tokens
+        .map(|cost| 1.0 / (1.0 + cost.max(0.0)))
+        .unwrap_or(0.5);
+    let latency = average_latency(cfg, &model.name);
+    let latency_score = if latency.is_finite() {
+        1.0 / (1.0 + latency / 1000.0)
+    } else {
+        0.5
+    };
+    let load_score = 1.0
+        / (1.0
+            + health
+                .map(|value| value.in_flight as f64)
+                .unwrap_or_default());
+    let context_score = model
+        .context_window
+        .map(|window| {
+            if window as u64 >= capabilities.estimated_context_tokens {
+                1.0
+            } else {
+                window as f64 / capabilities.estimated_context_tokens.max(1) as f64
+            }
+        })
+        .unwrap_or(0.5);
+
+    health_score * 0.28
+        + quota_score * 0.18
+        + cost_score * 0.16
+        + latency_score * 0.16
+        + load_score * 0.12
+        + context_score * 0.10
 }
 
 /// Pick a model from `model_names` according to `strategy`.
@@ -631,7 +923,7 @@ fn pick_model(
     cfg: &RoutingState,
 ) -> String {
     match strategy {
-        RoutingStrategy::Random => {
+        RoutingStrategy::Random | RoutingStrategy::Weighted | RoutingStrategy::P2c => {
             let nanos = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
@@ -639,7 +931,7 @@ fn pick_model(
             let idx = nanos % model_names.len();
             model_names[idx].clone()
         }
-        RoutingStrategy::LowestLatency => {
+        RoutingStrategy::Auto | RoutingStrategy::CostOptimized => {
             let mut best = model_names[0].clone();
             let mut best_latency = f64::MAX;
             for name in model_names {
@@ -655,12 +947,40 @@ fn pick_model(
             }
             best
         }
-        RoutingStrategy::Sequential => model_names[0].clone(),
-        RoutingStrategy::RoundRobin => {
+        RoutingStrategy::RoundRobin
+        | RoutingStrategy::StrictRandom
+        | RoutingStrategy::LeastUsed
+        | RoutingStrategy::ContextRelay
+        | RoutingStrategy::CacheOptimized => {
             let idx = cfg.round_robin_index.get(agg_name).copied().unwrap_or(0);
             let len = model_names.len();
             model_names[idx % len].clone()
         }
+        RoutingStrategy::Lkgp => cfg
+            .last_good_model
+            .get(agg_name)
+            .filter(|model| model_names.contains(model))
+            .cloned()
+            .unwrap_or_else(|| model_names[0].clone()),
+        RoutingStrategy::ContextOptimized => model_names
+            .iter()
+            .max_by_key(|name| {
+                cfg.providers
+                    .iter()
+                    .flat_map(|provider| provider.models.iter())
+                    .find(|model| model.name == **name)
+                    .and_then(|model| model.context_window)
+                    .unwrap_or_default()
+            })
+            .cloned()
+            .unwrap_or_else(|| model_names[0].clone()),
+        RoutingStrategy::Priority
+        | RoutingStrategy::FillFirst
+        | RoutingStrategy::ResetAware
+        | RoutingStrategy::ResetWindow
+        | RoutingStrategy::Headroom
+        | RoutingStrategy::Fusion
+        | RoutingStrategy::Pipeline => model_names[0].clone(),
     }
 }
 
@@ -681,24 +1001,18 @@ pub async fn record_routing_side_effects(
             let slot_count = if agg.targets.is_empty() {
                 parse_agg_models(&agg.models).len()
             } else {
-                let Some(highest_priority) = agg
+                let enabled = agg
                     .targets
                     .iter()
-                    .filter(|target| target.enabled && target.weight > 0)
-                    .map(|target| target.priority)
-                    .max()
-                else {
-                    return;
-                };
-                agg.targets
-                    .iter()
-                    .filter(|target| {
-                        target.enabled
-                            && target.weight > 0
-                            && target.priority == highest_priority
-                    })
-                    .map(|target| target.weight as usize)
-                    .sum()
+                    .filter(|target| target.enabled && target.weight > 0);
+                if matches!(
+                    agg.strategy_enum(),
+                    RoutingStrategy::RoundRobin | RoutingStrategy::Weighted
+                ) {
+                    enabled.map(|target| target.weight as usize).sum()
+                } else {
+                    enabled.count()
+                }
             };
             if slot_count > 0 {
                 let idx = cfg.round_robin_index.get(agg_name).copied().unwrap_or(0);
@@ -725,6 +1039,11 @@ pub async fn record_routing_side_effects(
     }
 
     // Update latency history (keep last 100 per model).
+    *cfg.usage_counts.entry(model.to_string()).or_default() += 1;
+    if let Some(agg_name) = aggregation_name {
+        cfg.last_good_model
+            .insert(agg_name.clone(), model.to_string());
+    }
     let history = cfg.latency_history.entry(model.to_string()).or_default();
     history.push(latency_ms as f64);
     if history.len() > 100 {
@@ -959,6 +1278,9 @@ mod tests {
                     enabled: true,
                     timeout_secs: Some(90),
                     max_retries: Some(1),
+                    cost_per_million_tokens: Some(1.25),
+                    quota_remaining: Some(0.8),
+                    quota_reset_at: None,
                 }],
                 strategy: "round-robin".into(),
                 priority: "P0".into(),
@@ -975,6 +1297,8 @@ mod tests {
                 needs_vision: true,
                 needs_json_mode: true,
                 needs_reasoning: true,
+                estimated_context_tokens: 1_024,
+                affinity_key: 42,
             },
             "anthropic-messages",
         )
@@ -1039,21 +1363,36 @@ mod tests {
         );
         assert_eq!(
             RoutingStrategy::from_stored("最低延迟"),
-            RoutingStrategy::LowestLatency
+            RoutingStrategy::Auto
         );
         assert_eq!(
             RoutingStrategy::from_stored("顺序"),
-            RoutingStrategy::Sequential
+            RoutingStrategy::Priority
         );
     }
 
     #[test]
     fn strategy_as_key_round_trips() {
         for s in [
+            RoutingStrategy::Priority,
+            RoutingStrategy::Weighted,
             RoutingStrategy::RoundRobin,
-            RoutingStrategy::LowestLatency,
+            RoutingStrategy::ContextRelay,
+            RoutingStrategy::FillFirst,
+            RoutingStrategy::P2c,
             RoutingStrategy::Random,
-            RoutingStrategy::Sequential,
+            RoutingStrategy::LeastUsed,
+            RoutingStrategy::CostOptimized,
+            RoutingStrategy::ResetAware,
+            RoutingStrategy::ResetWindow,
+            RoutingStrategy::Headroom,
+            RoutingStrategy::StrictRandom,
+            RoutingStrategy::Auto,
+            RoutingStrategy::Lkgp,
+            RoutingStrategy::ContextOptimized,
+            RoutingStrategy::CacheOptimized,
+            RoutingStrategy::Fusion,
+            RoutingStrategy::Pipeline,
         ] {
             assert_eq!(RoutingStrategy::from_stored(s.as_key()), s);
         }
@@ -1266,5 +1605,100 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(route.provider.id, "p1");
+    }
+
+    #[tokio::test]
+    async fn model_level_routing_policy_shadows_same_named_direct_model() {
+        let state = make_state();
+        {
+            let mut cfg = state.write().await;
+            cfg.providers.push(Provider {
+                id: "direct-provider".into(),
+                name: "Direct".into(),
+                api_base: "https://direct.example.com".into(),
+                api_key: "key".into(),
+                status: "active".into(),
+                models: vec![Model {
+                    id: "direct-model".into(),
+                    name: "public-model".into(),
+                    alias: None,
+                    context_window: None,
+                    max_output_tokens: None,
+                    supports_vision: false,
+                    supports_reasoning: false,
+                    supports_reasoning_effort: false,
+                    default_reasoning_effort: None,
+                    supports_tool_calls: false,
+                    supports_json_mode: false,
+                }],
+                api_flavor: "openai".into(),
+                api_key_encrypted: false,
+                model_mapping: None,
+                proxy_config: None,
+                supports_system_role: true,
+            });
+            cfg.providers.push(Provider {
+                id: "policy-provider".into(),
+                name: "Policy target".into(),
+                api_base: "https://policy.example.com".into(),
+                api_key: "key".into(),
+                status: "active".into(),
+                models: vec![Model {
+                    id: "policy-model".into(),
+                    name: "upstream-model".into(),
+                    alias: None,
+                    context_window: None,
+                    max_output_tokens: None,
+                    supports_vision: false,
+                    supports_reasoning: false,
+                    supports_reasoning_effort: false,
+                    default_reasoning_effort: None,
+                    supports_tool_calls: false,
+                    supports_json_mode: false,
+                }],
+                api_flavor: "openai".into(),
+                api_key_encrypted: false,
+                model_mapping: None,
+                proxy_config: None,
+                supports_system_role: true,
+            });
+            cfg.aggregations.push(Aggregation {
+                id: "model-policy".into(),
+                name: "public-model".into(),
+                models: "upstream-model".into(),
+                targets: vec![crate::types::RouteTarget {
+                    id: "policy-target".into(),
+                    provider_id: "policy-provider".into(),
+                    model: "upstream-model".into(),
+                    upstream_model: None,
+                    protocol: Some("openai-chat".into()),
+                    priority: 0,
+                    weight: 1,
+                    enabled: true,
+                    timeout_secs: None,
+                    max_retries: None,
+                    cost_per_million_tokens: None,
+                    quota_remaining: None,
+                    quota_reset_at: None,
+                }],
+                strategy: "priority".into(),
+                priority: "P0".into(),
+                enabled: true,
+            });
+        }
+
+        let route = route_request(
+            &state,
+            "public-model",
+            &std::collections::HashSet::new(),
+            &RequestCapabilities::default(),
+            "openai",
+        )
+        .await
+        .expect("model-level policy should be selected");
+
+        assert_eq!(route.provider.id, "policy-provider");
+        assert_eq!(route.aggregation_name.as_deref(), Some("public-model"));
+        assert_eq!(route.target_id.as_deref(), Some("policy-target"));
     }
 }

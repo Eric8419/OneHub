@@ -28,6 +28,8 @@ interface DropdownProps {
   placeholder?: string;
   /** Show a search box at the top of the dropdown. */
   searchable?: boolean;
+  /** Placeholder shown inside the optional search box. */
+  searchPlaceholder?: string;
   disabled?: boolean;
   style?: React.CSSProperties;
   className?: string;
@@ -49,6 +51,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
   onChange,
   placeholder = '— 选择 —',
   searchable = false,
+  searchPlaceholder = '搜索…',
   disabled = false,
   style,
   className,
@@ -396,7 +399,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
                   autoFocus
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="搜索提供商…"
+                  placeholder={searchPlaceholder}
                   style={{
                     flex: 1,
                     border: 'none',

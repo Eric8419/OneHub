@@ -4,8 +4,6 @@ import { useAggregationStore } from '../../store/aggregationStore';
 import { AnimatedContent } from '../../components/ui';
 import { ModelInventory } from './ModelInventory';
 import { useT } from '../../i18n';
-// import { AggregationTable } from './AggregationTable'; // 暂时隐藏
-// import { QuickAddPanel } from './QuickAddPanel'; // 暂时隐藏
 
 export const ModelConfig: React.FC = () => {
   const t = useT();
@@ -49,15 +47,6 @@ export const ModelConfig: React.FC = () => {
       <AnimatedContent delay={80}>
         <ModelInventory />
       </AnimatedContent>
-
-      {/* Aggregation rules & quick add — temporarily hidden
-      <AnimatedContent delay={160}>
-        <AggregationTable />
-      </AnimatedContent>
-      <AnimatedContent delay={200}>
-        <QuickAddPanel />
-      </AnimatedContent>
-      */}
     </div>
   );
 };

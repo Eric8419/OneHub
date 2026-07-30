@@ -1,10 +1,11 @@
 import { Fragment, useState } from 'react';
 import { useAggregationStore } from '../../store/aggregationStore';
 import { Card, SectionTitle, Tag, Switch, ConfirmDialog, FlexRow } from '../../components/ui';
-import { Pencil, Trash2, List, Shuffle, Pin } from 'lucide-react';
-import { normalizeStrategyKey } from '../../types/aggregation';
-import type { RouteTarget } from '../../types/aggregation';
+import { Pencil, Trash2, List, Sparkles } from 'lucide-react';
+import { normalizeStrategyKey, STRATEGY_OPTIONS } from '../../types/aggregation';
+import type { RouteTarget, RoutingStrategy } from '../../types/aggregation';
 import { useT } from '../../i18n';
+import { RoutingStrategySelect } from './RoutingStrategySelect';
 
 const priorityTag: Record<string, 'brand' | 'blue' | 'neutral'> = {
   P0: 'brand',
@@ -17,7 +18,7 @@ export const AggregationTable: React.FC = () => {
   const { aggregations, updateAggregation, removeAggregation } = useAggregationStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
-  const [editRoundRobin, setEditRoundRobin] = useState(true);
+  const [editStrategy, setEditStrategy] = useState<RoutingStrategy>('round-robin');
   const [editTargets, setEditTargets] = useState<RouteTarget[]>([]);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
@@ -26,8 +27,7 @@ export const AggregationTable: React.FC = () => {
     if (agg) {
       setEditingId(id);
       setEditName(agg.name);
-      // ON = round-robin, OFF = sequential (failover).
-      setEditRoundRobin(normalizeStrategyKey(agg.strategy) !== 'sequential');
+      setEditStrategy(normalizeStrategyKey(agg.strategy) as RoutingStrategy);
       setEditTargets(agg.targets?.map((target) => ({ ...target })) ?? []);
     }
   };
@@ -37,7 +37,7 @@ export const AggregationTable: React.FC = () => {
       try {
         await updateAggregation(editingId, {
           name: editName,
-          strategy: editRoundRobin ? 'round-robin' : 'sequential',
+          strategy: editStrategy,
           targets: editTargets,
         });
         setEditingId(null);
@@ -259,37 +259,24 @@ export const AggregationTable: React.FC = () => {
                       }}
                     >
                       {editingId === a.id ? (
-                        <FlexRow gap="var(--spacer-10)">
-                          <Switch
-                            checked={editRoundRobin}
-                            onChange={setEditRoundRobin}
-                          />
-                          <span
-                            style={{
-                              fontSize: 'var(--body-sm-font-size)',
-                              color: 'var(--text-secondary)',
-                            }}
-                          >
-                            {editRoundRobin ? t('routing.mode.roundRobin') : t('routing.mode.failover')}
-                          </span>
-                        </FlexRow>
+                        <RoutingStrategySelect
+                          value={editStrategy}
+                          onChange={setEditStrategy}
+                          size="sm"
+                          showDescription={false}
+                          style={{ width: 190 }}
+                        />
                       ) : (
                         <FlexRow gap="var(--spacer-8)">
-                          {normalizeStrategyKey(a.strategy) !== 'sequential' ? (
-                            <>
-                              <Shuffle size={14} style={{ color: 'var(--icon-tertiary)', flexShrink: 0 }} />
-                              <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--body-sm-font-size)' }}>
-                                {t('routing.mode.roundRobin')}
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <Pin size={14} style={{ color: 'var(--icon-tertiary)', flexShrink: 0 }} />
-                              <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--body-sm-font-size)' }}>
-                                {t('routing.mode.failover')}
-                              </span>
-                            </>
-                          )}
+                          <Sparkles size={14} style={{ color: 'var(--icon-tertiary)', flexShrink: 0 }} />
+                          <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--body-sm-font-size)' }}>
+                            {(() => {
+                              const option = STRATEGY_OPTIONS.find(
+                                (item) => item.value === normalizeStrategyKey(a.strategy),
+                              );
+                              return option ? t(`routing.strategy.${option.labelKey}`) : a.strategy;
+                            })()}
+                          </span>
                         </FlexRow>
                       )}
                     </td>
@@ -449,6 +436,9 @@ export const AggregationTable: React.FC = () => {
                             <span>权重</span>
                             <span>超时（秒）</span>
                             <span>重试</span>
+                            <span>成本 / 百万 Token</span>
+                            <span>剩余配额 %</span>
+                            <span>配额重置</span>
                             <span>启用</span>
                           </div>
                           {editTargets.map((target) => (
@@ -503,6 +493,56 @@ export const AggregationTable: React.FC = () => {
                                 onChange={(event) =>
                                   patchTarget(target.id, {
                                     maxRetries: event.target.value ? Number(event.target.value) : undefined,
+                                  })
+                                }
+                              />
+                              <input
+                                className="mc-input"
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={target.costPerMillionTokens ?? ''}
+                                placeholder="未知"
+                                onChange={(event) =>
+                                  patchTarget(target.id, {
+                                    costPerMillionTokens: event.target.value
+                                      ? Number(event.target.value)
+                                      : undefined,
+                                  })
+                                }
+                              />
+                              <input
+                                className="mc-input"
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={
+                                  target.quotaRemaining === undefined
+                                    ? ''
+                                    : Math.round(target.quotaRemaining * 100)
+                                }
+                                placeholder="未知"
+                                onChange={(event) =>
+                                  patchTarget(target.id, {
+                                    quotaRemaining: event.target.value
+                                      ? Math.min(1, Math.max(0, Number(event.target.value) / 100))
+                                      : undefined,
+                                  })
+                                }
+                              />
+                              <input
+                                className="mc-input"
+                                type="datetime-local"
+                                value={
+                                  target.quotaResetAt
+                                    ? new Date(target.quotaResetAt).toISOString().slice(0, 16)
+                                    : ''
+                                }
+                                onChange={(event) =>
+                                  patchTarget(target.id, {
+                                    quotaResetAt: event.target.value
+                                      ? new Date(event.target.value).getTime()
+                                      : undefined,
                                   })
                                 }
                               />

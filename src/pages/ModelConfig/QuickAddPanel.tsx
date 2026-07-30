@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useAggregationStore } from '../../store/aggregationStore';
 import { useProviderStore } from '../../store/providerStore';
-import { Card, SectionTitle, toast, Dropdown, Switch, FlexRow } from '../../components/ui';
-import { Shuffle, Pin } from 'lucide-react';
-import type { RouteTarget } from '../../types/aggregation';
+import { Card, SectionTitle, toast, Dropdown } from '../../components/ui';
+import type { RouteTarget, RoutingStrategy } from '../../types/aggregation';
 import { useT } from '../../i18n';
+import { RoutingStrategySelect } from './RoutingStrategySelect';
 
 const priorityOptions = [
   { value: 'P0', label: 'P0' },
@@ -21,7 +21,7 @@ const protocolForFlavor = (flavor?: string): NonNullable<RouteTarget['protocol']
 export const QuickAddPanel: React.FC = () => {
   const t = useT();
   const [name, setName] = useState('');
-  const [roundRobin, setRoundRobin] = useState(true);
+  const [strategy, setStrategy] = useState<RoutingStrategy>('round-robin');
   const [priority, setPriority] = useState('P0');
   const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
   const [nameError, setNameError] = useState(false);
@@ -72,7 +72,7 @@ export const QuickAddPanel: React.FC = () => {
             enabled: true,
           })),
         // Persist the normalized enum key.
-        strategy: roundRobin ? 'round-robin' : 'sequential',
+        strategy,
         priority,
         enabled: true,
       });
@@ -153,19 +153,7 @@ export const QuickAddPanel: React.FC = () => {
             >
               {t('routing.mode.label')}
             </label>
-            <FlexRow gap="var(--spacer-10)" style={{ height: 36, alignItems: 'center' }}>
-              <Switch checked={roundRobin} onChange={setRoundRobin} />
-              <FlexRow gap="var(--spacer-6)" style={{ alignItems: 'center' }}>
-                {roundRobin ? (
-                  <Shuffle size={14} style={{ color: 'var(--icon-tertiary)', flexShrink: 0 }} />
-                ) : (
-                  <Pin size={14} style={{ color: 'var(--icon-tertiary)', flexShrink: 0 }} />
-                )}
-                <span style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-secondary)' }}>
-                  {roundRobin ? t('routing.mode.roundRobin') : t('routing.mode.failover')}
-                </span>
-              </FlexRow>
-            </FlexRow>
+            <RoutingStrategySelect value={strategy} onChange={setStrategy} />
           </div>
           <div
             className="mc-quick-add__field"

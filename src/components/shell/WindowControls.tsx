@@ -7,9 +7,14 @@ const isMac = (() => {
   return /mac|iphone|ipad|ipod/i.test(navigator.platform || navigator.userAgent);
 })();
 
+const isTauri = () =>
+  typeof window !== 'undefined' &&
+  Boolean((window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
+
 function useMaximized() {
   const [maximized, setMaximized] = useState(false);
   useEffect(() => {
+    if (!isTauri()) return;
     const win = getCurrentWindow();
     win.isMaximized().then(setMaximized);
     const unlisten = win.onResized(() => win.isMaximized().then(setMaximized));
@@ -25,6 +30,7 @@ function useMaximized() {
 export function useWindowFilled() {
   const [filled, setFilled] = useState(false);
   useEffect(() => {
+    if (!isTauri()) return;
     const win = getCurrentWindow();
     const check = async () => {
       try {
@@ -129,7 +135,7 @@ const WinControls: React.FC = () => {
 
 export const WindowControls: React.FC = () => {
   // On macOS, native traffic lights are rendered by the system.
-  if (isMac) return null;
+  if (isMac || !isTauri()) return null;
   return <WinControls />;
 };
 

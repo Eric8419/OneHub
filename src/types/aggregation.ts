@@ -3,7 +3,29 @@
 // matches on these keys via the RoutingStrategy enum. UI labels
 // are derived here so the wire format is language-independent.
 
-export type RoutingStrategy = 'round-robin' | 'lowest-latency' | 'random' | 'sequential';
+export const ROUTING_STRATEGY_VALUES = [
+  'priority',
+  'weighted',
+  'round-robin',
+  'context-relay',
+  'fill-first',
+  'p2c',
+  'random',
+  'least-used',
+  'cost-optimized',
+  'reset-aware',
+  'reset-window',
+  'headroom',
+  'strict-random',
+  'auto',
+  'lkgp',
+  'context-optimized',
+  'cache-optimized',
+  'fusion',
+  'pipeline',
+] as const;
+
+export type RoutingStrategy = (typeof ROUTING_STRATEGY_VALUES)[number];
 
 export interface RouteTarget {
   id: string;
@@ -16,6 +38,11 @@ export interface RouteTarget {
   enabled: boolean;
   timeoutSecs?: number;
   maxRetries?: number;
+  /** Optional price hint used by cost-aware and auto routing. */
+  costPerMillionTokens?: number;
+  /** Optional live/manual quota hints (0..1 and Unix milliseconds). */
+  quotaRemaining?: number;
+  quotaResetAt?: number;
 }
 
 export interface Aggregation {
@@ -31,34 +58,60 @@ export interface Aggregation {
   enabled: boolean;
 }
 
-export const STRATEGY_OPTIONS: { value: RoutingStrategy; label: string }[] = [
-  { value: 'round-robin', label: '轮询 (Round Robin)' },
-  { value: 'lowest-latency', label: '最低延迟' },
-  { value: 'random', label: '随机' },
-  { value: 'sequential', label: '顺序' },
+export interface RoutingStrategyOption {
+  value: RoutingStrategy;
+  labelKey: string;
+  descriptionKey: string;
+  groupKey: string;
+}
+
+export const STRATEGY_OPTIONS: RoutingStrategyOption[] = [
+  { value: 'priority', labelKey: 'priority', descriptionKey: 'priorityDesc', groupKey: 'deterministic' },
+  { value: 'fill-first', labelKey: 'fillFirst', descriptionKey: 'fillFirstDesc', groupKey: 'deterministic' },
+  { value: 'round-robin', labelKey: 'roundRobin', descriptionKey: 'roundRobinDesc', groupKey: 'balanced' },
+  { value: 'weighted', labelKey: 'weighted', descriptionKey: 'weightedDesc', groupKey: 'balanced' },
+  { value: 'p2c', labelKey: 'p2c', descriptionKey: 'p2cDesc', groupKey: 'balanced' },
+  { value: 'least-used', labelKey: 'leastUsed', descriptionKey: 'leastUsedDesc', groupKey: 'balanced' },
+  { value: 'random', labelKey: 'random', descriptionKey: 'randomDesc', groupKey: 'randomized' },
+  { value: 'strict-random', labelKey: 'strictRandom', descriptionKey: 'strictRandomDesc', groupKey: 'randomized' },
+  { value: 'cost-optimized', labelKey: 'costOptimized', descriptionKey: 'costOptimizedDesc', groupKey: 'adaptive' },
+  { value: 'reset-aware', labelKey: 'resetAware', descriptionKey: 'resetAwareDesc', groupKey: 'adaptive' },
+  { value: 'reset-window', labelKey: 'resetWindow', descriptionKey: 'resetWindowDesc', groupKey: 'adaptive' },
+  { value: 'headroom', labelKey: 'headroom', descriptionKey: 'headroomDesc', groupKey: 'adaptive' },
+  { value: 'auto', labelKey: 'auto', descriptionKey: 'autoDesc', groupKey: 'intelligent' },
+  { value: 'lkgp', labelKey: 'lkgp', descriptionKey: 'lkgpDesc', groupKey: 'intelligent' },
+  { value: 'context-optimized', labelKey: 'contextOptimized', descriptionKey: 'contextOptimizedDesc', groupKey: 'intelligent' },
+  { value: 'cache-optimized', labelKey: 'cacheOptimized', descriptionKey: 'cacheOptimizedDesc', groupKey: 'intelligent' },
+  { value: 'context-relay', labelKey: 'contextRelay', descriptionKey: 'contextRelayDesc', groupKey: 'orchestration' },
+  { value: 'fusion', labelKey: 'fusion', descriptionKey: 'fusionDesc', groupKey: 'orchestration' },
+  { value: 'pipeline', labelKey: 'pipeline', descriptionKey: 'pipelineDesc', groupKey: 'orchestration' },
 ];
 
 /** Map a stored strategy key to its localized label. Falls back
  * to the key itself (and tolerates legacy localized strings via
  * `normalizeStrategyKey`). */
-export function strategyLabel(strategy: string): string {
-  const found = STRATEGY_OPTIONS.find((o) => o.value === strategy);
-  if (found) return found.label;
-  // Legacy localized values (pre-refactor data): map them back.
-  return normalizeStrategyKey(strategy) === strategy
-    ? strategy
-    : (STRATEGY_OPTIONS.find((o) => o.value === normalizeStrategyKey(strategy))?.label ?? strategy);
+export function strategyLabel(
+  strategy: string,
+  translate?: (key: string) => string,
+): string {
+  const normalized = normalizeStrategyKey(strategy);
+  const option = STRATEGY_OPTIONS.find((item) => item.value === normalized);
+  return option && translate
+    ? translate(`routing.strategy.${option.labelKey}`)
+    : normalized;
 }
 
 /** Convert a legacy localized strategy string to its stable key.
  * Mirrors the backend `RoutingStrategy::from_stored` fallback so
  * old persisted aggregations keep working after upgrade. */
 export function normalizeStrategyKey(strategy: string): string {
-  const known: RoutingStrategy[] = ['round-robin', 'lowest-latency', 'random', 'sequential'];
-  if (known.includes(strategy as RoutingStrategy)) return strategy;
+  if ((ROUTING_STRATEGY_VALUES as readonly string[]).includes(strategy)) return strategy;
+  // MelodyHub pre-19-strategy keys.
+  if (strategy === 'lowest-latency') return 'auto';
+  if (strategy === 'sequential') return 'priority';
   if (strategy.includes('随机')) return 'random';
-  if (strategy.includes('最低延迟')) return 'lowest-latency';
-  if (strategy.includes('顺序')) return 'sequential';
+  if (strategy.includes('最低延迟')) return 'auto';
+  if (strategy.includes('顺序')) return 'priority';
   // "轮询 (Round Robin)" and anything else → default.
   return 'round-robin';
 }

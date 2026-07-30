@@ -21,9 +21,24 @@ use serde::{Deserialize, Serialize};
 pub enum RoutingStrategy {
     #[default]
     RoundRobin,
-    LowestLatency,
+    Priority,
+    Weighted,
+    ContextRelay,
+    FillFirst,
+    P2c,
     Random,
-    Sequential,
+    LeastUsed,
+    CostOptimized,
+    ResetAware,
+    ResetWindow,
+    Headroom,
+    StrictRandom,
+    Auto,
+    Lkgp,
+    ContextOptimized,
+    CacheOptimized,
+    Fusion,
+    Pipeline,
 }
 
 impl RoutingStrategy {
@@ -33,13 +48,28 @@ impl RoutingStrategy {
     pub fn from_stored(value: &str) -> Self {
         match value {
             "round-robin" => RoutingStrategy::RoundRobin,
-            "lowest-latency" => RoutingStrategy::LowestLatency,
+            "priority" | "sequential" => RoutingStrategy::Priority,
+            "weighted" => RoutingStrategy::Weighted,
+            "context-relay" => RoutingStrategy::ContextRelay,
+            "fill-first" => RoutingStrategy::FillFirst,
+            "p2c" => RoutingStrategy::P2c,
             "random" => RoutingStrategy::Random,
-            "sequential" => RoutingStrategy::Sequential,
+            "least-used" => RoutingStrategy::LeastUsed,
+            "cost-optimized" => RoutingStrategy::CostOptimized,
+            "reset-aware" => RoutingStrategy::ResetAware,
+            "reset-window" => RoutingStrategy::ResetWindow,
+            "headroom" => RoutingStrategy::Headroom,
+            "strict-random" => RoutingStrategy::StrictRandom,
+            "auto" | "lowest-latency" => RoutingStrategy::Auto,
+            "lkgp" => RoutingStrategy::Lkgp,
+            "context-optimized" => RoutingStrategy::ContextOptimized,
+            "cache-optimized" => RoutingStrategy::CacheOptimized,
+            "fusion" => RoutingStrategy::Fusion,
+            "pipeline" => RoutingStrategy::Pipeline,
             // Legacy localized labels (pre-refactor data)
             s if s.contains("随机") => RoutingStrategy::Random,
-            s if s.contains("最低延迟") => RoutingStrategy::LowestLatency,
-            s if s.contains("顺序") => RoutingStrategy::Sequential,
+            s if s.contains("最低延迟") => RoutingStrategy::Auto,
+            s if s.contains("顺序") => RoutingStrategy::Priority,
             // Default fallback (covers "轮询 (Round Robin)" etc.)
             _ => RoutingStrategy::RoundRobin,
         }
@@ -50,9 +80,24 @@ impl RoutingStrategy {
     pub fn as_key(&self) -> &'static str {
         match self {
             RoutingStrategy::RoundRobin => "round-robin",
-            RoutingStrategy::LowestLatency => "lowest-latency",
+            RoutingStrategy::Priority => "priority",
+            RoutingStrategy::Weighted => "weighted",
+            RoutingStrategy::ContextRelay => "context-relay",
+            RoutingStrategy::FillFirst => "fill-first",
+            RoutingStrategy::P2c => "p2c",
             RoutingStrategy::Random => "random",
-            RoutingStrategy::Sequential => "sequential",
+            RoutingStrategy::LeastUsed => "least-used",
+            RoutingStrategy::CostOptimized => "cost-optimized",
+            RoutingStrategy::ResetAware => "reset-aware",
+            RoutingStrategy::ResetWindow => "reset-window",
+            RoutingStrategy::Headroom => "headroom",
+            RoutingStrategy::StrictRandom => "strict-random",
+            RoutingStrategy::Auto => "auto",
+            RoutingStrategy::Lkgp => "lkgp",
+            RoutingStrategy::ContextOptimized => "context-optimized",
+            RoutingStrategy::CacheOptimized => "cache-optimized",
+            RoutingStrategy::Fusion => "fusion",
+            RoutingStrategy::Pipeline => "pipeline",
         }
     }
 }
@@ -202,6 +247,15 @@ pub struct RouteTarget {
     pub timeout_secs: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_retries: Option<u32>,
+    /// Optional price hint for cost-aware routing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost_per_million_tokens: Option<f64>,
+    /// Optional normalized quota headroom in the 0..=1 range.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quota_remaining: Option<f64>,
+    /// Optional quota reset timestamp in Unix milliseconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quota_reset_at: Option<i64>,
 }
 
 fn default_route_target_weight() -> u32 {

@@ -39,6 +39,7 @@ pub fn is_protocol_compatible(inbound_flavor: &str, provider_flavor: &str) -> bo
                 | FLAVOR_OPENAI_COMPAT
                 | FLAVOR_ANTHROPIC
                 | FLAVOR_RESPONSES
+                | "openai-chat"
                 | "anthropic-messages"
                 | "openai-responses"
         )
