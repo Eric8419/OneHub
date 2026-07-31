@@ -148,6 +148,18 @@ const zh: Record<string, string> = {
   'models.routing.saved': '模型路由策略已保存',
   'models.routing.noSources': '当前模型没有可用的上游来源',
   'models.routing.saveFailed': '保存路由策略失败',
+  'models.routing.priorityHint': '按优先级从高到低选用上游；高优先级不可用时自动回退到次优先级。',
+  'models.routing.fillFirstHint': '持续使用最高优先级上游，直到被限流（429）或不可用时再切换到次优先级；冷却恢复后回流到首选。',
+  'models.routing.weightedHint': '按权重比例随机分配请求；权重越大被选中的概率越高，长期比例约等于权重比。',
+  'models.routing.targetList': '上游目标',
+  'models.routing.priorityColumnHint': '数字越大越优先',
+  'models.routing.weightColumnHint': '数字越大比重越大（最小 1）',
+  'models.routing.colUpstream': '上游模型',
+  'models.routing.colPriority': '优先级',
+  'models.routing.colWeight': '权重',
+  'models.routing.colEnabled': '启用',
+  'models.routing.enabledOn': '启用',
+  'models.routing.enabledOff': '停用',
 
   // ── 供应商 ──
   'providers.title': 'API 供应商',

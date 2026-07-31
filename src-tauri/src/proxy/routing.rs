@@ -11,6 +11,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
+use rand::distributions::{Distribution, WeightedIndex};
+use rand::thread_rng;
+use rand::Rng;
 use tokio::sync::RwLock;
 
 use crate::types::{Aggregation, Model, Provider, RouteTarget, RoutingStrategy};
@@ -92,7 +95,7 @@ pub struct ProviderHealth {
 }
 
 /// Error types that affect provider health.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HealthErrorKind {
     /// 429 Too Many Requests.
     RateLimit,
@@ -123,13 +126,18 @@ impl ProviderHealth {
 
     /// Mark this provider as having experienced an error.
     /// Updates cooldown timers based on error type.
-    pub fn mark_unhealthy(&mut self, kind: HealthErrorKind) {
+    /// `cooldown_secs` overrides the default RateLimit cooldown when
+    /// the upstream supplied a `Retry-After` header; ignored for
+    /// other error kinds.
+    pub fn mark_unhealthy(&mut self, kind: HealthErrorKind, cooldown_secs: Option<u64>) {
         let now = Instant::now();
         match kind {
             HealthErrorKind::RateLimit => {
-                // Cool down for 60 seconds on rate limit.
+                // Prefer the upstream-provided Retry-After; fall back
+                // to a 60-second default when absent.
+                let secs = cooldown_secs.unwrap_or(60);
                 self.rate_limit_reset_at =
-                    Some(now + std::time::Duration::from_secs(60));
+                    Some(now + std::time::Duration::from_secs(secs));
             }
             HealthErrorKind::ServerError => {
                 self.consecutive_failures += 1;
@@ -215,22 +223,26 @@ pub fn is_provider_available(
 }
 
 /// Mark a provider as unhealthy after an error. Creates the health
-/// entry if it doesn't exist yet.
+/// entry if it doesn't exist yet. `cooldown_secs` overrides the
+/// default RateLimit cooldown when the upstream supplied a
+/// `Retry-After` header; ignored for other error kinds.
 pub async fn mark_provider_unhealthy(
     state: &SharedRouting,
     provider_id: &str,
     kind: HealthErrorKind,
+    cooldown_secs: Option<u64>,
 ) {
     let mut cfg = state.write().await;
     let health = cfg
         .provider_health
         .entry(provider_id.to_string())
         .or_default();
-    health.mark_unhealthy(kind);
+    health.mark_unhealthy(kind, cooldown_secs);
     eprintln!(
-        "[proxy] Provider {} health degraded: kind={:?} consecutive_failures={} available={}",
+        "[proxy] Provider {} health degraded: kind={:?} cooldown_secs={:?} consecutive_failures={} available={}",
         provider_id,
         kind,
+        cooldown_secs,
         health.consecutive_failures,
         health.is_available()
     );
@@ -497,18 +509,7 @@ pub async fn route_request(
                     ));
                 }
 
-                let weighted_indices: Vec<usize> = candidates
-                    .iter()
-                    .enumerate()
-                    .flat_map(|(index, (target, _, _, _))| {
-                        std::iter::repeat_n(index, target.weight as usize)
-                    })
-                    .collect();
                 let strategy = aggregation.strategy_enum();
-                let time_seed = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .subsec_nanos() as usize;
                 let cursor = cfg
                     .round_robin_index
                     .get(&aggregation.name)
@@ -527,17 +528,42 @@ pub async fn route_request(
                         })
                         .unwrap_or(0)
                 };
+                let fill_first = || {
+                    candidates
+                        .iter()
+                        .position(|(target, _, _, _)| {
+                            target
+                                .quota_remaining
+                                .map(|quota| quota > 0.0)
+                                .unwrap_or(true)
+                        })
+                        .unwrap_or_else(priority_first)
+                };
                 let picked_index = match strategy {
                     RoutingStrategy::Priority
-                    | RoutingStrategy::FillFirst
                     | RoutingStrategy::Fusion
                     | RoutingStrategy::Pipeline => priority_first(),
+                    RoutingStrategy::FillFirst => fill_first(),
                     RoutingStrategy::Weighted => {
-                        weighted_indices[time_seed % weighted_indices.len()]
+                        let weights: Vec<u32> = candidates
+                            .iter()
+                            .map(|(target, _, _, _)| target.weight.max(1))
+                            .collect();
+                        WeightedIndex::new(&weights)
+                            .map(|distribution| distribution.sample(&mut thread_rng()))
+                            .unwrap_or_else(|_| priority_first())
                     }
-                    RoutingStrategy::Random => time_seed % candidates.len(),
+                    RoutingStrategy::Random => {
+                        // Uniform random pick. Use thread_rng() for
+                        // unbiased uniform sampling (avoids modulo
+                        // bias from time_seed % len).
+                        let mut rng = thread_rng();
+                        rng.gen_range(0..candidates.len())
+                    }
                     RoutingStrategy::RoundRobin => {
-                        weighted_indices[cursor % weighted_indices.len()]
+                        // Simple cycle through targets in order;
+                        // weight is ignored.
+                        cursor % candidates.len()
                     }
                     RoutingStrategy::StrictRandom => {
                         let cycle = cursor / candidates.len();
@@ -552,26 +578,57 @@ pub async fn route_request(
                         deck[cursor % deck.len()]
                     }
                     RoutingStrategy::P2c => {
-                        let left = time_seed % candidates.len();
-                        let right = (time_seed.rotate_left(11).wrapping_add(1))
-                            % candidates.len();
-                        let load = |index: usize| {
-                            cfg.provider_health
-                                .get(&candidates[index].1.id)
-                                .map(|health| health.in_flight)
-                                .unwrap_or(0)
-                        };
-                        if load(left) <= load(right) {
-                            left
+                        // Power of Two Choices: independently sample
+                        // two candidates uniformly at random, then
+                        // keep the one with fewer in-flight requests.
+                        // Math foundation (Mitzenmacher 1996) requires
+                        // the two samples to be independent; using a
+                        // single time_seed for both breaks this.
+                        let len = candidates.len();
+                        if len <= 2 {
+                            // 0/1 candidate: trivial; 2: just pick the
+                            // less-loaded one directly.
+                            if len <= 1 {
+                                0
+                            } else {
+                                let load = |index: usize| {
+                                    cfg.provider_health
+                                        .get(&candidates[index].1.id)
+                                        .map(|h| h.in_flight)
+                                        .unwrap_or(0)
+                                };
+                                if load(0) <= load(1) {
+                                    0
+                                } else {
+                                    1
+                                }
+                            }
                         } else {
-                            right
+                            let mut rng = thread_rng();
+                            // Independent uniform samples from [0, len).
+                            let left = rng.gen_range(0..len);
+                            let right = rng.gen_range(0..len);
+                            let load = |index: usize| {
+                                cfg.provider_health
+                                    .get(&candidates[index].1.id)
+                                    .map(|h| h.in_flight)
+                                    .unwrap_or(0)
+                            };
+                            if load(left) <= load(right) {
+                                left
+                            } else {
+                                right
+                            }
                         }
                     }
                     RoutingStrategy::LeastUsed => candidates
                         .iter()
                         .enumerate()
-                        .min_by_key(|(_, (_, _, model, _))| {
-                            cfg.usage_counts.get(&model.name).copied().unwrap_or(0)
+                        .min_by_key(|(_, (_, provider, _, _))| {
+                            cfg.provider_health
+                                .get(&provider.id)
+                                .map(|h| h.in_flight)
+                                .unwrap_or(0)
                         })
                         .map(|(index, _)| index)
                         .unwrap_or(0),
@@ -662,6 +719,27 @@ pub async fn route_request(
                     .upstream_model
                     .clone()
                     .unwrap_or_else(|| resolve_model_mapping(&provider, &model.name));
+
+                // Strict-random must advance its cursor immediately
+                // after picking (not after the request completes),
+                // otherwise concurrent requests read the same cursor
+                // and may pick the same target within one cycle. The
+                // cursor grows monotonically (no modulo) so each
+                // completed cycle yields a fresh deck shuffle.
+                if strategy == RoutingStrategy::StrictRandom {
+                    let agg_name = aggregation.name.clone();
+                    // Release the read lock before acquiring the
+                    // write lock to advance the cursor.
+                    drop(cfg);
+                    let mut cfg_write = state.write().await;
+                    let idx = cfg_write
+                        .round_robin_index
+                        .get(&agg_name)
+                        .copied()
+                        .unwrap_or(0);
+                    cfg_write.round_robin_index.insert(agg_name, idx + 1);
+                }
+
                 return Ok(RouteResult {
                     provider,
                     model: model.name,
@@ -998,26 +1076,20 @@ pub async fn record_routing_side_effects(
     if let Some(agg_name) = aggregation_name {
         // Aggregation: advance its dedicated cursor.
         if let Some(agg) = cfg.aggregations.iter().find(|a| a.name == *agg_name) {
-            let slot_count = if agg.targets.is_empty() {
-                parse_agg_models(&agg.models).len()
-            } else {
-                let enabled = agg
-                    .targets
-                    .iter()
-                    .filter(|target| target.enabled && target.weight > 0);
-                if matches!(
-                    agg.strategy_enum(),
-                    RoutingStrategy::RoundRobin | RoutingStrategy::Weighted
-                ) {
-                    enabled.map(|target| target.weight as usize).sum()
+            // Strict-random advances its cursor at route time (in
+            // route_request) to prevent concurrent picks from the
+            // same cycle; skip the post-completion advance here.
+            if agg.strategy_enum() != RoutingStrategy::StrictRandom {
+                let slot_count = if agg.targets.is_empty() {
+                    parse_agg_models(&agg.models).len()
                 } else {
-                    enabled.count()
+                    agg.targets.iter().filter(|target| target.enabled).count()
+                };
+                if slot_count > 0 {
+                    let idx = cfg.round_robin_index.get(agg_name).copied().unwrap_or(0);
+                    let next = (idx + 1) % slot_count;
+                    cfg.round_robin_index.insert(agg_name.clone(), next);
                 }
-            };
-            if slot_count > 0 {
-                let idx = cfg.round_robin_index.get(agg_name).copied().unwrap_or(0);
-                let next = (idx + 1) % slot_count;
-                cfg.round_robin_index.insert(agg_name.clone(), next);
             }
         }
     } else {
@@ -1063,7 +1135,7 @@ mod tests {
     #[tokio::test]
     async fn reset_provider_health_clears_cooldowns_and_in_flight_counts() {
         let state = make_state();
-        mark_provider_unhealthy(&state, "p1", HealthErrorKind::AuthError).await;
+        mark_provider_unhealthy(&state, "p1", HealthErrorKind::AuthError, None).await;
         acquire_provider_slot(&state, "p1").await;
 
         {
@@ -1115,7 +1187,7 @@ mod tests {
                 supports_system_role: true,
             });
         }
-        mark_provider_unhealthy(&state, "p1", HealthErrorKind::AuthError).await;
+        mark_provider_unhealthy(&state, "p1", HealthErrorKind::AuthError, None).await;
 
         let route = route_request(
             &state,

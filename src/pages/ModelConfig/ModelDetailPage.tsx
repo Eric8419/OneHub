@@ -78,6 +78,26 @@ export const ModelDetailPage: React.FC = () => {
   );
   const [routingSaving, setRoutingSaving] = useState(false);
 
+  // 可编辑的上游目标列表。优先使用已持久化的 targets；否则按当前直接来源生成。
+  // priority/weight 等字段会随用户在 UI 上的编辑实时更新，保存时一并提交。
+  const [routingTargets, setRoutingTargets] = useState<RouteTarget[]>(() => {
+    if (currentRouting?.targets && currentRouting.targets.length > 0) {
+      return currentRouting.targets.map((target) => ({ ...target }));
+    }
+    return [];
+  });
+
+  // 当 currentRouting 变化（如首次加载、外部更新）时，同步 routingTargets。
+  useEffect(() => {
+    if (currentRouting?.targets && currentRouting.targets.length > 0) {
+      setRoutingTargets(currentRouting.targets.map((target) => ({ ...target })));
+    }
+  }, [currentRouting?.id, currentRouting?.targets]);
+
+  const patchRoutingTarget = useCallback((id: string, patch: Partial<RouteTarget>) => {
+    setRoutingTargets((targets) => targets.map((target) => (target.id === id ? { ...target, ...patch } : target)));
+  }, []);
+
   const sources = useMemo<MappingSource[]>(() => {
     const result: MappingSource[] = [];
 
@@ -201,26 +221,52 @@ export const ModelDetailPage: React.FC = () => {
 
   const allRows = useMemo(() => [...directSources, ...aggSources], [directSources, aggSources]);
   const routingTargetCount =
-    currentRouting?.targets?.filter((target) => target.enabled).length ||
+    routingTargets.filter((target) => target.enabled).length ||
     currentRouting?.models
       .split(',')
       .map((model) => model.trim())
       .filter(Boolean).length ||
     directSources.length;
 
-  const generatedRoutingTargets = useMemo<RouteTarget[]>(
-    () =>
-      directSources.map((row, index) => ({
-        id: createId(`model-route-target-${index}`),
-        providerId: row.providerId,
-        model: row.model.name,
-        protocol: protocolForFlavor(row.provider.apiFlavor),
-        priority: 0,
-        weight: 1,
-        enabled: true,
-      })),
-    [directSources],
-  );
+  // 为 target 编辑器准备展示信息：按 providerId 查找提供商名称，便于用户识别每个上游。
+  const targetDisplayMap = useMemo(() => {
+    const map = new Map<string, { providerName: string; providerId: string }>();
+    for (const row of directSources) {
+      map.set(row.providerId, { providerName: row.provider.name, providerId: row.providerId });
+    }
+    return map;
+  }, [directSources]);
+
+  // 当直接来源变化（如新增/删除 provider 中的同名模型）时，补齐缺失的 target，
+  // 已存在的 target 保留用户编辑过的字段。
+  useEffect(() => {
+    setRoutingTargets((prev) => {
+      const existing = new Map(prev.map((t) => [t.providerId, t]));
+      const next: RouteTarget[] = directSources.map((row, index) => {
+        const old = existing.get(row.providerId);
+        if (old) {
+          return {
+            ...old,
+            model: row.model.name,
+            protocol: protocolForFlavor(row.provider.apiFlavor),
+          };
+        }
+        return {
+          id: createId(`model-route-target-${index}`),
+          providerId: row.providerId,
+          model: row.model.name,
+          protocol: protocolForFlavor(row.provider.apiFlavor),
+          priority: 0,
+          weight: 1,
+          enabled: true,
+        };
+      });
+      // 仅在集合变化时返回新数组，避免无限渲染
+      if (next.length !== prev.length) return next;
+      const sameIds = next.every((t, i) => t.id === prev[i]?.id && t.providerId === prev[i]?.providerId);
+      return sameIds ? prev : next;
+    });
+  }, [directSources]);
 
   const bulkInitialValues: BulkEditValues = useMemo(() => {
     const ms = directSources.map((r) => r.model);
@@ -338,7 +384,7 @@ export const ModelDetailPage: React.FC = () => {
   }, [pendingEdits, providers, decodedName, updateProvider]);
 
   const handleSaveRouting = useCallback(async () => {
-    if (!currentRouting && generatedRoutingTargets.length === 0) {
+    if (!currentRouting && routingTargets.length === 0) {
       toast(t('models.routing.noSources'), 'error');
       return;
     }
@@ -348,14 +394,15 @@ export const ModelDetailPage: React.FC = () => {
       if (currentRouting) {
         await updateAggregation(currentRouting.id, {
           strategy: routingStrategy,
+          targets: routingTargets,
           enabled: true,
         });
       } else {
         await addAggregation({
           id: createId('model-route'),
           name: decodedName,
-          models: generatedRoutingTargets.map((target) => target.model).join(', '),
-          targets: generatedRoutingTargets,
+          models: routingTargets.map((target) => target.model).join(', '),
+          targets: routingTargets,
           strategy: routingStrategy,
           priority: 'P0',
           enabled: true,
@@ -374,7 +421,7 @@ export const ModelDetailPage: React.FC = () => {
     addAggregation,
     currentRouting,
     decodedName,
-    generatedRoutingTargets,
+    routingTargets,
     routingStrategy,
     t,
     updateAggregation,
@@ -618,13 +665,178 @@ export const ModelDetailPage: React.FC = () => {
                 size="lg"
                 icon={Save}
                 loading={routingSaving}
-                disabled={!currentRouting && generatedRoutingTargets.length === 0}
+                disabled={!currentRouting && routingTargets.length === 0}
                 onClick={handleSaveRouting}
               >
                 {t('models.routing.save')}
               </Button>
             </div>
           </div>
+
+          {/* 上游编辑面板：priority/fill-first 编辑优先级，weighted 编辑权重 */}
+          {(() => {
+            // 根据策略决定显示哪个字段
+            const isPriorityField = routingStrategy === 'priority' || routingStrategy === 'fill-first';
+            const isWeightField = routingStrategy === 'weighted';
+            if (!(isPriorityField || isWeightField) || routingTargets.length === 0) return null;
+
+            const hintKey =
+              routingStrategy === 'priority'
+                ? 'models.routing.priorityHint'
+                : routingStrategy === 'fill-first'
+                  ? 'models.routing.fillFirstHint'
+                  : 'models.routing.weightedHint';
+            const columnHint = isWeightField
+              ? t('models.routing.weightColumnHint')
+              : t('models.routing.priorityColumnHint');
+            const columnLabel = isWeightField
+              ? t('models.routing.colWeight')
+              : t('models.routing.colPriority');
+
+            return (
+              <div style={{ marginTop: 'var(--spacer-16)' }}>
+                <div
+                  style={{
+                    marginBottom: 'var(--spacer-8)',
+                    padding: 'var(--spacer-10) var(--spacer-12)',
+                    borderRadius: 'var(--radius-8)',
+                    background: 'var(--bg-overlay-l1)',
+                    color: 'var(--text-secondary)',
+                    fontSize: 'var(--body-sm-font-size)',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {t(hintKey)}
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 'var(--spacer-8)',
+                  }}
+                >
+                  <span
+                    style={{
+                      color: 'var(--text-secondary)',
+                      fontSize: 'var(--body-sm-font-size)',
+                      fontWeight: 'var(--font-weight-medium)',
+                    }}
+                  >
+                    {t('models.routing.targetList')}
+                  </span>
+                  <span style={{ color: 'var(--text-tertiary)', fontSize: 'var(--body-xs-font-size)' }}>
+                    {columnHint}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    border: '1px solid var(--border-neutral-l1)',
+                    borderRadius: 'var(--radius-8)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* 表头 */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'minmax(0, 1fr) 120px 80px',
+                      gap: 'var(--spacer-12)',
+                      padding: 'var(--spacer-8) var(--spacer-12)',
+                      background: 'var(--bg-overlay-l1)',
+                      fontSize: 'var(--body-xs-font-size)',
+                      color: 'var(--text-tertiary)',
+                      fontWeight: 'var(--font-weight-medium)',
+                    }}
+                  >
+                    <span>{t('models.routing.colUpstream')}</span>
+                    <span>{columnLabel}</span>
+                    <span>{t('models.routing.colEnabled')}</span>
+                  </div>
+                  {/* 行 */}
+                  {routingTargets.map((target) => {
+                    const display = targetDisplayMap.get(target.providerId);
+                    return (
+                      <div
+                        key={target.id}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'minmax(0, 1fr) 120px 80px',
+                          gap: 'var(--spacer-12)',
+                          padding: 'var(--spacer-8) var(--spacer-12)',
+                          borderTop: '1px solid var(--border-neutral-l1)',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 'var(--body-sm-font-size)',
+                              color: 'var(--text-default)',
+                              fontFamily: 'var(--font-family-mono)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {target.model}
+                          </div>
+                          <div style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
+                            {display?.providerName ?? target.providerId}
+                          </div>
+                        </div>
+                        <input
+                          className="mc-input"
+                          type="number"
+                          min={isWeightField ? 1 : undefined}
+                          value={isWeightField ? target.weight : target.priority}
+                          onChange={(event) =>
+                            patchRoutingTarget(
+                              target.id,
+                              isWeightField
+                                ? { weight: Math.max(1, Number(event.target.value)) }
+                                : { priority: Number(event.target.value) },
+                            )
+                          }
+                          style={{
+                            height: 28,
+                            padding: '0 var(--spacer-8)',
+                            borderRadius: 'var(--radius-6)',
+                            border: '1px solid var(--border-neutral-l1)',
+                            background: 'var(--bg-white)',
+                            color: 'var(--text-default)',
+                            fontSize: 'var(--body-sm-font-size)',
+                            outline: 'none',
+                            width: '100%',
+                          }}
+                        />
+                        <label
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 'var(--spacer-6)',
+                            fontSize: 'var(--body-xs-font-size)',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={target.enabled}
+                            onChange={(event) =>
+                              patchRoutingTarget(target.id, { enabled: event.target.checked })
+                            }
+                            style={{ cursor: 'pointer' }}
+                          />
+                          {target.enabled ? t('models.routing.enabledOn') : t('models.routing.enabledOff')}
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </Card>
       </AnimatedContent>
 

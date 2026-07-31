@@ -484,6 +484,15 @@ fn status_to_health_kind(status: u16) -> crate::proxy::routing::HealthErrorKind 
     }
 }
 
+/// Parse the `Retry-After` HTTP header (RFC 7231 §7.1.3) into
+/// seconds. Supports the delta-seconds form ("120") used by all
+/// major LLM providers. HTTP-date form is not parsed; when absent
+/// or unparseable, the caller falls back to a 60-second default.
+fn parse_retry_after(headers: &HeaderMap) -> Option<u64> {
+    let raw = headers.get("retry-after")?.to_str().ok()?;
+    raw.trim().parse::<u64>().ok()
+}
+
 struct OrchestrationRequestContext<'a> {
     is_streaming: bool,
     request_id: String,
@@ -521,12 +530,19 @@ async fn execute_orchestration_route(
                 .await;
         }
         Err((status, _)) if is_retryable_status(status.as_u16()) => {
-            crate::proxy::routing::mark_provider_unhealthy(
-                &state.routing,
-                &provider_id,
-                status_to_health_kind(status.as_u16()),
-            )
-            .await;
+            let kind = status_to_health_kind(status.as_u16());
+            // RateLimit (429) is already marked inside proxy_request
+            // with the correct Retry-After cooldown; skip here to
+            // avoid overwriting it with the 60s default.
+            if kind != crate::proxy::routing::HealthErrorKind::RateLimit {
+                crate::proxy::routing::mark_provider_unhealthy(
+                    &state.routing,
+                    &provider_id,
+                    kind,
+                    None,
+                )
+                .await;
+            }
         }
         _ => {}
     }
@@ -814,12 +830,19 @@ async fn proxy_request_with_failover(
                 if is_retryable_status(status_u16) {
                     // Retryable: mark provider unhealthy and try next.
                     let kind = status_to_health_kind(status_u16);
-                    crate::proxy::routing::mark_provider_unhealthy(
-                        &state.routing,
-                        &provider_id,
-                        kind,
-                    )
-                    .await;
+                    // RateLimit (429) is already marked inside
+                    // proxy_request with the correct Retry-After
+                    // cooldown; skip here to avoid overwriting it
+                    // with the 60s default.
+                    if kind != crate::proxy::routing::HealthErrorKind::RateLimit {
+                        crate::proxy::routing::mark_provider_unhealthy(
+                            &state.routing,
+                            &provider_id,
+                            kind,
+                            None,
+                        )
+                        .await;
+                    }
                     excluded.insert(provider_id);
                     last_error = Some((status, json_val));
                     continue;
@@ -1109,6 +1132,24 @@ async fn proxy_request(
     let latency_ms = start.elapsed().as_millis() as i64;
 
     if !status.is_success() {
+        // Parse Retry-After before consuming the response body via text().
+        let retry_after_secs = if status.as_u16() == 429 {
+            parse_retry_after(upstream_resp.headers())
+        } else {
+            None
+        };
+        // For 429, mark the provider unhealthy here with the
+        // upstream-provided cooldown. The failover loop skips
+        // RateLimit to avoid overwriting this with the 60s default.
+        if status.as_u16() == 429 {
+            crate::proxy::routing::mark_provider_unhealthy(
+                &state.routing,
+                &route.provider.id,
+                crate::proxy::routing::HealthErrorKind::RateLimit,
+                retry_after_secs,
+            )
+            .await;
+        }
         let err_text = upstream_resp.text().await.unwrap_or_default();
         finalize_record(
             &state.metrics,

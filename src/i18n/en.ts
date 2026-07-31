@@ -146,6 +146,18 @@ const en: Record<string, string> = {
   'models.routing.saved': 'Model routing strategy saved',
   'models.routing.noSources': 'This model has no available upstream source',
   'models.routing.saveFailed': 'Failed to save routing strategy',
+  'models.routing.priorityHint': 'Upstreams are tried from highest priority to lowest; if the highest is unavailable, requests automatically fall back to the next.',
+  'models.routing.fillFirstHint': 'Keeps using the highest-priority upstream until rate-limited (429) or unavailable, then switches to the next; returns to the first once the cooldown expires.',
+  'models.routing.weightedHint': 'Distributes requests randomly by weight; higher weight means higher selection probability, long-term ratio ≈ weight ratio.',
+  'models.routing.targetList': 'Upstream Targets',
+  'models.routing.priorityColumnHint': 'Higher number = higher priority',
+  'models.routing.weightColumnHint': 'Higher number = higher share (min 1)',
+  'models.routing.colUpstream': 'Upstream Model',
+  'models.routing.colPriority': 'Priority',
+  'models.routing.colWeight': 'Weight',
+  'models.routing.colEnabled': 'Enabled',
+  'models.routing.enabledOn': 'On',
+  'models.routing.enabledOff': 'Off',
 
   // ── Providers ──
   'providers.title': 'API Providers',
