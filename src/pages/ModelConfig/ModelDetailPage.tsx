@@ -58,6 +58,22 @@ const protocolForFlavor = (flavor?: string): NonNullable<RouteTarget['protocol']
 const createId = (prefix: string) =>
   `${prefix}-${crypto.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2)}`;
 
+const toDateTimeLocal = (timestamp?: number): string => {
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(
+    date.getMinutes(),
+  )}`;
+};
+
+const fromDateTimeLocal = (value: string): number | undefined => {
+  if (!value) return undefined;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? undefined : timestamp;
+};
+
 export const ModelDetailPage: React.FC = () => {
   const t = useT();
   const { modelName } = useParams<{ modelName: string }>();
@@ -240,6 +256,7 @@ export const ModelDetailPage: React.FC = () => {
   // 当直接来源变化（如新增/删除 provider 中的同名模型）时，补齐缺失的 target，
   // 已存在的 target 保留用户编辑过的字段。
   useEffect(() => {
+    if (directSources.length === 0) return;
     setRoutingTargets((prev) => {
       const existing = new Map(prev.map((t) => [t.providerId, t]));
       const next: RouteTarget[] = directSources.map((row, index) => {
@@ -248,7 +265,7 @@ export const ModelDetailPage: React.FC = () => {
           return {
             ...old,
             model: row.model.name,
-            protocol: protocolForFlavor(row.provider.apiFlavor),
+            protocol: old.protocol ?? protocolForFlavor(row.provider.apiFlavor),
           };
         }
         return {
@@ -673,25 +690,62 @@ export const ModelDetailPage: React.FC = () => {
             </div>
           </div>
 
-          {/* 上游编辑面板：priority/fill-first 编辑优先级，weighted 编辑权重 */}
+          {/* Target metadata is edited here so every strategy has a real,
+              persistent input instead of a label-only implementation. */}
           {(() => {
-            // 根据策略决定显示哪个字段
-            const isPriorityField = routingStrategy === 'priority' || routingStrategy === 'fill-first';
+            const isPriorityField = [
+              'priority',
+              'fill-first',
+              'cost-optimized',
+              'reset-aware',
+              'reset-window',
+              'headroom',
+              'lkgp',
+              'fusion',
+              'pipeline',
+            ].includes(routingStrategy);
             const isWeightField = routingStrategy === 'weighted';
-            if (!(isPriorityField || isWeightField) || routingTargets.length === 0) return null;
+            const isCostField = routingStrategy === 'cost-optimized' || routingStrategy === 'auto';
+            const isQuotaField = ['fill-first', 'reset-aware', 'headroom', 'auto'].includes(routingStrategy);
+            const isResetField = ['reset-aware', 'reset-window', 'auto'].includes(routingStrategy);
+            const showPanel =
+              isPriorityField || isWeightField || isCostField || isQuotaField || isResetField;
+            if (!showPanel || routingTargets.length === 0) return null;
 
-            const hintKey =
-              routingStrategy === 'priority'
-                ? 'models.routing.priorityHint'
-                : routingStrategy === 'fill-first'
-                  ? 'models.routing.fillFirstHint'
-                  : 'models.routing.weightedHint';
-            const columnHint = isWeightField
-              ? t('models.routing.weightColumnHint')
-              : t('models.routing.priorityColumnHint');
-            const columnLabel = isWeightField
-              ? t('models.routing.colWeight')
-              : t('models.routing.colPriority');
+            const hintKeys = [
+              isPriorityField && 'models.routing.priorityHint',
+              isWeightField && 'models.routing.weightedHint',
+              isCostField && 'models.routing.costHint',
+              isQuotaField && 'models.routing.quotaHint',
+              isResetField && 'models.routing.resetHint',
+            ].filter(Boolean) as string[];
+            const columns = [
+              isPriorityField || isWeightField ? (isWeightField ? 'weight' : 'priority') : null,
+              isCostField ? 'cost' : null,
+              isQuotaField ? 'quota' : null,
+              isResetField ? 'reset' : null,
+            ].filter(Boolean) as string[];
+            const columnWidth: Record<string, string> = {
+              priority: '96px',
+              weight: '96px',
+              cost: '132px',
+              quota: '112px',
+              reset: '188px',
+            };
+            const gridTemplateColumns = `minmax(190px, 1fr) ${columns
+              .map((column) => columnWidth[column])
+              .join(' ')} 82px`;
+            const inputStyle = {
+              height: 28,
+              padding: '0 var(--spacer-8)',
+              borderRadius: 'var(--radius-6)',
+              border: '1px solid var(--border-neutral-l1)',
+              background: 'var(--bg-white)',
+              color: 'var(--text-default)',
+              fontSize: 'var(--body-sm-font-size)',
+              outline: 'none',
+              width: '100%',
+            } as const;
 
             return (
               <div style={{ marginTop: 'var(--spacer-16)' }}>
@@ -706,7 +760,7 @@ export const ModelDetailPage: React.FC = () => {
                     lineHeight: 1.5,
                   }}
                 >
-                  {t(hintKey)}
+                  {hintKeys.map((key) => t(key)).join(' ')}
                 </div>
                 <div
                   style={{
@@ -726,22 +780,22 @@ export const ModelDetailPage: React.FC = () => {
                     {t('models.routing.targetList')}
                   </span>
                   <span style={{ color: 'var(--text-tertiary)', fontSize: 'var(--body-xs-font-size)' }}>
-                    {columnHint}
+                    {columns.map((column) => t(`models.routing.col${column[0].toUpperCase()}${column.slice(1)}`)).join(' · ')}
                   </span>
                 </div>
                 <div
                   style={{
                     border: '1px solid var(--border-neutral-l1)',
                     borderRadius: 'var(--radius-8)',
-                    overflow: 'hidden',
+                    overflowX: 'auto',
                   }}
                 >
-                  {/* 表头 */}
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: 'minmax(0, 1fr) 120px 80px',
+                      gridTemplateColumns,
                       gap: 'var(--spacer-12)',
+                      minWidth: 620,
                       padding: 'var(--spacer-8) var(--spacer-12)',
                       background: 'var(--bg-overlay-l1)',
                       fontSize: 'var(--body-xs-font-size)',
@@ -750,10 +804,11 @@ export const ModelDetailPage: React.FC = () => {
                     }}
                   >
                     <span>{t('models.routing.colUpstream')}</span>
-                    <span>{columnLabel}</span>
+                    {columns.map((column) => (
+                      <span key={column}>{t(`models.routing.col${column[0].toUpperCase()}${column.slice(1)}`)}</span>
+                    ))}
                     <span>{t('models.routing.colEnabled')}</span>
                   </div>
-                  {/* 行 */}
                   {routingTargets.map((target) => {
                     const display = targetDisplayMap.get(target.providerId);
                     return (
@@ -761,8 +816,9 @@ export const ModelDetailPage: React.FC = () => {
                         key={target.id}
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: 'minmax(0, 1fr) 120px 80px',
+                          gridTemplateColumns,
                           gap: 'var(--spacer-12)',
+                          minWidth: 620,
                           padding: 'var(--spacer-8) var(--spacer-12)',
                           borderTop: '1px solid var(--border-neutral-l1)',
                           alignItems: 'center',
@@ -785,31 +841,86 @@ export const ModelDetailPage: React.FC = () => {
                             {display?.providerName ?? target.providerId}
                           </div>
                         </div>
-                        <input
-                          className="mc-input"
-                          type="number"
-                          min={isWeightField ? 1 : undefined}
-                          value={isWeightField ? target.weight : target.priority}
-                          onChange={(event) =>
-                            patchRoutingTarget(
-                              target.id,
-                              isWeightField
-                                ? { weight: Math.max(1, Number(event.target.value)) }
-                                : { priority: Number(event.target.value) },
-                            )
-                          }
-                          style={{
-                            height: 28,
-                            padding: '0 var(--spacer-8)',
-                            borderRadius: 'var(--radius-6)',
-                            border: '1px solid var(--border-neutral-l1)',
-                            background: 'var(--bg-white)',
-                            color: 'var(--text-default)',
-                            fontSize: 'var(--body-sm-font-size)',
-                            outline: 'none',
-                            width: '100%',
-                          }}
-                        />
+                        {isPriorityField && (
+                          <input
+                            className="mc-input"
+                            type="number"
+                            value={target.priority}
+                            onChange={(event) =>
+                              patchRoutingTarget(target.id, { priority: Number(event.target.value) || 0 })
+                            }
+                            style={inputStyle}
+                          />
+                        )}
+                        {isWeightField && (
+                          <input
+                            className="mc-input"
+                            type="number"
+                            min={1}
+                            value={target.weight}
+                            onChange={(event) =>
+                              patchRoutingTarget(target.id, { weight: Math.max(1, Number(event.target.value) || 1) })
+                            }
+                            style={inputStyle}
+                          />
+                        )}
+                        {isCostField && (
+                          <input
+                            className="mc-input"
+                            type="number"
+                            min={0}
+                            step="0.0001"
+                            placeholder={t('models.routing.costPlaceholder')}
+                            value={target.costPerMillionTokens ?? ''}
+                            onChange={(event) =>
+                              (() => {
+                                const value = Number(event.target.value);
+                                patchRoutingTarget(target.id, {
+                                  costPerMillionTokens:
+                                    event.target.value === '' || !Number.isFinite(value)
+                                      ? undefined
+                                      : Math.max(0, value),
+                                });
+                              })()
+                            }
+                            style={inputStyle}
+                          />
+                        )}
+                        {isQuotaField && (
+                          <input
+                            className="mc-input"
+                            type="number"
+                            min={0}
+                            max={100}
+                            step="0.1"
+                            placeholder={t('models.routing.quotaPlaceholder')}
+                            value={target.quotaRemaining === undefined ? '' : target.quotaRemaining * 100}
+                            onChange={(event) =>
+                              (() => {
+                                const value = Number(event.target.value);
+                                patchRoutingTarget(target.id, {
+                                  quotaRemaining:
+                                    event.target.value === '' || !Number.isFinite(value)
+                                      ? undefined
+                                      : Math.min(100, Math.max(0, value)) / 100,
+                                });
+                              })()
+                            }
+                            style={inputStyle}
+                          />
+                        )}
+                        {isResetField && (
+                          <input
+                            className="mc-input"
+                            type="datetime-local"
+                            title={t('models.routing.colReset')}
+                            value={toDateTimeLocal(target.quotaResetAt)}
+                            onChange={(event) =>
+                              patchRoutingTarget(target.id, { quotaResetAt: fromDateTimeLocal(event.target.value) })
+                            }
+                            style={inputStyle}
+                          />
+                        )}
                         <label
                           style={{
                             display: 'inline-flex',
@@ -823,9 +934,7 @@ export const ModelDetailPage: React.FC = () => {
                           <input
                             type="checkbox"
                             checked={target.enabled}
-                            onChange={(event) =>
-                              patchRoutingTarget(target.id, { enabled: event.target.checked })
-                            }
+                            onChange={(event) => patchRoutingTarget(target.id, { enabled: event.target.checked })}
                             style={{ cursor: 'pointer' }}
                           />
                           {target.enabled ? t('models.routing.enabledOn') : t('models.routing.enabledOff')}

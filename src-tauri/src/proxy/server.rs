@@ -501,6 +501,13 @@ struct OrchestrationRequestContext<'a> {
     original_provider: String,
 }
 
+struct RoutingOutcomeContext<'a> {
+    aggregation_name: &'a Option<String>,
+    provider_id: Option<&'a str>,
+    target_id: Option<&'a str>,
+    success: bool,
+}
+
 async fn execute_orchestration_route(
     state: &SharedAppState,
     route: RouteResult,
@@ -654,24 +661,26 @@ async fn orchestrate_routes(
     let judge = routes[0].clone();
     let mut panel_body = body.clone();
     panel_body["stream"] = json!(false);
-    let panel_calls = routes
-        .into_iter()
-        .take(8)
-        .enumerate()
-        .map(|(index, route)| {
-            execute_orchestration_route(
-                state,
-                route,
-                panel_body.clone(),
-                OrchestrationRequestContext {
-                    is_streaming: false,
-                    request_id: format!("{request_id}:fusion:{index}"),
-                    inbound_flavor,
-                    attempt: index as u32,
-                    original_provider: original_provider.clone(),
-                },
-            )
-        });
+    let panel_calls =
+        routes
+            .into_iter()
+            .skip(1)
+            .take(8)
+            .enumerate()
+            .map(|(index, route)| {
+                execute_orchestration_route(
+                    state,
+                    route,
+                    panel_body.clone(),
+                    OrchestrationRequestContext {
+                        is_streaming: false,
+                        request_id: format!("{request_id}:fusion:{index}"),
+                        inbound_flavor,
+                        attempt: index as u32,
+                        original_provider: original_provider.clone(),
+                    },
+                )
+            });
     let panel_results = futures::future::join_all(panel_calls).await;
     let mut answers = Vec::new();
     for response in panel_results.into_iter().flatten() {
@@ -905,6 +914,7 @@ async fn proxy_request(
     let app_handle = state.app_handle.read().await.clone();
 
     let provider_name = route.provider.name.clone();
+    let provider_id = route.provider.id.clone();
     let selected_model = route.model.clone();
     let upstream_model = route.upstream_model.clone();
     let target_id = route.target_id.clone();
@@ -940,7 +950,12 @@ async fn proxy_request(
                 failover_count,
                 original_provider: original_provider.to_string(),
             },
-            &route.aggregation_name,
+            RoutingOutcomeContext {
+                aggregation_name: &route.aggregation_name,
+                provider_id: Some(&provider_id),
+                target_id: target_id.as_deref(),
+                success: false,
+            },
         )
         .await;
         return Err((
@@ -1113,7 +1128,12 @@ async fn proxy_request(
                     failover_count,
                     original_provider: original_provider.to_string(),
                 },
-                &route.aggregation_name,
+                RoutingOutcomeContext {
+                    aggregation_name: &route.aggregation_name,
+                    provider_id: Some(&provider_id),
+                    target_id: target_id.as_deref(),
+                    success: false,
+                },
             )
             .await;
             return Err((
@@ -1168,7 +1188,12 @@ async fn proxy_request(
                 failover_count,
                 original_provider: original_provider.to_string(),
             },
-            &route.aggregation_name,
+            RoutingOutcomeContext {
+                aggregation_name: &route.aggregation_name,
+                provider_id: Some(&provider_id),
+                target_id: target_id.as_deref(),
+                success: false,
+            },
         )
         .await;
         return Err((
@@ -1199,6 +1224,8 @@ async fn proxy_request(
         let provider_clone = provider_name.clone();
         let req_type_clone = request_type_streaming.clone();
         let aggregation_name_clone = route.aggregation_name.clone();
+        let provider_id_clone = provider_id.clone();
+        let target_id_clone = target_id.clone();
         let request_id_owned = request_id.to_string();
         let original_provider_clone = original_provider.to_string();
         // We can't move the borrowed `adapter` across spawn, so we
@@ -1343,7 +1370,12 @@ async fn proxy_request(
                     failover_count,
                     original_provider: original_provider_clone,
                 },
-                &aggregation_name_clone,
+                RoutingOutcomeContext {
+                    aggregation_name: &aggregation_name_clone,
+                    provider_id: Some(&provider_id_clone),
+                    target_id: target_id_clone.as_deref(),
+                    success: !had_error,
+                },
             )
             .await;
         });
@@ -1425,7 +1457,12 @@ async fn proxy_request(
             failover_count,
             original_provider: original_provider.to_string(),
         },
-        &route.aggregation_name,
+        RoutingOutcomeContext {
+            aggregation_name: &route.aggregation_name,
+            provider_id: Some(&provider_id),
+            target_id: target_id.as_deref(),
+            success: true,
+        },
     )
     .await;
 
@@ -1485,16 +1522,18 @@ async fn finalize_record(
     routing: &SharedRouting,
     app_handle: Option<&tauri::AppHandle>,
     record: RequestRecord,
-    aggregation_name: &Option<String>,
+    context: RoutingOutcomeContext<'_>,
 ) {
     let model = record.model.clone();
     let latency = record.latency_ms;
-    // Update routing cursors/latency first, then persist the record.
-    crate::proxy::routing::record_routing_side_effects(
+    crate::proxy::routing::record_routing_outcome(
         routing,
-        aggregation_name,
+        context.aggregation_name,
         &model,
+        context.provider_id,
+        context.target_id,
         latency,
+        context.success,
     )
     .await;
     // Notify the frontend before `record` is moved into metrics.
@@ -1618,6 +1657,9 @@ async fn capabilities_handler(
                     "priority": target.priority,
                     "weight": target.weight,
                     "enabled": target.enabled,
+                    "cost_per_million_tokens": target.cost_per_million_tokens,
+                    "quota_remaining": target.quota_remaining,
+                    "quota_reset_at": target.quota_reset_at,
                 })).collect::<Vec<_>>(),
             })
         })
