@@ -1549,7 +1549,7 @@ async fn health_handler() -> Json<Value> {
     Json(json!({
         "status": "ok",
         "service": "melody-hub-proxy",
-        "version": "0.1.0"
+        "version": env!("CARGO_PKG_VERSION")
     }))
 }
 

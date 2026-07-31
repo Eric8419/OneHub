@@ -2,9 +2,9 @@ import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProviderStore } from '../../store/providerStore';
 import { useAggregationStore } from '../../store/aggregationStore';
-import { buildLegacyAggregationTargets, normalizeStrategyKey, strategyLabel } from '../../types/aggregation';
-import type { Aggregation, RouteTarget, RoutingStrategy } from '../../types/aggregation';
-import type { Model, Provider } from '../../types/provider';
+import { buildLegacyAggregationTargets, normalizeStrategyKey } from '../../types/aggregation';
+import type { RouteTarget, RoutingStrategy } from '../../types/aggregation';
+import type { Model } from '../../types/provider';
 import { Card, AnimatedContent, Button } from '../../components/ui';
 import { toast } from '../../components/ui/Toast';
 import { ModelBulkEditPanel, type BulkEditValues } from './ModelBulkEditPanel';
@@ -17,7 +17,6 @@ import {
   Eye,
   Brain,
   SlidersHorizontal,
-  Layers,
   ArrowRight,
   Server,
   Cpu,
@@ -36,18 +35,6 @@ interface DirectMapping {
   model: Model;
   matchedBy: 'name' | 'alias';
 }
-
-interface AggMapping {
-  kind: 'aggregation';
-  aggregation: Aggregation;
-  resolvedModels: Array<{
-    modelName: string;
-    providerName: string;
-    providerId: string;
-  }>;
-}
-
-type MappingSource = DirectMapping | AggMapping;
 
 const protocolForFlavor = (flavor?: string): NonNullable<RouteTarget['protocol']> => {
   if (flavor === 'anthropic' || flavor === 'anthropic-messages') return 'anthropic-messages';
@@ -131,8 +118,8 @@ export const ModelDetailPage: React.FC = () => {
     setRoutingTargets((targets) => targets.map((target) => (target.id === id ? { ...target, ...patch } : target)));
   }, []);
 
-  const sources = useMemo<MappingSource[]>(() => {
-    const result: MappingSource[] = [];
+  const sourceMappings = useMemo<DirectMapping[]>(() => {
+    const result: DirectMapping[] = [];
 
     for (const provider of providers) {
       for (const model of provider.models) {
@@ -160,38 +147,10 @@ export const ModelDetailPage: React.FC = () => {
       }
     }
 
-    for (const agg of aggregations) {
-      if (!agg.enabled) continue;
-      if (agg.name !== decodedName) continue;
-      const modelNames = agg.models
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const resolvedModels: AggMapping['resolvedModels'] = [];
-      for (const mn of modelNames) {
-        for (const provider of providers) {
-          for (const model of provider.models) {
-            if (model.name === mn || model.alias?.trim() === mn) {
-              resolvedModels.push({
-                modelName: model.name,
-                providerName: provider.name,
-                providerId: provider.id,
-              });
-            }
-          }
-        }
-      }
-      result.push({
-        kind: 'aggregation',
-        aggregation: { ...agg },
-        resolvedModels,
-      });
-    }
-
     return result;
-  }, [decodedName, providers, aggregations]);
+  }, [decodedName, providers]);
 
-  const paramSources = sources.filter((s): s is DirectMapping => s.kind === 'direct' || s.kind === 'alias');
+  const paramSources = sourceMappings;
 
   const getEffectiveModel = useCallback(
     (source: DirectMapping): Model => {
@@ -208,9 +167,8 @@ export const ModelDetailPage: React.FC = () => {
   const allJsonMode = paramSources.length > 0 && paramSources.every((s) => getEffectiveModel(s).supportsJsonMode);
   const maxCtx = Math.max(0, ...paramSources.map((s) => getEffectiveModel(s).contextWindow || 0));
   const maxOutput = Math.max(0, ...paramSources.map((s) => getEffectiveModel(s).maxOutputTokens || 0));
-  const hasDirect = sources.some((s) => s.kind === 'direct');
-  const hasAlias = sources.some((s) => s.kind === 'alias');
-  const hasAgg = sources.some((s) => s.kind === 'aggregation');
+  const hasDirect = sourceMappings.some((s) => s.kind === 'direct');
+  const hasAlias = sourceMappings.some((s) => s.kind === 'alias');
 
   const directSources: SourceRow[] = useMemo(() => {
     const rows: SourceRow[] = [];
@@ -219,7 +177,7 @@ export const ModelDetailPage: React.FC = () => {
       for (const m of p.models) {
         if (m.name === decodedName || m.alias === decodedName) {
           if (!seenProviderIds.has(p.id)) {
-            rows.push({ providerId: p.id, provider: p, model: m, isAggregation: false });
+            rows.push({ providerId: p.id, provider: p, model: m });
             seenProviderIds.add(p.id);
           }
           break;
@@ -229,30 +187,6 @@ export const ModelDetailPage: React.FC = () => {
     return rows;
   }, [providers, decodedName]);
 
-  const aggSources: SourceRow[] = useMemo(() => {
-    const rows: SourceRow[] = [];
-    for (const agg of aggregations) {
-      if (!agg.enabled) continue;
-      if (agg.name !== decodedName) continue;
-      const fakeProvider: Provider = {
-        id: `agg_${agg.id}`,
-        name: agg.name,
-        apiBase: '',
-        apiKey: '',
-        status: 'disabled' as const,
-        models: [],
-      };
-      rows.push({
-        providerId: fakeProvider.id,
-        provider: fakeProvider,
-        model: { id: agg.id, name: decodedName } as Model,
-        isAggregation: true,
-      });
-    }
-    return rows;
-  }, [aggregations, decodedName]);
-
-  const allRows = useMemo(() => [...directSources, ...aggSources], [directSources, aggSources]);
   const routingTargetCount =
     routingTargets.filter((target) => target.enabled).length ||
     currentRouting?.models
@@ -489,7 +423,7 @@ export const ModelDetailPage: React.FC = () => {
     );
   }, [currentRouting?.id, currentRouting?.strategy, decodedName]);
 
-  if (sources.length === 0) {
+  if (sourceMappings.length === 0 && !currentRouting) {
     return (
       <div style={{ padding: 'var(--spacer-48)', textAlign: 'center' }}>
         <p style={{ color: 'var(--text-tertiary)', marginBottom: 'var(--spacer-16)' }}>未找到模型「{decodedName}」</p>
@@ -577,10 +511,9 @@ export const ModelDetailPage: React.FC = () => {
             </h1>
           </div>
           <p style={{ fontSize: 'var(--body-base-font-size)', color: 'var(--text-tertiary)', margin: 0 }}>
-            {sources.length} 个来源映射
+            {sourceMappings.length} 个供应商来源映射
             {hasDirect && ' · 直接'}
             {hasAlias && ' · 别名'}
-            {hasAgg && ' · 聚合'}
           </p>
         </div>
       </AnimatedContent>
@@ -1011,7 +944,7 @@ export const ModelDetailPage: React.FC = () => {
           <AnimatedContent delay={120}>
             <div style={{ marginBottom: 'var(--spacer-24)' }}>
               <ModelSourcesTable
-                rows={allRows}
+                rows={directSources}
                 pendingEdits={pendingEdits}
                 onChange={handleSourceChange}
                 onReset={handleReset}
@@ -1025,36 +958,33 @@ export const ModelDetailPage: React.FC = () => {
         </>
       )}
 
-      <AnimatedContent delay={150}>
-        <Card>
-          <h2
-            style={{
-              fontSize: 'var(--heading-xs-font-size)',
-              fontWeight: 'var(--heading-xs-font-weight)',
-              color: 'var(--text-default)',
-              margin: '0 0 var(--spacer-16) 0',
-              paddingBottom: 'var(--spacer-12)',
-              borderBottom: '1px solid var(--border-neutral-l1)',
-            }}
-          >
-            来源映射详情
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-12)' }}>
-            {sources.map((source, idx) => {
-              if (source.kind === 'aggregation') {
-                return <AggregationDetailRow key={`agg-${idx}`} source={source} />;
-              }
-              return (
+      {sourceMappings.length > 0 && (
+        <AnimatedContent delay={150}>
+          <Card>
+            <h2
+              style={{
+                fontSize: 'var(--heading-xs-font-size)',
+                fontWeight: 'var(--heading-xs-font-weight)',
+                color: 'var(--text-default)',
+                margin: '0 0 var(--spacer-16) 0',
+                paddingBottom: 'var(--spacer-12)',
+                borderBottom: '1px solid var(--border-neutral-l1)',
+              }}
+            >
+              来源映射详情
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacer-12)' }}>
+              {sourceMappings.map((source, idx) => (
                 <DirectDetailRow
                   key={`dir-${idx}`}
                   source={source}
                   pendingPatch={pendingEdits.get(source.providerId)}
                 />
-              );
-            })}
-          </div>
-        </Card>
-      </AnimatedContent>
+              ))}
+            </div>
+          </Card>
+        </AnimatedContent>
+      )}
     </div>
   );
 };
@@ -1239,103 +1169,6 @@ const DirectDetailRow: React.FC<{ source: DirectMapping; pendingPatch?: ModelPat
           </div>
         )}
       </div>
-    </div>
-  );
-};
-
-const AggregationDetailRow: React.FC<{ source: AggMapping }> = ({ source }) => {
-  const t = useT();
-  const { aggregation, resolvedModels } = source;
-  return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--spacer-10)',
-        padding: 'var(--spacer-16)',
-        borderRadius: 'var(--radius-10)',
-        border: '1px solid var(--border-neutral-l1)',
-        background: 'var(--bg-base-default)',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacer-8)' }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 28,
-            height: 28,
-            borderRadius: 'var(--radius-6)',
-            background: 'var(--brand-100)',
-            color: 'var(--icon-brand)',
-            flexShrink: 0,
-          }}
-        >
-          <Layers size={14} />
-        </div>
-        <span
-          style={{
-            fontSize: 'var(--body-base-font-size)',
-            fontWeight: 'var(--font-weight-strong)',
-            color: 'var(--text-default)',
-          }}
-        >
-          聚合路由
-        </span>
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            height: 22,
-            padding: '0 var(--spacer-8)',
-            borderRadius: 'var(--radius-4)',
-            background: 'var(--bg-overlay-l2)',
-            color: 'var(--text-tertiary)',
-            fontSize: 'var(--body-xs-font-size)',
-          }}
-        >
-          {strategyLabel(aggregation.strategy, t)}
-        </span>
-        <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>
-          {resolvedModels.length} 个模型
-        </span>
-      </div>
-
-      {resolvedModels.length > 0 && (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--spacer-6)',
-            paddingLeft: 36,
-          }}
-        >
-          {resolvedModels.map((rm, i) => (
-            <div
-              key={`${rm.providerId}-${rm.modelName}-${i}`}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--spacer-8)',
-                padding: 'var(--spacer-8) var(--spacer-12)',
-                borderRadius: 'var(--radius-6)',
-                background: 'var(--bg-overlay-l1)',
-                fontSize: 'var(--body-sm-font-size)',
-              }}
-            >
-              <Server size={12} style={{ color: 'var(--icon-tertiary)' }} />
-              <span style={{ color: 'var(--text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>
-                {rm.providerName}
-              </span>
-              <ArrowRight size={10} style={{ color: 'var(--text-tertiary)' }} />
-              <span style={{ fontFamily: 'var(--font-family-mono)', color: 'var(--text-tertiary)' }}>
-                {rm.modelName}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 };

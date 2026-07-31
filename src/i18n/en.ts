@@ -6,7 +6,7 @@ const en: Record<string, string> = {
   'sidebar.settings': 'Settings',
   'sidebar.running': 'Running',
   'sidebar.stopped': 'Stopped',
-  'sidebar.version': 'v1.0.0',
+  'sidebar.version': 'v{version}',
 
   // ── Header menu ──
   'header.about': 'About Melody Hub',

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Switch } from '../../components/ui/Switch';
 import { Dropdown } from '../../components/ui/Dropdown';
 import { Button } from '../../components/ui/Button';
@@ -31,7 +31,6 @@ export interface SourceRow {
   providerId: string;
   provider: Provider;
   model: Model;
-  isAggregation?: boolean;
 }
 
 export interface ModelPatch {
@@ -75,9 +74,6 @@ export const ModelSourcesTable: React.FC<ModelSourcesTableProps> = ({
 }) => {
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
-  const directRows = useMemo(() => rows.filter((r) => !r.isAggregation), [rows]);
-  const aggRows = useMemo(() => rows.filter((r) => r.isAggregation), [rows]);
-
   const handleChange = (providerId: string, patch: ModelPatch) => {
     const existing = pendingEdits.get(providerId) ?? {};
     const merged = { ...existing, ...patch };
@@ -93,8 +89,6 @@ export const ModelSourcesTable: React.FC<ModelSourcesTableProps> = ({
     key: keyof ModelPatch &
       ('supportsVision' | 'supportsReasoning' | 'supportsReasoningEffort' | 'supportsToolCalls' | 'supportsJsonMode'),
   ) => {
-    if (row.isAggregation)
-      return <span style={{ color: 'var(--text-tertiary)', fontSize: 'var(--body-sm-font-size)' }}>—</span>;
     const m = applyPatch(row.model, pendingEdits.get(row.providerId));
     const val = m[key] as boolean | undefined;
     const disabled = key === 'supportsReasoningEffort' && !m.supportsReasoning;
@@ -120,7 +114,7 @@ export const ModelSourcesTable: React.FC<ModelSourcesTableProps> = ({
       >
         <span style={{ fontSize: 'var(--body-base-font-size)', fontWeight: 500 }}>各来源参数</span>
         <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)', marginLeft: 8 }}>
-          ({directRows.length} 个可编辑来源{aggRows.length > 0 ? `, ${aggRows.length} 个聚合路由` : ''})
+          ({rows.length} 个可编辑来源)
         </span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <Button variant="secondary" size="sm" icon={RotateCcw} onClick={onReset} disabled={!hasEdits || saving}>
@@ -160,7 +154,7 @@ export const ModelSourcesTable: React.FC<ModelSourcesTableProps> = ({
             <span></span>
           </div>
 
-          {directRows.map((row) => {
+          {rows.map((row) => {
             const m = applyPatch(row.model, pendingEdits.get(row.providerId));
             const hasPatch = pendingEdits.has(row.providerId);
             return (
@@ -267,57 +261,6 @@ export const ModelSourcesTable: React.FC<ModelSourcesTableProps> = ({
             );
           })}
 
-          {aggRows.length > 0 && (
-            <>
-              <div
-                style={{
-                  padding: '4px 14px',
-                  background: 'var(--bg-overlay-l2)',
-                  fontSize: 'var(--body-xs-font-size)',
-                  color: 'var(--text-tertiary)',
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                }}
-              >
-                聚合路由（不可编辑）
-              </div>
-              {aggRows.map((row) => (
-                <div
-                  key={row.providerId}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 50px 50px 52px 80px 50px 50px 80px 80px 100px 40px',
-                    alignItems: 'center',
-                    padding: '6px 14px',
-                    borderBottom: '1px solid var(--border-neutral-l1)',
-                    opacity: 0.6,
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <ProviderLogo providerId={row.provider.id} name={row.provider.name} size={20} />
-                    <span style={{ fontSize: 'var(--body-sm-font-size)' }}>{row.provider.name}</span>
-                    <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>(聚合)</span>
-                  </div>
-                  {Array(9)
-                    .fill(0)
-                    .map((_, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          display: 'grid',
-                          placeItems: 'center',
-                          color: 'var(--text-tertiary)',
-                          fontSize: 'var(--body-sm-font-size)',
-                        }}
-                      >
-                        —
-                      </div>
-                    ))}
-                  <div></div>
-                </div>
-              ))}
-            </>
-          )}
         </div>
       </div>
 

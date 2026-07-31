@@ -6,7 +6,7 @@ const zh: Record<string, string> = {
   'sidebar.settings': '应用设置',
   'sidebar.running': '服务运行中',
   'sidebar.stopped': '服务已停止',
-  'sidebar.version': 'v1.0.0',
+  'sidebar.version': 'v{version}',
 
   // ── 头像菜单 ──
   'header.about': '关于 Melody Hub',

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { LayoutDashboard, Server, Cpu, Settings } from 'lucide-react';
+import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { useT } from '../../i18n';
 import { isMac } from './WindowControls';
@@ -29,6 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
   const [proxyHost, setProxyHost] = useState('');
   const [proxyPort, setProxyPort] = useState(0);
   const [proxyStatus, setProxyStatus] = useState<ProxyStatus>('checking');
+  const [appVersion, setAppVersion] = useState('');
 
   const navItems: NavItem[] = [
     { key: 'dashboard', label: t('sidebar.dashboard'), icon: <LayoutDashboard size={16} />, path: '/dashboard' },
@@ -58,6 +60,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
     check();
     const interval = setInterval(check, 5000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    getVersion()
+      .then((version) => {
+        if (active) setAppVersion(version);
+      })
+      .catch(() => {
+        // Keep the version label empty when running outside Tauri.
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Memoize status label and dot class
@@ -287,7 +303,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
             whiteSpace: 'nowrap',
           }}
         >
-          v0.1.0
+          {appVersion ? t('sidebar.version', { version: appVersion }) : null}
         </span>
       </div>
     </aside>
