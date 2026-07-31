@@ -179,8 +179,7 @@ impl ProviderHealth {
 }
 
 /// Mutable routing state: configured providers + aggregations,
-/// per-aggregation round-robin cursors, and per-model latency
-/// history used by the lowest-latency strategy.
+/// per-aggregation round-robin cursors, and per-target routing history.
 pub struct RoutingState {
     pub providers: Vec<Provider>,
     pub aggregations: Vec<Aggregation>,
@@ -193,6 +192,12 @@ pub struct RoutingState {
     pub provider_health: HashMap<String, ProviderHealth>,
     /// Successful request counts, keyed by concrete model name.
     pub usage_counts: HashMap<String, u64>,
+    /// Total routing attempts, keyed by concrete target/provider identity.
+    /// Failed attempts count here so least-used reflects actual traffic.
+    pub target_request_counts: HashMap<String, u64>,
+    /// Successful routing attempts, keyed by concrete target/provider identity.
+    /// Used with target_request_counts to calculate P2C success rates.
+    pub target_success_counts: HashMap<String, u64>,
     /// Last successful model for each aggregation.
     pub last_good_model: HashMap<String, String>,
     /// Last successful concrete target/provider for each aggregation.
@@ -214,6 +219,8 @@ impl RoutingState {
             target_latency_history: HashMap::new(),
             provider_health: HashMap::new(),
             usage_counts: HashMap::new(),
+            target_request_counts: HashMap::new(),
+            target_success_counts: HashMap::new(),
             last_good_model: HashMap::new(),
             last_good_target: HashMap::new(),
             affinity_targets: HashMap::new(),
@@ -929,46 +936,36 @@ fn select_candidate_index(
             deck[cursor % len]
         }
         RoutingStrategy::P2c => {
-            if len <= 2 {
-                if len == 1 {
-                    0
-                } else {
-                    let load = |index: usize| {
-                        cfg.provider_health
-                            .get(&candidates[index].1.id)
-                            .map(|health| health.in_flight)
-                            .unwrap_or(0)
-                    };
-                    if load(0) <= load(1) {
-                        0
-                    } else {
-                        1
-                    }
-                }
+            if len == 1 {
+                0
             } else {
+                // Sample two distinct targets, matching OmniRoute's
+                // power-of-two-choices implementation. The stronger
+                // target score wins; ties preserve the first sample.
                 let mut rng = thread_rng();
-                let left = rng.gen_range(0..len);
-                let right = rng.gen_range(0..len);
-                let load = |index: usize| {
-                    cfg.provider_health
-                        .get(&candidates[index].1.id)
-                        .map(|health| health.in_flight)
-                        .unwrap_or(0)
-                };
-                if load(left) <= load(right) {
-                    left
+                let first = rng.gen_range(0..len);
+                let second_offset = rng.gen_range(0..(len - 1));
+                let second = if second_offset >= first {
+                    second_offset + 1
                 } else {
-                    right
+                    second_offset
+                };
+                if p2c_target_score(cfg, &candidates[second])
+                    > p2c_target_score(cfg, &candidates[first])
+                {
+                    second
+                } else {
+                    first
                 }
             }
         }
         RoutingStrategy::LeastUsed => candidates
             .iter()
             .enumerate()
-            .min_by_key(|(_, (_, provider, _, _))| {
-                cfg.provider_health
-                    .get(&provider.id)
-                    .map(|health| health.in_flight)
+            .min_by_key(|(_, candidate)| {
+                cfg.target_request_counts
+                    .get(&candidate_identity(candidate))
+                    .copied()
                     .unwrap_or(0)
             })
             .map(|(index, _)| index)
@@ -1204,9 +1201,52 @@ fn auto_score(
         + context_score * 0.10
 }
 
-/// Record a routing outcome. Cursor state is advanced at route time; this
-/// function only records successful usage/latency and concrete target
-/// identity. Failed attempts must not become "last known good" routes.
+/// Score one target for OmniRoute-compatible power-of-two choices.
+///
+/// Unknown targets receive neutral defaults so a newly configured target is
+/// eligible without being permanently preferred or penalized. Concrete target
+/// telemetry is preferred; model-level latency is used as a legacy fallback.
+fn p2c_target_score(cfg: &RoutingState, candidate: &RoutingCandidate) -> f64 {
+    let identity = candidate_identity(candidate);
+    let total_requests = cfg
+        .target_request_counts
+        .get(&identity)
+        .copied()
+        .unwrap_or(0);
+    let successes = cfg
+        .target_success_counts
+        .get(&identity)
+        .copied()
+        .unwrap_or(0);
+    let success_score = if total_requests > 0 {
+        (successes as f64 / total_requests as f64).clamp(0.0, 1.0)
+    } else {
+        0.5
+    };
+
+    let latency = cfg
+        .target_latency_history
+        .get(&identity)
+        .filter(|samples| !samples.is_empty())
+        .map(|samples| samples.iter().sum::<f64>() / samples.len() as f64)
+        .or_else(|| {
+            cfg.latency_history
+                .get(&candidate.2.name)
+                .filter(|samples| !samples.is_empty())
+                .map(|samples| samples.iter().sum::<f64>() / samples.len() as f64)
+        });
+    let latency_score = match latency {
+        Some(value) if value.is_finite() && value > 0.0 => 1.0 / (value + 10.0).log10(),
+        _ => 0.25,
+    };
+
+    success_score + latency_score
+}
+
+/// Record a routing outcome. Cursor state is advanced at route time. Every
+/// attempt updates concrete-target request counts; successful attempts also
+/// update usage/latency and last-known-good state. Failed attempts must not
+/// become "last known good" routes.
 pub async fn record_routing_outcome(
     state: &SharedRouting,
     aggregation_name: &Option<String>,
@@ -1216,15 +1256,23 @@ pub async fn record_routing_outcome(
     latency_ms: i64,
     success: bool,
 ) {
-    if !success {
-        return;
-    }
     let mut cfg = state.write().await;
-    *cfg.usage_counts.entry(model.to_string()).or_default() += 1;
     let target_identity = target_id.map(str::to_string).or_else(|| {
         provider_id.map(|provider| format!("legacy:{}:{}", provider, model))
     });
     if let Some(identity) = target_identity.as_ref() {
+        *cfg.target_request_counts
+            .entry(identity.clone())
+            .or_default() += 1;
+    }
+    if !success {
+        return;
+    }
+    *cfg.usage_counts.entry(model.to_string()).or_default() += 1;
+    if let Some(identity) = target_identity.as_ref() {
+        *cfg.target_success_counts
+            .entry(identity.clone())
+            .or_default() += 1;
         let history = cfg
             .target_latency_history
             .entry(identity.clone())
@@ -1388,6 +1436,9 @@ mod tests {
         );
         cfg.latency_history.insert("small".into(), vec![500.0]);
         cfg.latency_history.insert("large".into(), vec![100.0]);
+        cfg.target_request_counts.insert("t1".into(), 12);
+        cfg.target_request_counts.insert("t2".into(), 3);
+        cfg.target_request_counts.insert("t3".into(), 7);
         cfg.last_good_target.insert("agg".into(), "t2".into());
 
         assert_eq!(
@@ -1626,6 +1677,73 @@ mod tests {
             Some("model-a")
         );
         assert!(cfg.usage_counts.is_empty());
+        assert_eq!(cfg.target_request_counts.get("t2"), Some(&1));
+        assert!(cfg.target_success_counts.is_empty());
+    }
+
+    #[test]
+    fn least_used_uses_historical_target_requests_not_in_flight_load() {
+        let candidates = vec![
+            test_candidate("t1", "p1", "model-a", 10, 1, None, None, None, None),
+            test_candidate("t2", "p2", "model-b", 5, 1, None, None, None, None),
+        ];
+        let mut cfg = RoutingState::new();
+        cfg.provider_health.insert(
+            "p1".into(),
+            ProviderHealth {
+                in_flight: 0,
+                ..Default::default()
+            },
+        );
+        cfg.provider_health.insert(
+            "p2".into(),
+            ProviderHealth {
+                in_flight: 20,
+                ..Default::default()
+            },
+        );
+        cfg.target_request_counts.insert("t1".into(), 100);
+        cfg.target_request_counts.insert("t2".into(), 2);
+
+        assert_eq!(
+            select_candidate_index(
+                RoutingStrategy::LeastUsed,
+                "least-used",
+                &candidates,
+                &mut cfg,
+                &RequestCapabilities::default(),
+            ),
+            1
+        );
+    }
+
+    #[test]
+    fn p2c_samples_distinct_targets_and_prefers_successful_low_latency_target() {
+        let candidates = vec![
+            test_candidate("t1", "p1", "model-a", 10, 1, None, None, None, None),
+            test_candidate("t2", "p2", "model-b", 5, 1, None, None, None, None),
+        ];
+        let mut cfg = RoutingState::new();
+        cfg.target_request_counts.insert("t1".into(), 10);
+        cfg.target_success_counts.insert("t1".into(), 1);
+        cfg.target_latency_history
+            .insert("t1".into(), vec![1_000.0]);
+        cfg.target_request_counts.insert("t2".into(), 10);
+        cfg.target_success_counts.insert("t2".into(), 10);
+        cfg.target_latency_history.insert("t2".into(), vec![50.0]);
+
+        for _ in 0..32 {
+            assert_eq!(
+                select_candidate_index(
+                    RoutingStrategy::P2c,
+                    "p2c",
+                    &candidates,
+                    &mut cfg,
+                    &RequestCapabilities::default(),
+                ),
+                1
+            );
+        }
     }
 
     #[tokio::test]
