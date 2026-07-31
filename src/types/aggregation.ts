@@ -3,6 +3,8 @@
 // matches on these keys via the RoutingStrategy enum. UI labels
 // are derived here so the wire format is language-independent.
 
+import type { Provider } from './provider';
+
 export const ROUTING_STRATEGY_VALUES = [
   'priority',
   'weighted',
@@ -57,6 +59,43 @@ export interface Aggregation {
   priority: string;
   enabled: boolean;
 }
+
+const protocolForFlavor = (flavor?: string): NonNullable<RouteTarget['protocol']> => {
+  if (flavor === 'anthropic' || flavor === 'anthropic-messages') return 'anthropic-messages';
+  if (flavor === 'responses' || flavor === 'openai-responses') return 'openai-responses';
+  return 'openai-chat';
+};
+
+/** Materialize a legacy aggregation into editable concrete targets. */
+export const buildLegacyAggregationTargets = (
+  aggregation: Aggregation | undefined,
+  providers: Provider[],
+): RouteTarget[] => {
+  if (!aggregation || aggregation.targets?.length) return [];
+  const modelNames = aggregation.models
+    .split(',')
+    .map((model) => model.trim())
+    .filter(Boolean);
+  const targets: RouteTarget[] = [];
+  modelNames.forEach((requestedModel, modelIndex) => {
+    for (const provider of providers) {
+      const model = provider.models.find(
+        (candidate) => candidate.name === requestedModel || candidate.alias?.trim() === requestedModel,
+      );
+      if (!model) continue;
+      targets.push({
+        id: `legacy-${aggregation.id}-${provider.id}-${modelIndex}`,
+        providerId: provider.id,
+        model: model.name,
+        protocol: protocolForFlavor(provider.apiFlavor),
+        priority: modelNames.length - modelIndex,
+        weight: 1,
+        enabled: true,
+      });
+    }
+  });
+  return targets;
+};
 
 export interface RoutingStrategyOption {
   value: RoutingStrategy;

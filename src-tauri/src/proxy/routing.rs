@@ -184,6 +184,9 @@ pub struct RoutingState {
     pub providers: Vec<Provider>,
     pub aggregations: Vec<Aggregation>,
     pub round_robin_index: HashMap<String, usize>,
+    /// Stable candidate order used to keep round-robin failover from
+    /// skipping the next target when the failed provider is filtered out.
+    pub round_robin_order: HashMap<String, Vec<String>>,
     pub latency_history: HashMap<String, Vec<f64>>,
     /// Per-concrete-target latency history for Auto routing. The model-level
     /// history remains as a fallback for legacy data.
@@ -215,6 +218,7 @@ impl RoutingState {
             providers: Vec::new(),
             aggregations: Vec::new(),
             round_robin_index: HashMap::new(),
+            round_robin_order: HashMap::new(),
             latency_history: HashMap::new(),
             target_latency_history: HashMap::new(),
             provider_health: HashMap::new(),
@@ -462,10 +466,11 @@ pub async fn route_request(
 
     if !direct_hits.is_empty() && !has_model_routing_policy {
         let rr_key = format!("direct:{}", model_or_agg);
-        let idx =
-            cfg.round_robin_index.get(&rr_key).copied().unwrap_or(0) % direct_hits.len();
-        cfg.round_robin_index
-            .insert(rr_key, idx.saturating_add(1) % direct_hits.len());
+        let identities: Vec<String> = direct_hits
+            .iter()
+            .map(|(provider, model)| format!("legacy:{}:{}", provider.id, model))
+            .collect();
+        let idx = select_round_robin_identity_index(&rr_key, &identities, &mut cfg);
         let (provider, model) = direct_hits[idx % direct_hits.len()].clone();
         let upstream_model = resolve_model_mapping(&provider, &model);
         return Ok(RouteResult {
@@ -783,9 +788,15 @@ fn highest_priority_index(candidates: &[RoutingCandidate]) -> usize {
     candidates
         .iter()
         .enumerate()
-        .max_by_key(|(_, (target, _, _, _))| target.priority)
-        .map(|(index, _)| index)
-        .unwrap_or(0)
+        .fold(0, |best, (index, candidate)| {
+            if candidate.0.priority > candidates[best].0.priority {
+                index
+            } else {
+                // Preserve configured order when priorities tie, matching a
+                // stable descending priority sort.
+                best
+            }
+        })
 }
 
 fn context_fits(model: &Model, estimated_context_tokens: u64) -> bool {
@@ -906,15 +917,9 @@ fn select_candidate_index(
         }
         RoutingStrategy::Random => thread_rng().gen_range(0..len),
         RoutingStrategy::RoundRobin => {
-            let index = cfg
-                .round_robin_index
-                .get(aggregation_name)
-                .copied()
-                .unwrap_or(0)
-                % len;
-            cfg.round_robin_index
-                .insert(aggregation_name.to_string(), index.saturating_add(1) % len);
-            index
+            let identities: Vec<String> =
+                candidates.iter().map(candidate_identity).collect();
+            select_round_robin_identity_index(aggregation_name, &identities, cfg)
         }
         RoutingStrategy::StrictRandom => {
             let cursor = cfg
@@ -1128,6 +1133,63 @@ fn stable_route_hash(aggregation: &str, target: &str, cycle: usize) -> u64 {
     target.hash(&mut hasher);
     cycle.hash(&mut hasher);
     hasher.finish()
+}
+
+/// Select the next available identity in a stable round-robin order.
+///
+/// The candidate list is often filtered between failover attempts. Keeping
+/// the configured identity order separately means that removing a failed
+/// target does not advance the cursor by the filtered-list index and skip the
+/// target that should be tried next.
+fn select_round_robin_identity_index(
+    key: &str,
+    identities: &[String],
+    cfg: &mut RoutingState,
+) -> usize {
+    debug_assert!(!identities.is_empty());
+    let (selected_index, next_cursor) = {
+        let order = cfg.round_robin_order.entry(key.to_string()).or_default();
+        let order_matches_current_set = order.len() <= identities.len()
+            && order
+                .iter()
+                .all(|known| identities.iter().any(|identity| identity == known));
+        if order.is_empty()
+            || (order_matches_current_set && order.as_slice() != identities)
+        {
+            // When all previously known identities are present, the current
+            // candidate order reflects configuration order (not failover
+            // filtering), so reconcile reordering/additions immediately.
+            *order = identities.to_vec();
+        } else {
+            // A filtered failover list is a strict subset of the configured
+            // order; retain the missing identities and append genuinely new
+            // targets until the full order is observed again.
+            for identity in identities {
+                if !order.iter().any(|known| known == identity) {
+                    order.push(identity.clone());
+                }
+            }
+        }
+        let order_len = order.len().max(1);
+        let cursor = cfg.round_robin_index.get(key).copied().unwrap_or(0) % order_len;
+        let mut selected = None;
+        for offset in 0..order_len {
+            let position = (cursor + offset) % order_len;
+            let Some(identity) = order.get(position) else {
+                continue;
+            };
+            if let Some(index) = identities
+                .iter()
+                .position(|candidate| candidate == identity)
+            {
+                selected = Some((index, (position + 1) % order_len));
+                break;
+            }
+        }
+        selected.unwrap_or((0, (cursor + 1) % order_len))
+    };
+    cfg.round_robin_index.insert(key.to_string(), next_cursor);
+    selected_index
 }
 
 fn reset_aware_score(target: &RouteTarget) -> f64 {
@@ -2061,6 +2123,69 @@ mod tests {
 
         assert_ne!(r1.provider.id, r2.provider.id);
         assert_eq!(r1.provider.id, r3.provider.id);
+    }
+
+    #[tokio::test]
+    async fn round_robin_failover_tries_the_next_identity_without_skipping() {
+        let state = make_state();
+        {
+            let mut cfg = state.write().await;
+            let candidates = [
+                test_candidate("t1", "p1", "model-a", 0, 1, None, None, None, None),
+                test_candidate("t2", "p2", "model-b", 0, 1, None, None, None, None),
+                test_candidate("t3", "p3", "model-c", 0, 1, None, None, None, None),
+            ];
+            for (_, provider, _, _) in &candidates {
+                cfg.providers.push(provider.clone());
+            }
+            cfg.aggregations.push(Aggregation {
+                id: "rr-failover".into(),
+                name: "rr-failover-model".into(),
+                models: String::new(),
+                targets: candidates
+                    .iter()
+                    .map(|candidate| candidate.0.clone())
+                    .collect(),
+                strategy: "round-robin".into(),
+                priority: "P0".into(),
+                enabled: true,
+            });
+        }
+
+        let empty = std::collections::HashSet::new();
+        let first = route_request(
+            &state,
+            "rr-failover-model",
+            &empty,
+            &RequestCapabilities::default(),
+            "openai",
+        )
+        .await
+        .unwrap();
+        assert_eq!(first.target_id.as_deref(), Some("t1"));
+
+        let excluded = std::collections::HashSet::from(["p1".to_string()]);
+        let failover = route_request(
+            &state,
+            "rr-failover-model",
+            &excluded,
+            &RequestCapabilities::default(),
+            "openai",
+        )
+        .await
+        .unwrap();
+        assert_eq!(failover.target_id.as_deref(), Some("t2"));
+
+        let next_request = route_request(
+            &state,
+            "rr-failover-model",
+            &empty,
+            &RequestCapabilities::default(),
+            "openai",
+        )
+        .await
+        .unwrap();
+        assert_eq!(next_request.target_id.as_deref(), Some("t3"));
     }
 
     #[tokio::test]

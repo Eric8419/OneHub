@@ -1,8 +1,8 @@
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProviderStore } from '../../store/providerStore';
 import { useAggregationStore } from '../../store/aggregationStore';
-import { normalizeStrategyKey, strategyLabel } from '../../types/aggregation';
+import { buildLegacyAggregationTargets, normalizeStrategyKey, strategyLabel } from '../../types/aggregation';
 import type { Aggregation, RouteTarget, RoutingStrategy } from '../../types/aggregation';
 import type { Model, Provider } from '../../types/provider';
 import { Card, AnimatedContent, Button } from '../../components/ui';
@@ -89,10 +89,15 @@ export const ModelDetailPage: React.FC = () => {
     () => aggregations.find((aggregation) => aggregation.name === decodedName),
     [aggregations, decodedName],
   );
+  const legacyAggregationTargets = useMemo(
+    () => buildLegacyAggregationTargets(currentRouting, providers),
+    [currentRouting, providers],
+  );
   const [routingStrategy, setRoutingStrategy] = useState<RoutingStrategy>(
     normalizeStrategyKey(currentRouting?.strategy ?? 'round-robin') as RoutingStrategy,
   );
   const [routingSaving, setRoutingSaving] = useState(false);
+  const routingSourceKeyRef = useRef<string | undefined>(undefined);
 
   // 可编辑的上游目标列表。优先使用已持久化的 targets；否则按当前直接来源生成。
   // priority/weight 等字段会随用户在 UI 上的编辑实时更新，保存时一并提交。
@@ -104,11 +109,23 @@ export const ModelDetailPage: React.FC = () => {
   });
 
   // 当 currentRouting 变化（如首次加载、外部更新）时，同步 routingTargets。
+  // Legacy aggregation 会在这里展开成 concrete targets，让所有策略的
+  // 元数据都能在同一个编辑器中配置。
   useEffect(() => {
+    const targetSignature = currentRouting?.targets?.length
+      ? currentRouting.targets.map((target) => target.id).join(',')
+      : legacyAggregationTargets.map((target) => target.id).join(',');
+    const sourceKey = currentRouting
+      ? `aggregation:${currentRouting.id}:${targetSignature}`
+      : `direct:${decodedName}`;
     if (currentRouting?.targets && currentRouting.targets.length > 0) {
       setRoutingTargets(currentRouting.targets.map((target) => ({ ...target })));
+      routingSourceKeyRef.current = sourceKey;
+    } else if (routingSourceKeyRef.current !== sourceKey) {
+      setRoutingTargets(legacyAggregationTargets.map((target) => ({ ...target })));
+      routingSourceKeyRef.current = sourceKey;
     }
-  }, [currentRouting?.id, currentRouting?.targets]);
+  }, [currentRouting, decodedName, legacyAggregationTargets]);
 
   const patchRoutingTarget = useCallback((id: string, patch: Partial<RouteTarget>) => {
     setRoutingTargets((targets) => targets.map((target) => (target.id === id ? { ...target, ...patch } : target)));
@@ -247,16 +264,18 @@ export const ModelDetailPage: React.FC = () => {
   // 为 target 编辑器准备展示信息：按 providerId 查找提供商名称，便于用户识别每个上游。
   const targetDisplayMap = useMemo(() => {
     const map = new Map<string, { providerName: string; providerId: string }>();
-    for (const row of directSources) {
-      map.set(row.providerId, { providerName: row.provider.name, providerId: row.providerId });
+    for (const provider of providers) {
+      map.set(provider.id, { providerName: provider.name, providerId: provider.id });
     }
     return map;
-  }, [directSources]);
+  }, [providers]);
 
   // 当直接来源变化（如新增/删除 provider 中的同名模型）时，补齐缺失的 target，
   // 已存在的 target 保留用户编辑过的字段。
   useEffect(() => {
-    if (directSources.length === 0) return;
+    // Existing aggregations are initialized by the legacy/explicit target
+    // effect above; only direct models need automatic source discovery here.
+    if (currentRouting || directSources.length === 0) return;
     setRoutingTargets((prev) => {
       const existing = new Map(prev.map((t) => [t.providerId, t]));
       const next: RouteTarget[] = directSources.map((row, index) => {
@@ -283,7 +302,7 @@ export const ModelDetailPage: React.FC = () => {
       const sameIds = next.every((t, i) => t.id === prev[i]?.id && t.providerId === prev[i]?.providerId);
       return sameIds ? prev : next;
     });
-  }, [directSources]);
+  }, [currentRouting, directSources]);
 
   const bulkInitialValues: BulkEditValues = useMemo(() => {
     const ms = directSources.map((r) => r.model);
