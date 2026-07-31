@@ -775,7 +775,7 @@ pub async fn aggregation_route_plan(
     }
 
     let mut targets = aggregation.targets.clone();
-    targets.sort_by(|left, right| right.priority.cmp(&left.priority));
+    targets.sort_by_key(|right| std::cmp::Reverse(right.priority));
     let mut routes = Vec::new();
     for target in targets
         .iter()
