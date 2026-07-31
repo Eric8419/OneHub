@@ -42,6 +42,7 @@ interface SettingsStore {
   error: string | null;
   setActiveCategory: (cat: SettingsCategory) => void;
   updateSettings: (partial: Partial<AppSettings>) => void;
+  saveSettingsNow: (partial: Partial<AppSettings>) => Promise<void>;
   loadSettings: () => Promise<void>;
   clearError: () => void;
 }
@@ -52,8 +53,17 @@ function normalizeSettings(settings: AppSettings): AppSettings {
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingSave = false;
+let saveRequested = false;
+let saveQueue = Promise.resolve();
+
+function enqueueSave(settings: AppSettings): Promise<void> {
+  const nextSave = saveQueue.then(() => desktopApi.saveSettings(settings));
+  saveQueue = nextSave.catch(() => undefined);
+  return nextSave;
+}
 
 function scheduleAutoSave() {
+  saveRequested = true;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveTimer = null;
@@ -63,16 +73,18 @@ function scheduleAutoSave() {
 
 async function doAutoSave() {
   if (pendingSave) return;
+  saveRequested = false;
   pendingSave = true;
   try {
     const state = useSettingsStore.getState();
     const normalized = normalizeSettings(state.settings);
-    await desktopApi.saveSettings(normalized);
+    await enqueueSave(normalized);
     useSettingsStore.setState({ error: null });
   } catch (e: unknown) {
     useSettingsStore.setState({ error: errorMessage(e, '保存失败') });
   } finally {
     pendingSave = false;
+    if (saveRequested && !saveTimer) scheduleAutoSave();
   }
 }
 
@@ -99,6 +111,27 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
       return { settings: newSettings };
     });
     scheduleAutoSave();
+  },
+
+  saveSettingsNow: async (partial) => {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    saveRequested = false;
+
+    const current = useSettingsStore.getState().settings;
+    const nextSettings = normalizeSettings({ ...current, ...partial });
+    set({ settings: nextSettings });
+
+    try {
+      await enqueueSave(nextSettings);
+      useSettingsStore.setState({ error: null });
+    } catch (e: unknown) {
+      const message = errorMessage(e, '保存失败');
+      useSettingsStore.setState({ error: message });
+      throw e;
+    }
   },
 
   loadSettings: async () => {

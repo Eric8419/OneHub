@@ -336,6 +336,7 @@ const en: Record<string, string> = {
   'settings.update.tokenRefreshed': 'Token refreshed',
   'settings.update.tokenCopied': 'Token copied to clipboard',
   'settings.update.copyFailed': 'Copy failed',
+  'settings.update.saveFailed': 'Failed to save token',
   'settings.update.tokenRefreshConfirm': 'Refreshing the token will invalidate the old token. All requests using the old token will need to be updated. Continue?',
   'settings.update.tokenRegenerateConfirm': 'A new random auth token will be generated. Continue?',
   'settings.update.logExported': 'Logs exported to: {path}',

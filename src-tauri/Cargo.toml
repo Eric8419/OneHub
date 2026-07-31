@@ -1,6 +1,6 @@
 [package]
 name = "melody-hub"
-version = "0.1.10"
+version = "0.1.11"
 description = "Local LLM API aggregation proxy"
 authors = ["you"]
 edition = "2021"

@@ -1566,6 +1566,32 @@ async fn models_handler(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    // Keep this diagnostic intentionally limited to non-secret request metadata.
+    // Never log the token itself: this is useful for distinguishing a transport
+    // problem from a client sending the wrong authentication header without
+    // exposing credentials in the desktop terminal log.
+    let origin = headers
+        .get("origin")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("-");
+    let user_agent = headers
+        .get("user-agent")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("-");
+    let accept = headers
+        .get("accept")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("-");
+    eprintln!(
+        "[proxy] GET /v1/models from {} authorization_header={} x_api_key_header={} origin={:?} user_agent={:?} accept={:?}",
+        addr,
+        headers.contains_key("authorization"),
+        headers.contains_key("x-api-key"),
+        origin,
+        user_agent,
+        accept,
+    );
+
     // Same auth gates as chat_completions_handler.
     {
         let auth = state.auth.read().await;
@@ -1605,6 +1631,7 @@ async fn models_handler(
         }
     }
 
+    eprintln!("[proxy] GET /v1/models succeeded: {} models", data.len());
     Ok(Json(json!({ "object": "list", "data": data })))
 }
 

@@ -341,6 +341,7 @@ const zh: Record<string, string> = {
   'settings.update.tokenRefreshed': '令牌已刷新',
   'settings.update.tokenCopied': '令牌已复制到剪贴板',
   'settings.update.copyFailed': '复制失败',
+  'settings.update.saveFailed': '令牌保存失败',
   'settings.update.tokenRefreshConfirm': '刷新令牌后旧令牌将失效，所有使用旧令牌的请求需要更新，确定继续？',
   'settings.update.tokenRegenerateConfirm': '将生成一个新的随机认证令牌，确定继续？',
   'settings.update.logExported': '日志已导出到: {path}',
