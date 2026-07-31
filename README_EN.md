@@ -25,7 +25,7 @@ Melody Hub is built with Tauri, React, and Rust. It unifies OpenAI, Anthropic, D
 
 - **Tri-Protocol Bidirectional Conversion** — OpenAI Chat Completions, Anthropic Messages, and OpenAI Responses can each access upstream services of the other two protocols, with SSE streaming conversion.
 - **Multi-Provider & Model Management** — Built-in presets for common services, plus support for custom OpenAI-compatible APIs. Includes model aliases, capability parameters, and detail views.
-- **Aggregation Routing & Failover** — Supports round-robin, lowest latency, random, and sequential strategies. Selects available models based on capability, concurrency, and upstream health.
+- **Aggregation Routing & Failover** — Supports 19 routing strategies and selects available models based on capability, context, cost, quota, concurrency, and upstream health.
 - **Secure Local Configuration** — API Keys are encrypted with AES-256-GCM. An authentication token is auto-generated on first launch.
 - **Usage & Health Monitoring** — Displays tokens, requests, response time, trends, heatmaps, recent requests, and provider health status.
 - **Tunable Proxy Policies** — Supports rate limiting, timeout, retry, concurrency, IP allowlist, CORS, and upstream network proxy.
@@ -116,8 +116,14 @@ These endpoints do not include Embeddings.
 | Provider | An upstream model service, e.g. OpenAI, Anthropic, DeepSeek, or a custom compatible service. |
 | Model | A specific model configuration under a Provider. |
 | Aggregation | A routing rule that combines multiple models into a single routable logical model. |
-| Routing Strategy | The selection strategy for aggregation: round-robin, lowest latency, random, sequential. |
+| Routing Strategy | One of 19 aggregation strategies covering priority, load balancing, cost/quota, intelligent routing, and multi-model orchestration. See the [routing strategy reference](./docs/routing-strategies/README.md). |
 | Proxy Auth Token | The Bearer Token for the Melody Hub local proxy, used to prevent unauthorized access. |
+
+### Routing Strategy Reference
+
+Each strategy has a separate note covering its selection logic, metadata fallback, failover behavior, and recommended use cases.
+
+See the [routing strategy index](./docs/routing-strategies/README.md) (Chinese).
 
 ### Configuration Reference
 

@@ -25,7 +25,7 @@ Melody Hub 基于 Tauri、React 和 Rust 构建，用一个本地地址统一接
 
 - **三协议双向转换** - OpenAI Chat Completions、Anthropic Messages 与 OpenAI Responses 任一入口均可访问另外两种协议的上游，并支持 SSE 流式转换。
 - **多提供商与模型管理** - 内置常用服务预设，也可连接自定义 OpenAI-compatible API；支持模型别名、能力参数和详情查看。
-- **聚合路由与故障转移** - 支持轮询、最低延迟、随机和顺序策略，并根据能力、并发与上游健康状态选择可用模型。
+- **聚合路由与故障转移** - 支持 19 种路由策略，并根据能力、上下文、成本、配额、并发与上游健康状态选择可用模型。
 - **安全的本地配置** - API Key 使用 AES-256-GCM 加密保存；首次启动自动生成代理认证令牌。
 - **用量与健康监控** - 展示 Token、请求数、响应时间、趋势、热力图、近期请求和提供商健康状态。
 - **可调代理策略** - 支持速率限制、超时、重试、并发数、IP 白名单、CORS 与上游网络代理。
@@ -116,8 +116,14 @@ http://127.0.0.1:8080
 | Provider | 一个上游模型服务，例如 OpenAI、Anthropic、DeepSeek 或自定义兼容服务。 |
 | Model | Provider 下的具体模型配置。 |
 | Aggregation | 聚合规则，把多个模型组合成一个可路由的逻辑模型。 |
-| Routing Strategy | 聚合规则的选择策略，包括轮询、最低延迟、随机、顺序。 |
+| Routing Strategy | 聚合规则的选择策略，共 19 种，覆盖优先级、负载均衡、成本/配额、智能路由和多模型编排。详见[路由策略说明](./docs/routing-strategies/README.md)。 |
 | Proxy Auth Token | Melody Hub 本地代理的 Bearer Token，用于防止未授权访问。 |
+
+### 路由策略文档
+
+每种策略都有独立说明，包括选择逻辑、缺失元数据时的回退、故障转移行为和适用场景：
+
+[打开 19 种路由策略说明与索引](./docs/routing-strategies/README.md)
 
 ### 主要配置
 
