@@ -79,6 +79,8 @@ export const buildLegacyAggregationTargets = (
   const targets: RouteTarget[] = [];
   modelNames.forEach((requestedModel, modelIndex) => {
     for (const provider of providers) {
+      // 跳过已禁用的供应商，保持与模型配置 UI 一致。
+      if (provider.status === 'disabled') continue;
       const model = provider.models.find(
         (candidate) => candidate.name === requestedModel || candidate.alias?.trim() === requestedModel,
       );
@@ -119,8 +121,18 @@ export const STRATEGY_OPTIONS: RoutingStrategyOption[] = [
   { value: 'headroom', labelKey: 'headroom', descriptionKey: 'headroomDesc', groupKey: 'adaptive' },
   { value: 'auto', labelKey: 'auto', descriptionKey: 'autoDesc', groupKey: 'intelligent' },
   { value: 'lkgp', labelKey: 'lkgp', descriptionKey: 'lkgpDesc', groupKey: 'intelligent' },
-  { value: 'context-optimized', labelKey: 'contextOptimized', descriptionKey: 'contextOptimizedDesc', groupKey: 'intelligent' },
-  { value: 'cache-optimized', labelKey: 'cacheOptimized', descriptionKey: 'cacheOptimizedDesc', groupKey: 'intelligent' },
+  {
+    value: 'context-optimized',
+    labelKey: 'contextOptimized',
+    descriptionKey: 'contextOptimizedDesc',
+    groupKey: 'intelligent',
+  },
+  {
+    value: 'cache-optimized',
+    labelKey: 'cacheOptimized',
+    descriptionKey: 'cacheOptimizedDesc',
+    groupKey: 'intelligent',
+  },
   { value: 'context-relay', labelKey: 'contextRelay', descriptionKey: 'contextRelayDesc', groupKey: 'orchestration' },
   { value: 'fusion', labelKey: 'fusion', descriptionKey: 'fusionDesc', groupKey: 'orchestration' },
   { value: 'pipeline', labelKey: 'pipeline', descriptionKey: 'pipelineDesc', groupKey: 'orchestration' },
@@ -129,15 +141,10 @@ export const STRATEGY_OPTIONS: RoutingStrategyOption[] = [
 /** Map a stored strategy key to its localized label. Falls back
  * to the key itself (and tolerates legacy localized strings via
  * `normalizeStrategyKey`). */
-export function strategyLabel(
-  strategy: string,
-  translate?: (key: string) => string,
-): string {
+export function strategyLabel(strategy: string, translate?: (key: string) => string): string {
   const normalized = normalizeStrategyKey(strategy);
   const option = STRATEGY_OPTIONS.find((item) => item.value === normalized);
-  return option && translate
-    ? translate(`routing.strategy.${option.labelKey}`)
-    : normalized;
+  return option && translate ? translate(`routing.strategy.${option.labelKey}`) : normalized;
 }
 
 /** Convert a legacy localized strategy string to its stable key.

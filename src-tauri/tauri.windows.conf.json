@@ -3,7 +3,7 @@
   "app": {
     "windows": [
       {
-        "title": "Melody Hub",
+        "title": "OneHub",
         "width": 1200,
         "height": 800,
         "minWidth": 960,

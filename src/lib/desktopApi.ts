@@ -60,6 +60,14 @@ export interface DesktopApi {
   checkForUpdates(): Promise<UpdateMetadata | null>;
   /** Download + install the pending update, streaming progress to `onEvent`. */
   downloadAndInstallUpdate(onEvent: (event: DownloadEvent) => void): Promise<void>;
+  /** Serialize the full config bundle (settings + providers + aggregations). */
+  exportConfig(): Promise<string>;
+  /** Write the config bundle to a JSON file in Downloads. Returns the path. */
+  exportConfigToFile(): Promise<string>;
+  /** Import a config bundle from a JSON string and apply it. */
+  importConfig(contents: string): Promise<void>;
+  /** Push the config bundle to a WebDAV server. Returns the remote URL. */
+  backupConfigToWebdav(url: string, username: string, password: string): Promise<string>;
 }
 
 export const desktopApi: DesktopApi = {
@@ -74,8 +82,7 @@ export const desktopApi: DesktopApi = {
   getProxyStatus: () =>
     invoke<{ running: boolean; host: string; port: number; uptimeSecs: number }>('get_proxy_status'),
   getStats: (timeRange) => invoke<UsageStats>('get_stats', { timeRange }),
-  getRecentRequests: (limit, timeRange) =>
-    invoke<RequestRecord[]>('get_recent_requests', { limit, timeRange }),
+  getRecentRequests: (limit, timeRange) => invoke<RequestRecord[]>('get_recent_requests', { limit, timeRange }),
   getDailyUsage: () => invoke<DailyUsage[]>('get_daily_usage'),
   resetStats: () => invoke('reset_stats'),
   exitApp: () => invoke('exit_app'),
@@ -94,6 +101,11 @@ export const desktopApi: DesktopApi = {
     };
     return invoke('download_and_install_update', { onEvent: channel });
   },
+  exportConfig: () => invoke<string>('export_config'),
+  exportConfigToFile: () => invoke<string>('export_config_to_file'),
+  importConfig: (contents) => invoke('import_config', { contents }),
+  backupConfigToWebdav: (url, username, password) =>
+    invoke<string>('backup_config_to_webdav', { url, username, password }),
 };
 
 /**

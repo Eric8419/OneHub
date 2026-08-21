@@ -11,19 +11,19 @@ use tauri::Manager;
 
 /// Subdirectory under the platform app-data dir that holds all
 /// Melody Hub persistent state.
-const APP_SUBDIR: &str = "melody-hub";
+const APP_SUBDIR: &str = "onehub";
 
 /// Encryption key filename (stored beside the config files).
 const KEY_FILE: &str = ".encryption_key";
 
 /// Resolve the app data directory, creating it if necessary.
-/// Falls back to a local `melody-hub_data` directory when the
+/// Falls back to a local `onehub_data` directory when the
 /// platform path cannot be resolved (e.g. headless test env).
 pub fn app_data_dir(app_handle: &tauri::AppHandle) -> PathBuf {
     let mut path = app_handle.path().app_data_dir().unwrap_or_else(|_| {
         let mut fallback =
             std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        fallback.push("melody-hub_data");
+        fallback.push("onehub_data");
         fallback
     });
     path.push(APP_SUBDIR);

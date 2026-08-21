@@ -1,15 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <!-- Bold S curve - scaled to 80% with padding, rotated 22deg to match logo -->
-  <g transform="translate(64,64) rotate(22) scale(0.78) translate(-64,-64)">
-    <path d="
-      M 34,22
-      C 90,20 92,64 62,64
-      C 32,64 24,106 78,108
-      "
-      stroke="black"
-      stroke-width="26"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      fill="none"/>
+  <!-- OneHub tray mark: central hub connected to six nodes (monochrome template) -->
+  <g stroke="black" stroke-width="6" stroke-linecap="round">
+    <line x1="64" y1="64" x2="64" y2="23"/>
+    <line x1="64" y1="64" x2="99.5" y2="43.5"/>
+    <line x1="64" y1="64" x2="99.5" y2="84.5"/>
+    <line x1="64" y1="64" x2="64" y2="105"/>
+    <line x1="64" y1="64" x2="28.5" y2="84.5"/>
+    <line x1="64" y1="64" x2="28.5" y2="43.5"/>
+  </g>
+  <g fill="black">
+    <circle cx="64" cy="23" r="9.5"/>
+    <circle cx="99.5" cy="43.5" r="9.5"/>
+    <circle cx="99.5" cy="84.5" r="9.5"/>
+    <circle cx="64" cy="105" r="9.5"/>
+    <circle cx="28.5" cy="84.5" r="9.5"/>
+    <circle cx="28.5" cy="43.5" r="9.5"/>
+    <circle cx="64" cy="64" r="15"/>
   </g>
 </svg>

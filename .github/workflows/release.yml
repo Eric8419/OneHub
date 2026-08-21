@@ -195,7 +195,7 @@ jobs:
 
       # ── Windows portable build ──
       # Tauri 2 doesn't ship a "portable" target. We take the built
-      # `melody-hub.exe` from `target/release/` (no --target was passed
+      # `OneHub.exe` from `target/release/` (no --target was passed
       # on Windows so it lands in the default host triple folder) and
       # zip it into a portable archive. WebView2 is bundled with Win11
       # and Win10 (recent builds), so the bare exe runs standalone.
@@ -203,14 +203,14 @@ jobs:
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
-          $exe = "src-tauri/target/release/melody-hub.exe"
+          $exe = "src-tauri/target/release/OneHub.exe"
           if (-not (Test-Path $exe)) {
             Write-Host "::error::Portable exe not found at $exe"
             exit 1
           }
           $version = "${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.version) }}"
           $version = $version -replace '^v', ''
-          $zip = "melody-hub_${version}_x64-portable.zip"
+          $zip = "OneHub_${version}_x64-portable.zip"
           Compress-Archive -Path $exe -DestinationPath $zip -Force
           Write-Host "Created $zip"
 
@@ -220,7 +220,7 @@ jobs:
         run: |
           $version = "${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.version) }}"
           $version = $version -replace '^v', ''
-          $zip = "melody-hub_${version}_x64-portable.zip"
+          $zip = "OneHub_${version}_x64-portable.zip"
           gh release upload "${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.version) }}" $zip --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

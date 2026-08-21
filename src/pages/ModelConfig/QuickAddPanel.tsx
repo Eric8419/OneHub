@@ -29,16 +29,18 @@ export const QuickAddPanel: React.FC = () => {
   const addAggregation = useAggregationStore((s) => s.addAggregation);
   const providers = useProviderStore((s) => s.providers);
 
-  // Collect all model names from all providers
-  const allModels = providers.flatMap((provider) =>
-    provider.models.map((model) => ({
-      providerId: provider.id,
-      providerName: provider.name,
-      model: model.name,
-      key: `${provider.id}:${model.id}`,
-      protocol: protocolForFlavor(provider.apiFlavor),
-    })),
-  );
+  // Collect all model names from all providers (disabled providers are hidden).
+  const allModels = providers
+    .filter((provider) => provider.status !== 'disabled')
+    .flatMap((provider) =>
+      provider.models.map((model) => ({
+        providerId: provider.id,
+        providerName: provider.name,
+        model: model.name,
+        key: `${provider.id}:${model.id}`,
+        protocol: protocolForFlavor(provider.apiFlavor),
+      })),
+    );
 
   const handleAdd = async (e?: React.FormEvent) => {
     e?.preventDefault();

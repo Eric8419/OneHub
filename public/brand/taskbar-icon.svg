@@ -1,40 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc" shape-rendering="crispEdges">
-  <title id="title">Melody Hub taskbar icon</title>
-  <desc id="desc">A small-size optimized cute pixel tech companion icon.</desc>
-  <rect width="256" height="256" fill="#F7F8FA"/>
-  <rect x="12" y="12" width="232" height="232" fill="none" stroke="#151515" stroke-width="12"/>
-  <g fill="#151515">
-    <rect x="120" y="28" width="16" height="16"/>
-    <rect x="128" y="44" width="8" height="16"/>
-    <rect x="72" y="56" width="112" height="16"/>
-    <rect x="60" y="72" width="20" height="28"/>
-    <rect x="176" y="72" width="20" height="28"/>
-    <rect x="44" y="108" width="20" height="48"/>
-    <rect x="192" y="108" width="20" height="48"/>
-    <rect x="72" y="92" width="112" height="20"/>
-    <rect x="60" y="112" width="20" height="64"/>
-    <rect x="176" y="112" width="20" height="64"/>
-    <rect x="80" y="176" width="96" height="20"/>
-    <rect x="96" y="124" width="20" height="20"/>
-    <rect x="140" y="124" width="20" height="20"/>
-    <rect x="108" y="156" width="8" height="8"/>
-    <rect x="124" y="148" width="8" height="20"/>
-    <rect x="140" y="156" width="8" height="8"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title id="title">OneHub taskbar icon</title>
+  <defs>
+    <linearGradient id="ohGradTb" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#26C474"/>
+      <stop offset="1" stop-color="#00964A"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#ohGradTb)"/>
+  <g stroke="#ffffff" stroke-width="7" stroke-opacity="0.92" stroke-linecap="round">
+    <line x1="128" y1="128" x2="128.0" y2="51.0"/>
+    <line x1="128" y1="128" x2="194.7" y2="89.5"/>
+    <line x1="128" y1="128" x2="194.7" y2="166.5"/>
+    <line x1="128" y1="128" x2="128.0" y2="205.0"/>
+    <line x1="128" y1="128" x2="61.3" y2="166.5"/>
+    <line x1="128" y1="128" x2="61.3" y2="89.5"/>
   </g>
-  <g fill="#E7EBF0">
-    <rect x="80" y="112" width="96" height="64"/>
-    <rect x="56" y="120" width="8" height="28"/>
-    <rect x="192" y="120" width="8" height="28"/>
+  <g fill="#ffffff">
+    <circle cx="128.0" cy="51.0" r="16"/>
+    <circle cx="194.7" cy="89.5" r="16"/>
+    <circle cx="194.7" cy="166.5" r="16"/>
+    <circle cx="128.0" cy="205.0" r="16"/>
+    <circle cx="61.3" cy="166.5" r="16"/>
+    <circle cx="61.3" cy="89.5" r="16"/>
+    <circle cx="128" cy="128" r="28"/>
   </g>
-  <g fill="#151515">
-    <rect x="96" y="124" width="20" height="20"/>
-    <rect x="140" y="124" width="20" height="20"/>
-    <rect x="108" y="156" width="8" height="8"/>
-    <rect x="124" y="148" width="8" height="20"/>
-    <rect x="140" y="156" width="8" height="8"/>
-  </g>
-  <g fill="#8FB7D9">
-    <rect x="124" y="32" width="8" height="8"/>
-    <rect x="124" y="148" width="8" height="20"/>
-  </g>
+  <circle cx="128" cy="128" r="14" fill="#00964A"/>
 </svg>

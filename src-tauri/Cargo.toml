@@ -1,12 +1,12 @@
 [package]
-name = "melody-hub"
+name = "onehub"
 version = "0.1.11"
 description = "Local LLM API aggregation proxy"
 authors = ["you"]
 edition = "2021"
 
 [lib]
-name = "melody_hub_lib"
+name = "onehub_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

@@ -39,6 +39,9 @@ const settingsFixture: AppSettings = {
   maxRetries: '0',
   checkUpdatesOnStart: true,
   updateChannel: 'stable',
+  webdavUrl: '',
+  webdavUsername: '',
+  webdavPassword: '',
 };
 
 const providerFixture: Provider = {

@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { getVersion } from '@tauri-apps/api/app';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { useSettingsStore } from '../../store/settingsStore';
+import { useProviderStore } from '../../store/providerStore';
+import { useAggregationStore } from '../../store/aggregationStore';
 import { useT, t } from '../../i18n';
 import {
   Button,
@@ -33,6 +35,8 @@ import {
   Rss,
   Globe,
   MessageSquare,
+  Upload,
+  CloudUpload,
 } from 'lucide-react';
 
 // Inline GitHub mark — lucide-react deliberately omits brand icons
@@ -266,6 +270,12 @@ export const SettingsForm: React.FC = () => {
     useSettingsStore();
   const [exporting, setExporting] = useState(false);
   const [openingDir, setOpeningDir] = useState(false);
+  const [exportingConfig, setExportingConfig] = useState(false);
+  const [importingConfig, setImportingConfig] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const reloadProviders = useProviderStore((s) => s.loadProviders);
+  const reloadAggregations = useAggregationStore((s) => s.loadAggregations);
   const [showToken, setShowToken] = useState(false);
   const [copied, setCopied] = useState(false);
   const [confirmRefreshToken, setConfirmRefreshToken] = useState(false);
@@ -465,6 +475,71 @@ export const SettingsForm: React.FC = () => {
     }
   };
 
+  // ── Config export / import / WebDAV backup ──
+  const handleExportConfig = async () => {
+    if (exportingConfig) return;
+    setExportingConfig(true);
+    try {
+      const path = await desktopApi.exportConfigToFile();
+      toast(t('settings.dataManagement.exportSuccess', { path }), 'success');
+    } catch (e: unknown) {
+      toast(errorMessage(e, t('settings.dataManagement.exportFailed')), 'error');
+    } finally {
+      setExportingConfig(false);
+    }
+  };
+
+  const handleImportConfigClick = () => {
+    if (importingConfig) return;
+    importInputRef.current?.click();
+  };
+
+  const handleImportFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // Reset the input so selecting the same file again re-triggers change.
+    event.target.value = '';
+    if (!file) return;
+    if (!window.confirm(t('settings.dataManagement.importConfirm'))) return;
+
+    setImportingConfig(true);
+    try {
+      const contents = await file.text();
+      if (!contents.trim()) {
+        toast(t('settings.dataManagement.importInvalid'), 'error');
+        return;
+      }
+      await desktopApi.importConfig(contents);
+      // Refresh in-memory stores from the freshly-persisted config.
+      await Promise.all([loadSettings(), reloadProviders(), reloadAggregations()]);
+      toast(t('settings.dataManagement.importSuccess'), 'success');
+    } catch (e: unknown) {
+      toast(errorMessage(e, t('settings.dataManagement.importFailed')), 'error');
+    } finally {
+      setImportingConfig(false);
+    }
+  };
+
+  const handleBackupToWebdav = async () => {
+    if (backingUp) return;
+    if (!settings.webdavUrl.trim()) {
+      toast(t('settings.webdav.urlRequired'), 'error');
+      return;
+    }
+    setBackingUp(true);
+    try {
+      const url = await desktopApi.backupConfigToWebdav(
+        settings.webdavUrl.trim(),
+        settings.webdavUsername,
+        settings.webdavPassword,
+      );
+      toast(t('settings.webdav.backupSuccess', { url }), 'success');
+    } catch (e: unknown) {
+      toast(errorMessage(e, t('settings.webdav.backupFailed')), 'error');
+    } finally {
+      setBackingUp(false);
+    }
+  };
+
   return (
     <div>
       {/* ═══════════════════════════════════════════════════ 通用设置 */}
@@ -570,10 +645,17 @@ export const SettingsForm: React.FC = () => {
           </SettingsGroup>
 
           <SettingsGroup title={translate('settings.appStartup')} isNew>
-            <SettingsRow label={translate('settings.appStartupLaunch')} hint={translate('settings.appStartupLaunchHint')}>
+            <SettingsRow
+              label={translate('settings.appStartupLaunch')}
+              hint={translate('settings.appStartupLaunchHint')}
+            >
               <Switch checked={settings.launchAtLogin} onChange={(v) => updateSettings({ launchAtLogin: v })} />
             </SettingsRow>
-            <SettingsRow label={translate('settings.appStartupMinimized')} hint={translate('settings.appStartupMinimizedHint')} isLast>
+            <SettingsRow
+              label={translate('settings.appStartupMinimized')}
+              hint={translate('settings.appStartupMinimizedHint')}
+              isLast
+            >
               <Switch checked={settings.startMinimized} onChange={(v) => updateSettings({ startMinimized: v })} />
             </SettingsRow>
           </SettingsGroup>
@@ -602,8 +684,12 @@ export const SettingsForm: React.FC = () => {
                   type="button"
                   className="icon-action-btn"
                   onClick={() => setShowToken((v) => !v)}
-                  aria-label={showToken ? translate('settings.security.hideToken') : translate('settings.security.showToken')}
-                  title={showToken ? translate('settings.security.hideToken') : translate('settings.security.showToken')}
+                  aria-label={
+                    showToken ? translate('settings.security.hideToken') : translate('settings.security.showToken')
+                  }
+                  title={
+                    showToken ? translate('settings.security.hideToken') : translate('settings.security.showToken')
+                  }
                 >
                   {showToken ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -761,7 +847,7 @@ export const SettingsForm: React.FC = () => {
               </span>
               <button
                 type="button"
-                onClick={() => openUrl('https://github.com/Lhy723/MelodyHub').catch(() => {})}
+                onClick={() => openUrl('https://github.com/Eric8419/OneHub').catch(() => {})}
                 title={translate('settings.about.githubTitle')}
                 style={{
                   display: 'inline-flex',
@@ -804,7 +890,7 @@ export const SettingsForm: React.FC = () => {
             >
               <img
                 src="/brand/app-icon-1024.png"
-                alt="Melody Hub"
+                alt="OneHub"
                 width={72}
                 height={72}
                 style={{
@@ -825,7 +911,7 @@ export const SettingsForm: React.FC = () => {
                     color: 'var(--text-default)',
                   }}
                 >
-                  Melody Hub
+                  OneHub
                 </div>
                 <div
                   style={{
@@ -883,36 +969,56 @@ export const SettingsForm: React.FC = () => {
               icon={<HelpCircle size={20} />}
               label={translate('settings.about.helpDocs')}
               actionLabel={translate('settings.about.view')}
-              onClick={() => openUrl('https://github.com/Lhy723/MelodyHub#readme').catch(() => {})}
+              onClick={() => openUrl('https://github.com/Eric8419/OneHub#readme').catch(() => {})}
             />
             <AboutLinkRow
               icon={<Rss size={20} />}
               label={translate('settings.about.changelog')}
               actionLabel={translate('settings.about.view')}
-              onClick={() => openUrl('https://github.com/Lhy723/MelodyHub/releases').catch(() => {})}
+              onClick={() => openUrl('https://github.com/Eric8419/OneHub/releases').catch(() => {})}
             />
             <AboutLinkRow
               icon={<Globe size={20} />}
               label={translate('settings.about.website')}
               actionLabel={translate('settings.about.view')}
-              onClick={() => openUrl('https://github.com/Lhy723/MelodyHub').catch(() => {})}
+              onClick={() => openUrl('https://github.com/Eric8419/OneHub').catch(() => {})}
             />
             <AboutLinkRow
               icon={<MessageSquare size={20} />}
               label={translate('settings.about.feedback')}
               actionLabel={translate('settings.about.submit')}
-              onClick={() => openUrl('https://github.com/Lhy723/MelodyHub/issues').catch(() => {})}
+              onClick={() => openUrl('https://github.com/Eric8419/OneHub/issues').catch(() => {})}
               isLast
             />
           </SettingsGroup>
 
           {/* ── Data management (kept but de-emphasized) ─── */}
           <SettingsGroup title={translate('settings.dataManagement.title')}>
-            <SettingsRow label="" isLast>
-              <Button onClick={() => toast(t('settings.dataManagement.exportToast'), 'info')}>{translate('settings.dataManagement.export')}</Button>
-              <Button variant="secondary" onClick={() => toast(t('settings.dataManagement.importToast'), 'info')}>
-                {translate('settings.dataManagement.import')}
+            <SettingsRow
+              label={translate('settings.dataManagement.export')}
+              hint={translate('settings.dataManagement.exportWarning')}
+            >
+              <Button icon={Download} disabled={exportingConfig} onClick={handleExportConfig}>
+                {exportingConfig
+                  ? translate('settings.dataManagement.exporting')
+                  : translate('settings.dataManagement.export')}
               </Button>
+            </SettingsRow>
+            <SettingsRow label={translate('settings.dataManagement.import')}>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json,.json"
+                style={{ display: 'none' }}
+                onChange={handleImportFileSelected}
+              />
+              <Button variant="secondary" icon={Upload} disabled={importingConfig} onClick={handleImportConfigClick}>
+                {importingConfig
+                  ? translate('settings.dataManagement.importing')
+                  : translate('settings.dataManagement.import')}
+              </Button>
+            </SettingsRow>
+            <SettingsRow label={translate('settings.dataManagement.reset')} isLast>
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -922,6 +1028,40 @@ export const SettingsForm: React.FC = () => {
                 }}
               >
                 {translate('settings.dataManagement.reset')}
+              </Button>
+            </SettingsRow>
+          </SettingsGroup>
+
+          {/* ── WebDAV backup ── */}
+          <SettingsGroup title={translate('settings.webdav.title')}>
+            <SettingsRow label={translate('settings.webdav.url')} hint={translate('settings.webdav.desc')}>
+              <TextInput
+                value={settings.webdavUrl}
+                onChange={(v) => updateSettings({ webdavUrl: v })}
+                placeholder={translate('settings.webdav.urlPlaceholder')}
+                width={280}
+              />
+            </SettingsRow>
+            <SettingsRow label={translate('settings.webdav.username')}>
+              <TextInput
+                value={settings.webdavUsername}
+                onChange={(v) => updateSettings({ webdavUsername: v })}
+                placeholder={translate('settings.webdav.usernamePlaceholder')}
+                width={280}
+              />
+            </SettingsRow>
+            <SettingsRow label={translate('settings.webdav.password')}>
+              <TextInput
+                type="password"
+                value={settings.webdavPassword}
+                onChange={(v) => updateSettings({ webdavPassword: v })}
+                placeholder={translate('settings.webdav.passwordPlaceholder')}
+                width={280}
+              />
+            </SettingsRow>
+            <SettingsRow label="" isLast>
+              <Button icon={CloudUpload} disabled={backingUp} onClick={handleBackupToWebdav}>
+                {backingUp ? translate('settings.webdav.backingUp') : translate('settings.webdav.backup')}
               </Button>
             </SettingsRow>
           </SettingsGroup>

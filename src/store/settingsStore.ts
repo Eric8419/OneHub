@@ -31,6 +31,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   logAutoClean: true,
   checkUpdatesOnStart: true,
   updateChannel: 'stable',
+  webdavUrl: '',
+  webdavUsername: '',
+  webdavPassword: '',
 };
 
 const AUTO_SAVE_DEBOUNCE_MS = 400;

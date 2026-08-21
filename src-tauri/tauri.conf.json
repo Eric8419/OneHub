@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "melody-hub",
+  "productName": "OneHub",
   "version": "0.1.11",
-  "identifier": "com.melody-hub.app",
+  "identifier": "com.onehub.app",
   "build": {
     "beforeDevCommand": "pnpm run dev",
     "devUrl": "http://127.0.0.1:5420",
@@ -13,7 +13,7 @@
     "macOSPrivateApi": true,
     "windows": [
       {
-        "title": "Melody Hub",
+        "title": "OneHub",
         "width": 1200,
         "height": 800,
         "minWidth": 960,
@@ -34,7 +34,7 @@
       "dialog": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU4QzQzRkREMkUxN0FDQkMKUldTOHJCY3UzVC9FV01oWXI0QTg2eFFRYlRpeTUwUTZmU2FLWkc2K1RvNWJ3SHNIUWtESXQxeTkK",
       "endpoints": [
-        "https://github.com/Lhy723/MelodyHub/releases/latest/download/latest.json"
+        "https://github.com/Eric8419/OneHub/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"
@@ -43,7 +43,7 @@
   },
   "bundle": {
     "active": true,
-    "createUpdaterArtifacts": true,
+    "createUpdaterArtifacts": false,
     "targets": ["dmg", "app", "nsis", "deb", "appimage", "rpm"],
     "icon": [
       "icons/32x32.png",

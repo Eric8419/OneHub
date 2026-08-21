@@ -36,7 +36,7 @@ pub async fn export_logs(
     });
 
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
-    let filename = format!("melody-hub-logs-{}.json", timestamp);
+    let filename = format!("onehub-logs-{}.json", timestamp);
     let export_path = downloads.join(&filename);
 
     let json = serde_json::to_string_pretty(&records).map_err(|e| e.to_string())?;

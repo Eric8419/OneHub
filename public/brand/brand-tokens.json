@@ -1,16 +1,16 @@
 {
   "brand": {
-    "name": "Melody Hub",
+    "name": "OneHub",
     "tagline": "Model routing console",
-    "aesthetic": "rounded-square soft pixel AI gateway"
+    "aesthetic": "rounded-square network hub gateway"
   },
   "colors": {
     "ink": "#171C24",
     "paper": "#F8F4EC",
     "tileLight": "#F2F0EC",
     "tileDark": "#1E2632",
-    "signalBlue": "#7EE7FF",
-    "statusGreen": "#6EE7A5"
+    "brandGreen": "#26C474",
+    "brandGreenDark": "#00964A"
   },
   "assets": {
     "sourceIcon": "/brand/source-icon.png",

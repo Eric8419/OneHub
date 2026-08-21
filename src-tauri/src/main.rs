@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    melody_hub_lib::run()
+    onehub_lib::run()
 }

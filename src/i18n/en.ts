@@ -9,7 +9,7 @@ const en: Record<string, string> = {
   'sidebar.version': 'v{version}',
 
   // ── Header menu ──
-  'header.about': 'About Melody Hub',
+  'header.about': 'About OneHub',
   'header.exit': 'Exit',
 
   // ── Shell page titles ──
@@ -141,14 +141,18 @@ const en: Record<string, string> = {
   'models.routing.title': 'Model Routing Strategy',
   'models.routing.desc': 'Choose and orchestrate upstream sources when clients request “{model}”.',
   'models.routing.upstreams': '{n} upstreams',
-  'models.routing.singleSourceHint': 'Only one upstream is available. The strategy will take effect when more sources are added.',
+  'models.routing.singleSourceHint':
+    'Only one upstream is available. The strategy will take effect when more sources are added.',
   'models.routing.save': 'Save Strategy',
   'models.routing.saved': 'Model routing strategy saved',
   'models.routing.noSources': 'This model has no available upstream source',
   'models.routing.saveFailed': 'Failed to save routing strategy',
-  'models.routing.priorityHint': 'Upstreams are tried from highest priority to lowest; if the highest is unavailable, requests automatically fall back to the next.',
-  'models.routing.fillFirstHint': 'Prefers a high-priority upstream with remaining quota, then switches when its quota is exhausted or it becomes unavailable.',
-  'models.routing.weightedHint': 'Distributes requests randomly by weight; higher weight means higher selection probability, long-term ratio ≈ weight ratio.',
+  'models.routing.priorityHint':
+    'Upstreams are tried from highest priority to lowest; if the highest is unavailable, requests automatically fall back to the next.',
+  'models.routing.fillFirstHint':
+    'Prefers a high-priority upstream with remaining quota, then switches when its quota is exhausted or it becomes unavailable.',
+  'models.routing.weightedHint':
+    'Distributes requests randomly by weight; higher weight means higher selection probability, long-term ratio ≈ weight ratio.',
   'models.routing.targetList': 'Upstream Targets',
   'models.routing.priorityColumnHint': 'Higher number = higher priority',
   'models.routing.weightColumnHint': 'Higher number = higher share (min 1)',
@@ -213,7 +217,8 @@ const en: Record<string, string> = {
   'providers.add.modelsPlaceholder': 'e.g.:\ngpt-4o\ngpt-4o-mini\nclaude-sonnet-4-20250514',
   'providers.add.advanced': 'Advanced Settings',
   'providers.add.apiType': 'API Type',
-  'providers.add.apiTypeHint': 'OpenAI-compatible APIs query /models; you can still add models manually if listing is unsupported',
+  'providers.add.apiTypeHint':
+    'OpenAI-compatible APIs query /models; you can still add models manually if listing is unsupported',
   'providers.add.protocol': 'Protocol Type',
   'providers.add.proxySettings': 'Proxy Settings',
   'providers.add.save': 'Add Provider',
@@ -258,7 +263,7 @@ const en: Record<string, string> = {
 
   'settings.appStartup': 'Application',
   'settings.appStartupLaunch': 'Launch at Login',
-  'settings.appStartupLaunchHint': 'Automatically run Melody Hub on system startup',
+  'settings.appStartupLaunchHint': 'Automatically run OneHub on system startup',
   'settings.appStartupMinimized': 'Start Minimized to Tray',
   'settings.appStartupMinimizedHint': 'Takes effect on next launch',
 
@@ -316,6 +321,32 @@ const en: Record<string, string> = {
   'settings.dataManagement.importToast': 'Config import is under development',
   'settings.dataManagement.resetConfirm': 'Are you sure you want to reset all data? This action cannot be undone.',
   'settings.dataManagement.resetToast': 'Reset is under development',
+  'settings.dataManagement.desc':
+    'Export or import the full configuration (providers, aggregations and app settings), or back it up to WebDAV.',
+  'settings.dataManagement.exporting': 'Exporting…',
+  'settings.dataManagement.exportSuccess': 'Config exported to {path}',
+  'settings.dataManagement.exportFailed': 'Config export failed',
+  'settings.dataManagement.importing': 'Importing…',
+  'settings.dataManagement.importSuccess': 'Config imported and applied',
+  'settings.dataManagement.importFailed': 'Config import failed',
+  'settings.dataManagement.importConfirm':
+    'Importing will overwrite your current providers, aggregations and app settings. Continue?',
+  'settings.dataManagement.importInvalid': 'The selected file is not a valid config file',
+  'settings.dataManagement.exportWarning': 'The exported file contains plaintext API keys. Keep it safe.',
+  'settings.webdav.title': 'WebDAV Backup',
+  'settings.webdav.desc':
+    'Back up the full configuration to a WebDAV server. A trailing / is treated as a directory and a timestamped filename is generated.',
+  'settings.webdav.url': 'WebDAV URL',
+  'settings.webdav.urlPlaceholder': 'https://dav.example.com/onehub/',
+  'settings.webdav.username': 'Username',
+  'settings.webdav.usernamePlaceholder': 'Optional',
+  'settings.webdav.password': 'Password',
+  'settings.webdav.passwordPlaceholder': 'Optional',
+  'settings.webdav.backup': 'Back up to WebDAV',
+  'settings.webdav.backingUp': 'Backing up…',
+  'settings.webdav.backupSuccess': 'Backed up to {url}',
+  'settings.webdav.backupFailed': 'WebDAV backup failed',
+  'settings.webdav.urlRequired': 'Please enter the WebDAV URL first',
 
   'settings.reset': 'Reset',
   'settings.save': 'Save',
@@ -337,7 +368,8 @@ const en: Record<string, string> = {
   'settings.update.tokenCopied': 'Token copied to clipboard',
   'settings.update.copyFailed': 'Copy failed',
   'settings.update.saveFailed': 'Failed to save token',
-  'settings.update.tokenRefreshConfirm': 'Refreshing the token will invalidate the old token. All requests using the old token will need to be updated. Continue?',
+  'settings.update.tokenRefreshConfirm':
+    'Refreshing the token will invalidate the old token. All requests using the old token will need to be updated. Continue?',
   'settings.update.tokenRegenerateConfirm': 'A new random auth token will be generated. Continue?',
   'settings.update.logExported': 'Logs exported to: {path}',
   'settings.update.logExportFailed': 'Export failed',
@@ -365,7 +397,7 @@ const en: Record<string, string> = {
 
   // Confirm dialog
   'confirm.exit.title': 'Exit Application',
-  'confirm.exit.message': 'Are you sure you want to exit Melody Hub?',
+  'confirm.exit.message': 'Are you sure you want to exit OneHub?',
 
   // Window controls
   'window.minimize': 'Minimize',
@@ -398,7 +430,8 @@ const en: Record<string, string> = {
   'routing.strategy.fillFirst': 'Fill First',
   'routing.strategy.fillFirstDesc': 'Use the preferred target until it becomes unavailable or its quota is exhausted.',
   'routing.strategy.p2c': 'Power of Two Choices',
-  'routing.strategy.p2cDesc': 'Sample two different targets and prefer the one with the stronger success and latency score.',
+  'routing.strategy.p2cDesc':
+    'Sample two different targets and prefer the one with the stronger success and latency score.',
   'routing.strategy.random': 'Random',
   'routing.strategy.randomDesc': 'Uniformly select from all available targets.',
   'routing.strategy.leastUsed': 'Least Used',

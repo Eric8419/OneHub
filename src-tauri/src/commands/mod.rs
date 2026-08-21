@@ -1,3 +1,4 @@
+pub mod backup;
 pub mod logs;
 pub mod providers;
 pub mod settings;

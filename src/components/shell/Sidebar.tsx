@@ -126,7 +126,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
       >
         <img
           src="/brand/app-icon-1024.png"
-          alt="Melody Hub"
+          alt="OneHub"
           width={isMac ? 20 : 28}
           height={isMac ? 20 : 28}
           style={{ borderRadius: isMac ? 5 : 7, flexShrink: 0, userSelect: 'none' }}
@@ -144,7 +144,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey, onNavigate }) => {
             letterSpacing: '-0.01em',
           }}
         >
-          Melody Hub
+          OneHub
         </span>
       </div>
 

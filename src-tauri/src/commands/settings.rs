@@ -57,6 +57,13 @@ pub struct AppSettings {
     // ── 关于 ──
     pub check_updates_on_start: bool,
     pub update_channel: String,
+    // ── 数据备份（WebDAV） ──
+    #[serde(default)]
+    pub webdav_url: String,
+    #[serde(default)]
+    pub webdav_username: String,
+    #[serde(default)]
+    pub webdav_password: String,
 }
 
 impl Default for AppSettings {
@@ -88,6 +95,9 @@ impl Default for AppSettings {
             log_auto_clean: true,
             check_updates_on_start: true,
             update_channel: "stable".into(),
+            webdav_url: String::new(),
+            webdav_username: String::new(),
+            webdav_password: String::new(),
         }
     }
 }
@@ -112,6 +122,16 @@ fn write_settings(
     storage::write_json_atomic(&path, settings)?;
     println!("[settings] Saved to {:?}", path);
     Ok(())
+}
+
+/// Persist settings to disk without applying them to the running
+/// proxy. Used by the data-import flow, which applies + restarts
+/// the proxy separately after all config files are written.
+pub fn persist_settings(
+    app_handle: &tauri::AppHandle,
+    settings: &AppSettings,
+) -> Result<(), String> {
+    write_settings(app_handle, settings)
 }
 
 /// Project persisted settings into the proxy AppState. This is

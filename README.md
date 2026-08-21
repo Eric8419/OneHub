@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="./public/brand/app-icon-1024.png" alt="Melody Hub" width="112" />
+  <img src="./public/brand/app-icon-1024.png" alt="OneHub" width="112" />
 </p>
 
-<h1 align="center">Melody Hub</h1>
+<h1 align="center">OneHub</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-0.1.11-blue?style=flat-square" alt="version" />
-  <img src="https://github.com/Lhy723/MelodyHub/actions/workflows/ci.yml/badge.svg" alt="ci" />
+  <img src="https://github.com/Eric8419/OneHub/actions/workflows/ci.yml/badge.svg" alt="ci" />
   <img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square" alt="tauri" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square" alt="react" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license" />
@@ -19,7 +19,7 @@
 
 ## 项目简介
 
-Melody Hub 基于 Tauri、React 和 Rust 构建，用一个本地地址统一接入 OpenAI、Anthropic、DeepSeek 及其他 OpenAI-compatible 服务。你可以在桌面界面中管理提供商与模型、组合路由规则，并查看请求量、Token 用量、延迟和上游健康状态。
+OneHub 基于 Tauri、React 和 Rust 构建，用一个本地地址统一接入 OpenAI、Anthropic、DeepSeek 及其他 OpenAI-compatible 服务。你可以在桌面界面中管理提供商与模型、组合路由规则，并查看请求量、Token 用量、延迟和上游健康状态。
 
 **核心特性：**
 
@@ -37,19 +37,19 @@ Melody Hub 基于 Tauri、React 和 Rust 构建，用一个本地地址统一接
 
 | 仪表盘 | 模型配置 | 设置 |
 |---|---|---|
-| <img src="./docs/screenshots/dashboard.png" alt="Melody Hub 仪表盘" width="280" /> | <img src="./docs/screenshots/models.png" alt="Melody Hub 模型配置" width="280" /> | <img src="./docs/screenshots/settings.png" alt="Melody Hub 设置" width="280" /> |
+| <img src="./docs/screenshots/dashboard.png" alt="OneHub 仪表盘" width="280" /> | <img src="./docs/screenshots/models.png" alt="OneHub 模型配置" width="280" /> | <img src="./docs/screenshots/settings.png" alt="OneHub 设置" width="280" /> |
 
 
 ## 安装指南
 
-从 [GitHub Releases](https://github.com/Lhy723/MelodyHub/releases/latest) 下载对应平台的安装包：
+从 [GitHub Releases](https://github.com/Eric8419/OneHub/releases/latest) 下载对应平台的安装包：
 
 | 平台 | 文件 |
 |------|------|
-| macOS (Apple Silicon) | `MelodyHub_*_aarch64.dmg` |
-| macOS (Intel) | `MelodyHub_*_x64.dmg` |
-| Windows | `MelodyHub_*_x64-setup.exe` |
-| Linux | `melody-hub_*_amd64.deb` 或 `*.AppImage` |
+| macOS (Apple Silicon) | `OneHub_*_aarch64.dmg` |
+| macOS (Intel) | `OneHub_*_x64.dmg` |
+| Windows | `OneHub_*_x64-setup.exe` |
+| Linux | `onehub_*_amd64.deb` 或 `*.AppImage` |
 
 macOS 首次打开时如果提示"无法验证开发者"，请在系统设置 → 隐私与安全性中点击"仍要打开"。
 
@@ -66,11 +66,11 @@ macOS 首次打开时如果提示"无法验证开发者"，请在系统设置 �
 
 ### 快速上手
 
-1. 启动 Melody Hub。
+1. 启动 OneHub。
 2. 在「API 供应商」中配置提供商，填写 Base URL、API Key 和模型列表。
 3. 在「模型配置」中查看和管理聚合规则，将多个模型组合为可路由逻辑模型。
 4. 在「应用设置」中确认本地代理端口、认证令牌、并发数和超时配置。
-5. 在其他客户端中把 API Base URL 指向 Melody Hub 本地代理，并使用设置页中的认证令牌。
+5. 在其他客户端中把 API Base URL 指向 OneHub 本地代理，并使用设置页中的认证令牌。
 
 默认代理地址：
 
@@ -117,7 +117,7 @@ http://127.0.0.1:8080
 | Model | Provider 下的具体模型配置。 |
 | Aggregation | 聚合规则，把多个模型组合成一个可路由的逻辑模型。 |
 | Routing Strategy | 聚合规则的选择策略，共 19 种，覆盖优先级、负载均衡、成本/配额、智能路由和多模型编排。详见[路由策略说明](./docs/routing-strategies/README.md)。 |
-| Proxy Auth Token | Melody Hub 本地代理的 Bearer Token，用于防止未授权访问。 |
+| Proxy Auth Token | OneHub 本地代理的 Bearer Token，用于防止未授权访问。 |
 
 ### 路由策略文档
 
@@ -159,8 +159,8 @@ http://127.0.0.1:8080
 ### 从源码运行
 
 ```bash
-git clone https://github.com/Lhy723/MelodyHub.git
-cd MelodyHub
+git clone https://github.com/Eric8419/OneHub.git
+cd OneHub
 
 pnpm install
 pnpm tauri dev
@@ -187,9 +187,9 @@ pnpm tauri build
 
 | 平台 | 路径 |
 |------|------|
-| Windows | `%APPDATA%/com.melody-hub.app/melody-hub/` |
-| macOS | `~/Library/Application Support/com.melody-hub.app/melody-hub/` |
-| Linux | `~/.local/share/com.melody-hub.app/melody-hub/` |
+| Windows | `%APPDATA%/com.onehub.app/onehub/` |
+| macOS | `~/Library/Application Support/com.onehub.app/onehub/` |
+| Linux | `~/.local/share/com.onehub.app/onehub/` |
 
 
 ## Changelog
@@ -204,5 +204,5 @@ pnpm tauri build
 
 
 <p align="center">
-  <sub>Built with Tauri, React and Rust by <a href="https://github.com/Lhy723">Lhy723</a></sub>
+  <sub>Built with Tauri, React and Rust by <a href="https://github.com/Eric8419">Eric8419</a></sub>
 </p>

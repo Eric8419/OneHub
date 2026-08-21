@@ -38,6 +38,11 @@ export interface AppSettings {
   // ── 关于 ──
   checkUpdatesOnStart: boolean;
   updateChannel: string;
+
+  // ── 数据备份（WebDAV） ──
+  webdavUrl: string;
+  webdavUsername: string;
+  webdavPassword: string;
 }
 
 export type SettingsCategory = 'general' | 'security' | 'proxy' | 'advanced' | 'about';

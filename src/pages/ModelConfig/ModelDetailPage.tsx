@@ -102,9 +102,7 @@ export const ModelDetailPage: React.FC = () => {
     const targetSignature = currentRouting?.targets?.length
       ? currentRouting.targets.map((target) => target.id).join(',')
       : legacyAggregationTargets.map((target) => target.id).join(',');
-    const sourceKey = currentRouting
-      ? `aggregation:${currentRouting.id}:${targetSignature}`
-      : `direct:${decodedName}`;
+    const sourceKey = currentRouting ? `aggregation:${currentRouting.id}:${targetSignature}` : `direct:${decodedName}`;
     if (currentRouting?.targets && currentRouting.targets.length > 0) {
       setRoutingTargets(currentRouting.targets.map((target) => ({ ...target })));
       routingSourceKeyRef.current = sourceKey;
@@ -121,7 +119,9 @@ export const ModelDetailPage: React.FC = () => {
   const sourceMappings = useMemo<DirectMapping[]>(() => {
     const result: DirectMapping[] = [];
 
+    // 已禁用的供应商不参与来源映射与路由展示。
     for (const provider of providers) {
+      if (provider.status === 'disabled') continue;
       for (const model of provider.models) {
         if (model.name === decodedName) {
           result.push({
@@ -174,6 +174,7 @@ export const ModelDetailPage: React.FC = () => {
     const rows: SourceRow[] = [];
     const seenProviderIds = new Set<string>();
     for (const p of providers) {
+      if (p.status === 'disabled') continue;
       for (const m of p.models) {
         if (m.name === decodedName || m.alias === decodedName) {
           if (!seenProviderIds.has(p.id)) {
@@ -206,37 +207,29 @@ export const ModelDetailPage: React.FC = () => {
 
   // 当直接来源变化（如新增/删除 provider 中的同名模型）时，补齐缺失的 target，
   // 已存在的 target 保留用户编辑过的字段。
+  //
+  // 说明：即使已存在持久化的聚合（currentRouting），只要该模型仍有直接来源，
+  // 就应把「后来新增、但尚未写入 targets」的供应商补进列表，否则新增供应商
+  // 的上游模型不会显示（例如已保存 5 个后又加了 2 个，界面仍只显示 5 个）。
   useEffect(() => {
-    // Existing aggregations are initialized by the legacy/explicit target
-    // effect above; only direct models need automatic source discovery here.
-    if (currentRouting || directSources.length === 0) return;
+    if (directSources.length === 0) return;
     setRoutingTargets((prev) => {
       const existing = new Map(prev.map((t) => [t.providerId, t]));
-      const next: RouteTarget[] = directSources.map((row, index) => {
-        const old = existing.get(row.providerId);
-        if (old) {
-          return {
-            ...old,
-            model: row.model.name,
-            protocol: old.protocol ?? protocolForFlavor(row.provider.apiFlavor),
-          };
-        }
-        return {
-          id: createId(`model-route-target-${index}`),
-          providerId: row.providerId,
-          model: row.model.name,
-          protocol: protocolForFlavor(row.provider.apiFlavor),
-          priority: 0,
-          weight: 1,
-          enabled: true,
-        };
-      });
-      // 仅在集合变化时返回新数组，避免无限渲染
-      if (next.length !== prev.length) return next;
-      const sameIds = next.every((t, i) => t.id === prev[i]?.id && t.providerId === prev[i]?.providerId);
-      return sameIds ? prev : next;
+      // 仅在确实缺少某个直接来源时才补齐，避免与持久化 targets 的初始化互相打架。
+      const missing = directSources.filter((row) => !existing.has(row.providerId));
+      if (missing.length === 0) return prev;
+      const appended: RouteTarget[] = missing.map((row, index) => ({
+        id: createId(`model-route-target-${prev.length + index}`),
+        providerId: row.providerId,
+        model: row.model.name,
+        protocol: protocolForFlavor(row.provider.apiFlavor),
+        priority: 0,
+        weight: 1,
+        enabled: true,
+      }));
+      return [...prev, ...appended];
     });
-  }, [currentRouting, directSources]);
+  }, [directSources]);
 
   const bulkInitialValues: BulkEditValues = useMemo(() => {
     const ms = directSources.map((r) => r.model);
@@ -380,22 +373,11 @@ export const ModelDetailPage: React.FC = () => {
       }
       toast(t('models.routing.saved'), 'success');
     } catch (error) {
-      toast(
-        `${t('models.routing.saveFailed')}: ${error instanceof Error ? error.message : String(error)}`,
-        'error',
-      );
+      toast(`${t('models.routing.saveFailed')}: ${error instanceof Error ? error.message : String(error)}`, 'error');
     } finally {
       setRoutingSaving(false);
     }
-  }, [
-    addAggregation,
-    currentRouting,
-    decodedName,
-    routingTargets,
-    routingStrategy,
-    t,
-    updateAggregation,
-  ]);
+  }, [addAggregation, currentRouting, decodedName, routingTargets, routingStrategy, t, updateAggregation]);
 
   const handleRemoveModel = useCallback(
     async (providerId: string) => {
@@ -418,9 +400,7 @@ export const ModelDetailPage: React.FC = () => {
   }, [decodedName]);
 
   useEffect(() => {
-    setRoutingStrategy(
-      normalizeStrategyKey(currentRouting?.strategy ?? 'round-robin') as RoutingStrategy,
-    );
+    setRoutingStrategy(normalizeStrategyKey(currentRouting?.strategy ?? 'round-robin') as RoutingStrategy);
   }, [currentRouting?.id, currentRouting?.strategy, decodedName]);
 
   if (sourceMappings.length === 0 && !currentRouting) {
@@ -660,8 +640,7 @@ export const ModelDetailPage: React.FC = () => {
             const isCostField = routingStrategy === 'cost-optimized' || routingStrategy === 'auto';
             const isQuotaField = ['fill-first', 'reset-aware', 'headroom', 'auto'].includes(routingStrategy);
             const isResetField = ['reset-aware', 'reset-window', 'auto'].includes(routingStrategy);
-            const showPanel =
-              isPriorityField || isWeightField || isCostField || isQuotaField || isResetField;
+            const showPanel = isPriorityField || isWeightField || isCostField || isQuotaField || isResetField;
             if (!showPanel || routingTargets.length === 0) return null;
 
             const hintKeys = [
@@ -732,7 +711,9 @@ export const ModelDetailPage: React.FC = () => {
                     {t('models.routing.targetList')}
                   </span>
                   <span style={{ color: 'var(--text-tertiary)', fontSize: 'var(--body-xs-font-size)' }}>
-                    {columns.map((column) => t(`models.routing.col${column[0].toUpperCase()}${column.slice(1)}`)).join(' · ')}
+                    {columns
+                      .map((column) => t(`models.routing.col${column[0].toUpperCase()}${column.slice(1)}`))
+                      .join(' · ')}
                   </span>
                 </div>
                 <div

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">OneHub mark</title>
+  <desc id="desc">A central hub connected to six surrounding nodes.</desc>
+  <defs>
+    <linearGradient id="ohGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#26C474"/>
+      <stop offset="1" stop-color="#00964A"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#ohGrad)"/>
+  <g stroke="#ffffff" stroke-width="7" stroke-opacity="0.92" stroke-linecap="round">
+    <line x1="128" y1="128" x2="128" y2="52"/>
+    <line x1="128" y1="128" x2="193.8" y2="90"/>
+    <line x1="128" y1="128" x2="193.8" y2="166"/>
+    <line x1="128" y1="128" x2="128" y2="204"/>
+    <line x1="128" y1="128" x2="62.2" y2="166"/>
+    <line x1="128" y1="128" x2="62.2" y2="90"/>
+  </g>
+  <g fill="#ffffff">
+    <circle cx="128" cy="52" r="16"/>
+    <circle cx="193.8" cy="90" r="16"/>
+    <circle cx="193.8" cy="166" r="16"/>
+    <circle cx="128" cy="204" r="16"/>
+    <circle cx="62.2" cy="166" r="16"/>
+    <circle cx="62.2" cy="90" r="16"/>
+    <circle cx="128" cy="128" r="28"/>
+  </g>
+  <circle cx="128" cy="128" r="14" fill="#00964A"/>
+</svg>

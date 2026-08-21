@@ -9,7 +9,7 @@ const zh: Record<string, string> = {
   'sidebar.version': 'v{version}',
 
   // ── 头像菜单 ──
-  'header.about': '关于 Melody Hub',
+  'header.about': '关于 OneHub',
   'header.exit': '退出',
 
   // ── Shell 页面标题 ──
@@ -263,7 +263,7 @@ const zh: Record<string, string> = {
 
   'settings.appStartup': '应用设置',
   'settings.appStartupLaunch': '开机启动',
-  'settings.appStartupLaunchHint': '系统启动时自动运行 Melody Hub',
+  'settings.appStartupLaunchHint': '系统启动时自动运行 OneHub',
   'settings.appStartupMinimized': '启动时最小化到托盘',
   'settings.appStartupMinimizedHint': '下次启动生效',
 
@@ -321,6 +321,29 @@ const zh: Record<string, string> = {
   'settings.dataManagement.importToast': '配置导入功能开发中',
   'settings.dataManagement.resetConfirm': '确定重置所有数据？此操作不可撤销。',
   'settings.dataManagement.resetToast': '重置功能开发中',
+  'settings.dataManagement.desc': '导出、导入完整配置（含供应商、模型聚合与应用设置），或备份到 WebDAV。',
+  'settings.dataManagement.exporting': '导出中…',
+  'settings.dataManagement.exportSuccess': '配置已导出到 {path}',
+  'settings.dataManagement.exportFailed': '配置导出失败',
+  'settings.dataManagement.importing': '导入中…',
+  'settings.dataManagement.importSuccess': '配置已导入并生效',
+  'settings.dataManagement.importFailed': '配置导入失败',
+  'settings.dataManagement.importConfirm': '导入配置将覆盖当前的供应商、模型聚合与应用设置，确定继续？',
+  'settings.dataManagement.importInvalid': '所选文件不是有效的配置文件',
+  'settings.dataManagement.exportWarning': '导出的文件包含明文 API Key，请妥善保管。',
+  'settings.webdav.title': 'WebDAV 备份',
+  'settings.webdav.desc': '将完整配置备份到 WebDAV 服务器。地址以 / 结尾时按目录处理并自动生成带时间戳的文件名。',
+  'settings.webdav.url': 'WebDAV 地址',
+  'settings.webdav.urlPlaceholder': 'https://dav.example.com/onehub/',
+  'settings.webdav.username': '用户名',
+  'settings.webdav.usernamePlaceholder': '可选',
+  'settings.webdav.password': '密码',
+  'settings.webdav.passwordPlaceholder': '可选',
+  'settings.webdav.backup': '备份到 WebDAV',
+  'settings.webdav.backingUp': '备份中…',
+  'settings.webdav.backupSuccess': '已备份到 {url}',
+  'settings.webdav.backupFailed': 'WebDAV 备份失败',
+  'settings.webdav.urlRequired': '请先填写 WebDAV 地址',
 
   'settings.reset': '重置默认',
   'settings.save': '保存设置',
@@ -370,7 +393,7 @@ const zh: Record<string, string> = {
 
   // Confirm dialog
   'confirm.exit.title': '退出应用',
-  'confirm.exit.message': '确定要退出 Melody Hub 吗？',
+  'confirm.exit.message': '确定要退出 OneHub 吗？',
 
   // Window controls
   'window.minimize': '最小化',

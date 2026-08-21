@@ -18,7 +18,7 @@ export const Shell: React.FC = () => {
     '/models': t('shell.models'),
     '/settings': t('shell.settings'),
   };
-  const pageTitle = pageTitles[location.pathname] || pageTitles[rootPath] || 'Melody Hub';
+  const pageTitle = pageTitles[location.pathname] || pageTitles[rootPath] || 'OneHub';
   const mainRef = useRef<HTMLElement>(null);
   const windowFilled = useWindowFilled();
 

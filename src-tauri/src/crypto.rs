@@ -26,7 +26,7 @@ use crate::paths;
 
 const KEY_LEN: usize = 32; // AES-256
 const NONCE_LEN: usize = 12; // GCM standard nonce
-const KEYRING_SERVICE: &str = "com.melody-hub.app";
+const KEYRING_SERVICE: &str = "com.onehub.app";
 const KEYRING_ACCOUNT: &str = "api-key-encryption-key";
 
 /// Decode a base64-encoded key into a fixed-size array.

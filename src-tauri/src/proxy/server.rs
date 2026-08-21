@@ -1548,7 +1548,7 @@ async fn finalize_record(
 async fn health_handler() -> Json<Value> {
     Json(json!({
         "status": "ok",
-        "service": "melody-hub-proxy",
+        "service": "onehub-proxy",
         "version": env!("CARGO_PKG_VERSION")
     }))
 }
@@ -1626,7 +1626,7 @@ async fn models_handler(
                 "id": agg.name,
                 "object": "model",
                 "created": 0,
-                "owned_by": "melody-hub",
+        "owned_by": "onehub",
             }));
         }
     }

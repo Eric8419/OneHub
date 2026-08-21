@@ -102,6 +102,11 @@ pub fn run() {
             commands::logs::export_logs,
             commands::logs::open_log_dir,
             commands::logs::init_log_dir,
+            // Backup / import-export
+            commands::backup::export_config,
+            commands::backup::export_config_to_file,
+            commands::backup::import_config,
+            commands::backup::backup_config_to_webdav,
             // Updater
             commands::updater::check_for_updates,
             commands::updater::download_and_install_update,
@@ -310,7 +315,7 @@ fn init_tray(app: &tauri::AppHandle) {
     let version_i = match MenuItem::with_id(
         app,
         "version",
-        format!("Melody Hub v{}", version),
+                format!("OneHub v{}", version),
         false,
         None::<&str>,
     ) {
@@ -321,7 +326,7 @@ fn init_tray(app: &tauri::AppHandle) {
         }
     };
     let quit_i =
-        match MenuItem::with_id(app, "quit", "退出 Melody Hub", true, None::<&str>) {
+        match MenuItem::with_id(app, "quit", "退出 OneHub", true, None::<&str>) {
             Ok(i) => i,
             Err(e) => {
                 eprintln!("[tray] Failed to create quit menu item: {}", e);
@@ -363,7 +368,7 @@ fn init_tray(app: &tauri::AppHandle) {
     let tray = match TrayIconBuilder::new()
         .icon(icon.clone())
         .icon_as_template(true)
-        .tooltip("Melody Hub")
+        .tooltip("OneHub")
         .menu(&tray_menu)
         .show_menu_on_left_click(false)
         .on_menu_event(move |app, event| match event.id.as_ref() {
@@ -453,14 +458,14 @@ fn init_tray(app: &tauri::AppHandle) {
             });
             let _ = tray.set_tooltip(Some(if status.running {
                 format!(
-                    "Melody Hub v{}\n代理运行中\n{}:{} ({})",
+                    "OneHub v{}\n代理运行中\n{}:{} ({})",
                     version,
                     status.host,
                     status.port,
                     format_uptime(status.uptime_secs)
                 )
             } else {
-                format!("Melody Hub v{}\n代理已停止", version)
+            format!("OneHub v{}\n代理已停止", version)
             }));
         }
     });

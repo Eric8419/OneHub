@@ -63,6 +63,8 @@ export const ModelInventory: React.FC = () => {
   //   3. Every enabled aggregation's `name` (aggregation exposure)
   const entries = useMemo(() => {
     const map = new Map<string, ExposedEntry>();
+    // 已禁用的供应商不应在模型配置里暴露其模型。
+    const activeProviders = providers.filter((provider) => provider.status !== 'disabled');
 
     const ensure = (name: string): ExposedEntry => {
       let e = map.get(name);
@@ -73,7 +75,7 @@ export const ModelInventory: React.FC = () => {
       return e;
     };
 
-    for (const provider of providers) {
+    for (const provider of activeProviders) {
       for (const model of provider.models) {
         // Direct exposure via model.name
         if (model.name) {
@@ -110,7 +112,7 @@ export const ModelInventory: React.FC = () => {
         .filter(Boolean);
       const resolvedModels: AggMapping['resolvedModels'] = [];
       for (const mn of modelNames) {
-        for (const provider of providers) {
+        for (const provider of activeProviders) {
           for (const model of provider.models) {
             if (model.name === mn || model.alias?.trim() === mn) {
               resolvedModels.push({
@@ -347,7 +349,9 @@ export const ModelInventory: React.FC = () => {
               e.currentTarget.style.background = 'transparent';
             }}
           >
-            {showAll ? `${t('models.inventory.collapseShow')} ${MAX_VISIBLE} 个` : `${t('models.inventory.expandAll')} ${entries.length} 个${t('models.inventory.expandAllSuffix')}`}
+            {showAll
+              ? `${t('models.inventory.collapseShow')} ${MAX_VISIBLE} 个`
+              : `${t('models.inventory.expandAll')} ${entries.length} 个${t('models.inventory.expandAllSuffix')}`}
           </button>
         </div>
       )}
