@@ -322,6 +322,10 @@ pub struct RequestRecord {
     pub first_token_ms: Option<i64>,
     #[serde(default)]
     pub error_category: String,
+    /// Human-readable detail for failed requests (upstream message,
+    /// connection error, etc.). Empty when the request succeeded.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub error_message: String,
     /// How many times the request failed over to a different
     /// provider before succeeding (or failing). 0 = no failover.
     #[serde(default)]

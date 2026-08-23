@@ -244,6 +244,7 @@ mod tests {
             latency_ms,
             first_token_ms: None,
             error_category: String::new(),
+            error_message: String::new(),
             failover_count: 0,
             original_provider: String::new(),
         }

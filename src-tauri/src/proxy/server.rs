@@ -948,6 +948,7 @@ async fn proxy_request(
                 latency_ms: 0,
                 first_token_ms: None,
                 error_category: "missing_api_key".into(),
+                error_message: err_msg.clone(),
                 failover_count,
                 original_provider: original_provider.to_string(),
             },
@@ -982,6 +983,27 @@ async fn proxy_request(
     ));
     let mut source_body = body.clone();
     source_body["model"] = json!(upstream_model);
+
+    // Codex and similar clients send reasoning_effort by default. When the
+    // target model does not support reasoning, strip these params so the
+    // upstream does not return 400 (degraded forwarding).
+    let target_supports_reasoning = route
+        .provider
+        .models
+        .iter()
+        .find(|m| {
+            m.name == selected_model
+                || m.alias.as_deref() == Some(selected_model.as_str())
+        })
+        .map(|m| m.supports_reasoning)
+        .unwrap_or(true);
+    if !target_supports_reasoning {
+        if let Some(obj) = source_body.as_object_mut() {
+            obj.remove("reasoning_effort");
+            obj.remove("reasoning");
+            obj.remove("thinking");
+        }
+    }
 
     // Some providers reject the `system` role in OpenAI Chat format.
     // When the outbound target doesn't support it, convert system content
@@ -1127,6 +1149,7 @@ async fn proxy_request(
                     latency_ms: start.elapsed().as_millis() as i64,
                     first_token_ms: None,
                     error_category: "upstream_connection_error".into(),
+                    error_message: sanitize_error(&err_msg),
                     failover_count,
                     original_provider: original_provider.to_string(),
                 },
@@ -1188,6 +1211,7 @@ async fn proxy_request(
                 latency_ms,
                 first_token_ms: None,
                 error_category: "upstream_error".into(),
+                error_message: sanitize_error(&err_text),
                 failover_count,
                 original_provider: original_provider.to_string(),
             },
@@ -1268,7 +1292,8 @@ async fn proxy_request(
                         buffer.extend_from_slice(&bytes);
                         // 记录首字用时：第一个上游数据块到达的时间。
                         if first_token_ms.is_none() {
-                            first_token_ms = Some(start_clone.elapsed().as_millis() as i64);
+                            first_token_ms =
+                                Some(start_clone.elapsed().as_millis() as i64);
                         }
                         let outgoing = if let Some(converter) = converter.as_mut() {
                             match converter.push(&bytes) {
@@ -1376,6 +1401,7 @@ async fn proxy_request(
                     } else {
                         String::new()
                     },
+                    error_message: String::new(),
                     failover_count,
                     original_provider: original_provider_clone,
                 },
@@ -1464,6 +1490,7 @@ async fn proxy_request(
             latency_ms,
             first_token_ms: None,
             error_category: String::new(),
+            error_message: String::new(),
             failover_count,
             original_provider: original_provider.to_string(),
         },
@@ -1633,11 +1660,11 @@ async fn models_handler(
     for agg in cfg.aggregations.iter().filter(|a| a.enabled) {
         if !agg.name.is_empty() && seen.insert(agg.name.clone()) {
             data.push(json!({
-                "id": agg.name,
-                "object": "model",
-                "created": 0,
-        "owned_by": "onehub",
-            }));
+                    "id": agg.name,
+                    "object": "model",
+                    "created": 0,
+            "owned_by": "onehub",
+                }));
         }
     }
 

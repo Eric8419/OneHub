@@ -5,7 +5,7 @@ import { Dropdown } from '../../../components/ui/Dropdown';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { toast } from '../../../components/ui/Toast';
 import { desktopApi } from '../../../lib/desktopApi';
-import { Plus, Trash2, ChevronRight, ChevronDown, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, ChevronRight, ChevronDown, RefreshCw, PlugZap, CircleCheck, CircleX, Loader2, Play } from 'lucide-react';
 import type { Model } from '../../../types/provider';
 
 const inputBaseStyle: React.CSSProperties = {
@@ -93,6 +93,7 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
     supportsJsonMode: null,
   });
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'row' | 'bulk'; ids: string[] } | null>(null);
+  const [testStates, setTestStates] = useState<Record<string, { testing: boolean; ok: boolean | null; message: string }>>({});
 
   const updateModel = useCallback(
     (id: string, patch: Partial<Model>) => {
@@ -137,6 +138,37 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
     else setSelectedIds(new Set(models.map((m) => m.id)));
   };
 
+  const handleTest = async (m: Model) => {
+    setTestStates((prev) => ({ ...prev, [m.id]: { testing: true, ok: null, message: '' } }));
+    try {
+      const result = await desktopApi.testModelConnection(apiFlavor || 'openai-compatible', apiBase, apiKey, m.name);
+      setTestStates((prev) => ({ ...prev, [m.id]: { testing: false, ok: result.success, message: result.message } }));
+    } catch (e) {
+      setTestStates((prev) => ({
+        ...prev,
+        [m.id]: { testing: false, ok: false, message: e instanceof Error ? e.message : String(e) },
+      }));
+    }
+  };
+
+  const handleTestAll = async () => {
+    setTestStates((prev) => {
+      const next = { ...prev };
+      models.forEach((m) => { next[m.id] = { testing: true, ok: null, message: '' }; });
+      return next;
+    });
+    await Promise.all(
+      models.map(async (m) => {
+        try {
+          const result = await desktopApi.testModelConnection(apiFlavor || 'openai-compatible', apiBase, apiKey, m.name);
+          setTestStates((prev) => ({ ...prev, [m.id]: { testing: false, ok: result.success, message: result.message } }));
+        } catch (e) {
+          setTestStates((prev) => ({ ...prev, [m.id]: { testing: false, ok: false, message: e instanceof Error ? e.message : String(e) } }));
+        }
+      }),
+    );
+  };
+
   const addModel = () => {
     const name = newModelName.trim();
     if (!name) return;
@@ -147,6 +179,8 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
     const newModel: Model = {
       id: modelIdFromName(name),
       name,
+      contextWindow: 1048576,
+      maxOutputTokens: 131072,
       supportsVision: false,
       supportsReasoning: false,
       supportsReasoningEffort: false,
@@ -199,6 +233,8 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
     const newModels = toAdd.map((name) => ({
       id: modelIdFromName(name),
       name,
+      contextWindow: 1048576,
+      maxOutputTokens: 131072,
       supportsVision: false,
       supportsReasoning: false,
       supportsReasoningEffort: false,
@@ -355,6 +391,9 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
         >
           <span style={{ fontSize: 'var(--body-sm-font-size)', fontWeight: 500 }}>已添加模型</span>
           <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)' }}>({models.length})</span>
+          <Button variant="secondary" size="sm" icon={Play} onClick={handleTestAll} disabled={models.length === 0} style={{ marginLeft: 'auto' }}>
+            一键测试所有
+          </Button>
           {selectedIds.size > 0 && (
             <>
               <span style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--bg-brand)', marginLeft: 4 }}>
@@ -452,6 +491,7 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
           {models.map((m) => {
             const isExpanded = expandedIds.has(m.id);
             const isSelected = selectedIds.has(m.id);
+            const test = testStates[m.id];
             return (
               <React.Fragment key={m.id}>
                 <div
@@ -502,6 +542,20 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
                         flex: 1,
                       }}
                     />
+                    <button
+                      type="button"
+                      title={test?.message ? test.message : "测试该模型连通性"}
+                      onClick={() => handleTest(m)}
+                      disabled={test?.testing}
+                      style={{ width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', borderRadius: 6, cursor: test?.testing ? 'wait' : 'pointer', color: test?.ok === true ? 'var(--status-success-default)' : test?.ok === false ? 'var(--status-error-default)' : 'var(--text-tertiary)', flexShrink: 0 }}
+                    >
+                      {test?.testing ? <Loader2 size={13} className="animate-spin" /> : test?.ok === true ? <CircleCheck size={13} /> : test?.ok === false ? <CircleX size={13} /> : <PlugZap size={13} />}
+                    </button>
+                    {test?.ok != null && !test.testing && (
+                      <span style={{ fontSize: 'var(--body-xs-font-size)', color: test.ok ? 'var(--status-success-default)' : 'var(--status-error-default)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>
+                        {test.message}
+                      </span>
+                    )}
                   </div>
                   <div style={cellStyle}>
                     <input

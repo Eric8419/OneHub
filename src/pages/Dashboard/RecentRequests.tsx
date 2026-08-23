@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStatsStore } from '../../store/statsStore';
 import { useSettingsStore } from '../../store/settingsStore';
-import { Card, Tag, FlexBetween, Skeleton } from '../../components/ui';
-import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Card, Tag, FlexBetween, Skeleton, Button } from '../../components/ui';
+import { ChevronLeft, ChevronRight, RefreshCw, X, CircleAlert, Copy } from 'lucide-react';
+import type { RequestRecord } from '../../types/stats';
 import { useT } from '../../i18n';
 
 const modelTagStyle: Record<string, { variant: 'brand' | 'green' | 'danger'; customColor?: string }> = {
@@ -41,6 +42,7 @@ export const RecentRequests: React.FC = () => {
   const pageSize = useSettingsStore((s) => s.settings.pageSize);
   const setPage = useStatsStore((s) => s.setPage);
   const prevLength = useRef(recentRequests.length);
+  const [detailError, setDetailError] = useState<RequestRecord | null>(null);
 
   // Track new rows for animation
   const newRowIds = useRef<Set<string>>(new Set());
@@ -398,12 +400,36 @@ export const RecentRequests: React.FC = () => {
                           borderBottom: '1px solid var(--border-neutral-l1)',
                         }}
                       >
-                        <Tag
-                          variant={req.status === 'success' || req.status === 'streaming' ? 'success' : 'danger'}
-                          style={{ border: 'none' }}
-                        >
-                        {req.status === 'success' || req.status === 'streaming' ? t('dashboard.table.success') : t('dashboard.table.failed')}
-                        </Tag>
+                        {req.status === 'success' || req.status === 'streaming' ? (
+                          <Tag
+                            variant="success"
+                            style={{ border: 'none', cursor: 'default' }}
+                          >
+                            {t('dashboard.table.success')}
+                          </Tag>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setDetailError(req)}
+                            title="点击查看失败原因"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              border: 'none',
+                              background: 'var(--status-error-surface-l1)',
+                              color: 'var(--status-error-default)',
+                              borderRadius: 'var(--radius-4)',
+                              padding: '2px 8px',
+                              font: 'inherit',
+                              fontSize: 'var(--body-sm-font-size)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <CircleAlert size={12} />
+                            {t('dashboard.table.failed')}
+                          </button>
+                        )}
                       </td>
                       <td
                         style={{
@@ -559,6 +585,192 @@ export const RecentRequests: React.FC = () => {
           )}
         </>
       )}
-    </Card>
-  );
+
+      {detailError && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(3px)',
+            WebkitBackdropFilter: 'blur(3px)',
+          }}
+          onClick={() => setDetailError(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 560,
+              maxWidth: 'calc(100vw - 40px)',
+              maxHeight: '82vh',
+              display: 'flex',
+              flexDirection: 'column',
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-neutral-l1)',
+              borderRadius: 'var(--radius-14, 14px)',
+              boxShadow: 'var(--shadow-floating)',
+              overflow: 'hidden',
+              animation: 'slideInUp 0.22s ease-out both',
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '14px 18px',
+                borderBottom: '1px solid var(--border-neutral-l1)',
+                background: 'var(--status-error-surface-l1)',
+              }}
+            >
+              <CircleAlert size={18} style={{ color: 'var(--status-error-default)', flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 'var(--heading-sm-font-size)', fontWeight: 'var(--heading-sm-font-weight)', color: 'var(--text-default)' }}>
+                  请求失败详情
+                </div>
+                <div style={{ fontSize: 'var(--body-xs-font-size)', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                  {detailError.model} · {detailError.provider}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailError(null)}
+                title="关闭 (Esc)"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 30,
+                  height: 30,
+                  border: 'none',
+                  background: 'transparent',
+                  borderRadius: 8,
+                  color: 'var(--text-tertiary)',
+                  cursor: 'pointer',
+                  transition: 'background var(--transition-fast, 0.12s ease)',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-overlay-l1)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '16px 18px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* Info grid */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                  gap: '10px 16px',
+                }}
+              >
+                <InfoCell label='时间' value={formatTimestamp(detailError.timestamp)} />
+                <InfoCell label='请求类型' value={detailError.type} />
+                <InfoCell label='错误分类' value={detailError.errorCategory || '未知'} />
+                <InfoCell label='失败次数' value={detailError.failoverCount ? String(detailError.failoverCount) : '0'} />
+              </div>
+
+              {/* Error message */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 'var(--body-sm-font-size)', fontWeight: 'var(--font-weight-medium)', color: 'var(--text-secondary)' }}>
+                    失败原因
+                  </span>
+                  {detailError.errorMessage && (
+                    <button
+                      type="button"
+                      onClick={() => { navigator.clipboard?.writeText(detailError.errorMessage ?? '')?.catch(() => {}); }}
+                      title="复制错误信息"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--text-tertiary)',
+                        fontSize: 'var(--body-xs-font-size)',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      <Copy size={12} /> 复制
+                    </button>
+                  )}
+                </div>
+                <div
+                  style={{
+                    padding: '12px 14px',
+                    borderRadius: 'var(--radius-10)',
+                    background: 'var(--bg-overlay-l1)',
+                    border: '1px solid var(--status-error-surface-l1)',
+                    borderLeft: '3px solid var(--status-error-default)',
+                    color: 'var(--text-default)',
+                    fontSize: 'var(--body-sm-font-size)',
+                    lineHeight: 1.65,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    userSelect: 'text',
+                  }}
+                >
+                  {detailError.errorMessage ||
+                    '无详细错误信息（仅错误分类：' + (detailError.errorCategory || '未知') + '）'}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 4 }}>
+                <Button size="sm" variant="secondary" onClick={() => setDetailError(null)}>
+                  关闭
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}    </Card>
+ );
 };
+
+const InfoCell: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div
+    style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 2,
+      padding: '8px 10px',
+      borderRadius: 'var(--radius-8)',
+      background: 'var(--bg-overlay-l1)',
+      minWidth: 0,
+    }}
+  >
+    <span
+      style={{
+        fontSize: 'var(--body-xs-font-size)',
+        color: 'var(--text-tertiary)',
+      }}
+    >
+      {label}
+    </span>
+    <span
+      style={{
+        fontSize: 'var(--body-sm-font-size)',
+        fontWeight: 'var(--font-weight-medium)',
+        color: 'var(--text-default)',
+        fontFamily: 'var(--font-family-mono)',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        userSelect: 'text',
+      }}
+      title={value}
+    >
+      {value || '—'}
+    </span>
+  </div>
+);

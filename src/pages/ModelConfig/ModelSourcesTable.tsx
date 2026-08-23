@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Switch } from '../../components/ui/Switch';
 import { Dropdown } from '../../components/ui/Dropdown';
 import { Button } from '../../components/ui/Button';
 import { ProviderLogo } from '../../components/ui/ProviderLogo';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { desktopApi } from '../../lib/desktopApi';
-import { Trash2, RotateCcw, PlugZap, CircleCheck, CircleX, Loader2 } from 'lucide-react';
+import { Trash2, RotateCcw, PlugZap, CircleCheck, CircleX, Loader2, Play } from 'lucide-react';
 import type { Model, Provider } from '../../types/provider';
 
 const cellInputStyle: React.CSSProperties = {
@@ -73,6 +74,7 @@ export const ModelSourcesTable: React.FC<ModelSourcesTableProps> = ({
   saving,
   hasEdits,
 }) => {
+  const navigate = useNavigate();
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [testStates, setTestStates] = useState<
     Record<string, { testing: boolean; ok: boolean | null; message: string; latencyMs?: number }>
@@ -109,6 +111,36 @@ export const ModelSourcesTable: React.FC<ModelSourcesTableProps> = ({
         },
       }));
     }
+  };
+
+  const handleTestAll = async () => {
+    const targets = rows.map((row) => ({ row }));
+    setTestStates((prev) => {
+      const next = { ...prev };
+      targets.forEach(({ row }) => { next[row.providerId] = { testing: true, ok: null, message: '' }; });
+      return next;
+    });
+    await Promise.all(
+      targets.map(async ({ row }) => {
+        try {
+          const result = await desktopApi.testModelConnection(
+            row.provider.apiFlavor || 'openai-compatible',
+            row.provider.apiBase,
+            row.provider.apiKey,
+            row.model.name,
+          );
+          setTestStates((prev) => ({
+            ...prev,
+            [row.providerId]: { testing: false, ok: result.success, message: result.message, latencyMs: result.latencyMs },
+          }));
+        } catch (e) {
+          setTestStates((prev) => ({
+            ...prev,
+            [row.providerId]: { testing: false, ok: false, message: e instanceof Error ? e.message : String(e) },
+          }));
+        }
+      }),
+    );
   };
 
   const handleChange = (providerId: string, patch: ModelPatch) => {
@@ -154,6 +186,9 @@ export const ModelSourcesTable: React.FC<ModelSourcesTableProps> = ({
           ({rows.length} 个可编辑来源)
         </span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <Button variant="secondary" size="sm" icon={Play} onClick={handleTestAll} disabled={rows.length === 0}>
+            一键测试所有
+          </Button>
           <Button variant="secondary" size="sm" icon={RotateCcw} onClick={onReset} disabled={!hasEdits || saving}>
             重置修改
           </Button>
@@ -210,7 +245,27 @@ export const ModelSourcesTable: React.FC<ModelSourcesTableProps> = ({
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <ProviderLogo providerId={row.provider.id} name={row.provider.name} size={20} />
-                  <span style={{ fontSize: 'var(--body-sm-font-size)', fontWeight: 500 }}>{row.provider.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/providers/${row.provider.id}`)}
+                    title="跳转到该供应商页面"
+                    style={{
+                      fontSize: 'var(--body-sm-font-size)',
+                      fontWeight: 500,
+                      color: 'var(--text-brand)',
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      textDecoration: 'underline',
+                      textDecorationColor: 'var(--border-neutral-l1)',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--bg-brand)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-brand)'; }}
+                  >
+                    {row.provider.name}
+                  </button>
                   <button
                     type="button"
                     title={test?.message ? test.message : '测试该供应商模型的连通性'}

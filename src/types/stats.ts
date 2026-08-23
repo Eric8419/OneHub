@@ -37,6 +37,8 @@ export interface RequestRecord {
   /** Time to first token in ms (streaming only). */
   firstTokenMs?: number;
   errorCategory: string;
+  /** Human-readable failure detail (empty when success). */
+  errorMessage?: string;
   /** How many times the request failed over to a different
    * provider before succeeding (or failing). 0 = no failover. */
   failoverCount?: number;

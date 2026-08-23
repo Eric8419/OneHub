@@ -47,9 +47,8 @@ impl RequestCapabilities {
         if self.needs_json_mode && !model.supports_json_mode {
             return false;
         }
-        if self.needs_reasoning && !model.supports_reasoning {
-            return false;
-        }
+        // Reasoning is a preference, not a hard requirement: prefer models that
+        // support reasoning; if none do, degrade (the forwarding layer strips the params).
         true
     }
 }
@@ -438,7 +437,11 @@ pub async fn route_request(
             excluded_by_health = true;
             continue;
         }
-        let hit = (provider.clone(), model.name.clone());
+        let hit = (
+            provider.clone(),
+            model.name.clone(),
+            model.supports_reasoning,
+        );
         if cfg
             .provider_health
             .get(&provider.id)
@@ -464,14 +467,27 @@ pub async fn route_request(
         direct_hits = health_fallback_hits;
     }
 
+    // Reasoning preference: prefer models that support reasoning;
+    // keep all candidates otherwise (degrade at forwarding).
+    if capabilities.needs_reasoning && direct_hits.len() > 1 {
+        let reasoning_hits: Vec<_> = direct_hits
+            .iter()
+            .filter(|(_, _, supports_reasoning)| *supports_reasoning)
+            .cloned()
+            .collect();
+        if !reasoning_hits.is_empty() {
+            direct_hits = reasoning_hits;
+        }
+    }
+
     if !direct_hits.is_empty() && !has_model_routing_policy {
         let rr_key = format!("direct:{}", model_or_agg);
         let identities: Vec<String> = direct_hits
             .iter()
-            .map(|(provider, model)| format!("legacy:{}:{}", provider.id, model))
+            .map(|(provider, model, _)| format!("legacy:{}:{}", provider.id, model))
             .collect();
         let idx = select_round_robin_identity_index(&rr_key, &identities, &mut cfg);
-        let (provider, model) = direct_hits[idx % direct_hits.len()].clone();
+        let (provider, model, _) = direct_hits[idx % direct_hits.len()].clone();
         let upstream_model = resolve_model_mapping(&provider, &model);
         return Ok(RouteResult {
             outbound_flavor: provider.api_flavor.clone(),
@@ -541,6 +557,19 @@ pub async fn route_request(
                     ));
                 }
 
+                // Reasoning preference: prefer targets that support reasoning;
+                // keep all targets otherwise (degrade).
+                if capabilities.needs_reasoning && candidates.len() > 1 {
+                    let reasoning_candidates: Vec<_> = candidates
+                        .iter()
+                        .filter(|(_, _, model, _)| model.supports_reasoning)
+                        .cloned()
+                        .collect();
+                    if !reasoning_candidates.is_empty() {
+                        candidates = reasoning_candidates;
+                    }
+                }
+
                 if candidates.is_empty() {
                     return Err(format!(
                         "No available target for aggregation '{}'",
@@ -594,6 +623,19 @@ pub async fn route_request(
                 capabilities,
                 inbound_flavor,
             );
+            // Reasoning preference: prefer models that support reasoning;
+            // keep all otherwise (degrade).
+            if capabilities.needs_reasoning && candidates.len() > 1 {
+                let reasoning_candidates: Vec<_> = candidates
+                    .iter()
+                    .filter(|(_, _, model, _)| model.supports_reasoning)
+                    .cloned()
+                    .collect();
+                if !reasoning_candidates.is_empty() {
+                    candidates = reasoning_candidates;
+                }
+            }
+
             if candidates.is_empty() {
                 return Err(format!(
                     "No available provider for aggregation '{}' (all targets excluded, unhealthy, incompatible, or unsupported)",
