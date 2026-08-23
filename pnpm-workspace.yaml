@@ -7,3 +7,5 @@ autoInstallPeers: true
 resolutionMode: highest
 onlyBuiltDependencies:
   - esbuild
+allowBuilds:
+  esbuild: true
