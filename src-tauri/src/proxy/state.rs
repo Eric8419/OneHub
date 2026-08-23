@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Melody Hub — Proxy application state
+// OneHub — Proxy application state
 // ═══════════════════════════════════════════════════════════════
 // Splits the former `ProxyConfig` god-object into focused
 // sub-states, each behind its own RwLock so hot paths (e.g.

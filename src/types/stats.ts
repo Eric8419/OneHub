@@ -34,6 +34,8 @@ export interface RequestRecord {
   tokens: number;
   status: string;
   latencyMs: number;
+  /** Time to first token in ms (streaming only). */
+  firstTokenMs?: number;
   errorCategory: string;
   /** How many times the request failed over to a different
    * provider before succeeding (or failing). 0 = no failover. */

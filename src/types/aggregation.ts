@@ -152,7 +152,7 @@ export function strategyLabel(strategy: string, translate?: (key: string) => str
  * old persisted aggregations keep working after upgrade. */
 export function normalizeStrategyKey(strategy: string): string {
   if ((ROUTING_STRATEGY_VALUES as readonly string[]).includes(strategy)) return strategy;
-  // MelodyHub pre-19-strategy keys.
+  // OneHub pre-19-strategy keys.
   if (strategy === 'lowest-latency') return 'auto';
   if (strategy === 'sequential') return 'priority';
   if (strategy.includes('随机')) return 'random';

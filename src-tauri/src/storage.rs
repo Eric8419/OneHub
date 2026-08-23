@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Melody Hub — Persistence layer
+// OneHub — Persistence layer
 // ═══════════════════════════════════════════════════════════════
 // Centralizes JSON load/save for providers, aggregations and
 // settings. Provider API keys are encrypted on write and

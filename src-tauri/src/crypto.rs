@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Melody Hub — API Key Encryption Module
+// OneHub — API Key Encryption Module
 // ═══════════════════════════════════════════════════════════════
 // Uses AES-256-GCM to encrypt API keys before persisting to disk.
 // The AES key is stored in **two** places for redundancy:

@@ -1,4 +1,4 @@
-//! Wire-protocol codecs built around Melody Hub's canonical IR.
+//! Wire-protocol codecs built around OneHub's canonical IR.
 
 pub mod stream;
 
@@ -3390,7 +3390,7 @@ mod tests {
                         "type": "tool_use",
                         "id": "toolu_1",
                         "name": "lookup",
-                        "input": {"query": "Melody Hub"}
+                        "input": {"query": "OneHub"}
                     }]
                 },
                 {
@@ -3429,7 +3429,7 @@ mod tests {
                 "type": "function",
                 "function": {
                     "name": "lookup",
-                    "arguments": "{\"query\":\"Melody Hub\"}"
+                    "arguments": "{\"query\":\"OneHub\"}"
                 }
             })
         );
@@ -3476,7 +3476,7 @@ mod tests {
                 "type": "tool_use",
                 "id": "toolu_1",
                 "name": "lookup",
-                "input": {"query": "Melody Hub"}
+                "input": {"query": "OneHub"}
             }],
             "stop_reason": "tool_use",
             "usage": {"input_tokens": 12, "output_tokens": 8}
@@ -3497,7 +3497,7 @@ mod tests {
                 "type": "function",
                 "function": {
                     "name": "lookup",
-                    "arguments": "{\"query\":\"Melody Hub\"}"
+                    "arguments": "{\"query\":\"OneHub\"}"
                 }
             })
         );

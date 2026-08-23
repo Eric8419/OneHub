@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Melody Hub — Config export / import / WebDAV backup
+// OneHub — Config export / import / WebDAV backup
 // ═══════════════════════════════════════════════════════════════
 // A single versioned bundle carries settings + providers +
 // aggregations so users can move their whole configuration between
@@ -92,6 +92,7 @@ pub fn export_config_to_file(app_handle: tauri::AppHandle) -> Result<String, Str
 fn parse_bundle(contents: &str) -> Result<ConfigBundle, String> {
     let bundle: ConfigBundle = serde_json::from_str(contents)
         .map_err(|e| format!("配置文件解析失败：{}", e))?;
+    // "melody-hub" 为旧版导出兼容标记，保留以支持导入旧配置。
     if !bundle.app.is_empty() && bundle.app != APP_TAG && bundle.app != "melody-hub" {
         return Err("这不是 OneHub 的配置文件".to_string());
     }

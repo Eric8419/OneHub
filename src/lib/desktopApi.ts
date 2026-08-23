@@ -55,6 +55,13 @@ export interface DesktopApi {
     apiBase: string,
     apiKey: string,
   ): Promise<{ success: boolean; modelCount?: number; error?: { kind: string; message: string }; message: string }>;
+  /** Probe a specific model with a minimal 1-token request. */
+  testModelConnection(
+    flavor: string,
+    apiBase: string,
+    apiKey: string,
+    model: string,
+  ): Promise<{ success: boolean; error?: { kind: string; message: string }; message: string; latencyMs: number }>;
   getProviderHealth(): Promise<Record<string, ProviderHealthSnapshot>>;
   /** Probe the updater endpoints. Returns `null` when up-to-date. */
   checkForUpdates(): Promise<UpdateMetadata | null>;
@@ -91,6 +98,8 @@ export const desktopApi: DesktopApi = {
   exportLogs: () => invoke<string>('export_logs'),
   fetchProviderModels: (flavor, apiBase, apiKey) => invoke('fetch_provider_models', { flavor, apiBase, apiKey }),
   testProviderConnection: (flavor, apiBase, apiKey) => invoke('test_provider_connection', { flavor, apiBase, apiKey }),
+  testModelConnection: (flavor, apiBase, apiKey, model) =>
+    invoke('test_model_connection', { flavor, apiBase, apiKey, model }),
   getProviderHealth: () => invoke<Record<string, ProviderHealthSnapshot>>('get_provider_health'),
   checkForUpdates: () => invoke<UpdateMetadata | null>('check_for_updates'),
   downloadAndInstallUpdate: (onEvent) => {

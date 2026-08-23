@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Melody Hub — Stats commands
+// OneHub — Stats commands
 // ═══════════════════════════════════════════════════════════════
 // Reads from the MetricsStore, which loads recent JSONL history
 // on startup — so the dashboard survives restarts. Returned
@@ -242,6 +242,7 @@ mod tests {
             tokens,
             status: "success".into(),
             latency_ms,
+            first_token_ms: None,
             error_category: String::new(),
             failover_count: 0,
             original_provider: String::new(),

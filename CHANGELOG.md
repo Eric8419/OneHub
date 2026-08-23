@@ -142,7 +142,7 @@ Initial development release.
 
 ## 版本策略
 
-Melody Hub 遵循语义化版本（SemVer 2.0.0）：
+OneHub 遵循语义化版本（SemVer 2.0.0）：
 
 | 版本 | 说明 |
 |---|---|

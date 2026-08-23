@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Melody Hub — Request routing
+// OneHub — Request routing
 // ═══════════════════════════════════════════════════════════════
 // Resolves an incoming `model` field to a concrete (provider,
 // model) pair, applying aggregation strategies. Strategies are

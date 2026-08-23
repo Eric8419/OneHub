@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Melody Hub — Provider adapter layer
+// OneHub — Provider adapter layer
 // ═══════════════════════════════════════════════════════════════
 // Modeled after opencode's provider/protocol split:
 //
@@ -1010,6 +1010,135 @@ pub struct FetchModelsResult {
     pub success: bool,
     pub models: Vec<RemoteModelEntry>,
     pub message: String,
+}
+
+/// Result of testing connectivity to a specific model.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelTestResult {
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<ProxyError>,
+    /// Human-readable summary for a toast.
+    pub message: String,
+    /// Round-trip latency in milliseconds (request sent until the
+    /// upstream response is received).
+    pub latency_ms: u64,
+}
+
+/// Test connectivity to a specific model by sending a minimal
+/// 1-token request through the provider's chat / messages /
+/// responses endpoint. Verifies the key, base URL, and that the
+/// given model name is accepted by the upstream.
+pub async fn test_model(
+    flavor: &str,
+    api_base: &str,
+    api_key: &str,
+    model: &str,
+    timeout_secs: u64,
+) -> ModelTestResult {
+    let protocol = resolve_protocol(flavor);
+    let client = match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(timeout_secs))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            return ModelTestResult {
+                success: false,
+                error: Some(ProxyError::Connection {
+                    message: format!("Failed to build HTTP client: {}", e),
+                }),
+                message: "无法创建 HTTP 客户端".into(),
+                latency_ms: 0,
+            }
+        }
+    };
+
+    let start = std::time::Instant::now();
+    let base = api_base.trim_end_matches('/');
+    let (hname, hval) = protocol.auth.apply(api_key);
+
+    // Pick the endpoint + minimal body per protocol family.
+    let (url, body) = if matches!(flavor, "responses" | "openai-responses") {
+        (
+            format!("{}/responses", base),
+            serde_json::json!({
+                "model": model,
+                "input": "ping",
+                "max_output_tokens": 1,
+            }),
+        )
+    } else if matches!(protocol.flavor, ProtocolFlavor::OpenAi) {
+        (
+            format!("{}/chat/completions", base),
+            serde_json::json!({
+                "model": model,
+                "messages": [{"role": "user", "content": "ping"}],
+                "max_tokens": 1,
+            }),
+        )
+    } else {
+        (
+            format!("{}/messages", base),
+            serde_json::json!({
+                "model": model,
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "ping"}],
+            }),
+        )
+    };
+
+    let mut req = client
+        .post(&url)
+        .header(&hname, &hval)
+        .header("Content-Type", "application/json")
+        .json(&body);
+    for (name, value) in &protocol.extra_headers {
+        req = req.header(name, value);
+    }
+
+    let resp = match req.send().await {
+        Ok(r) => r,
+        Err(e) => {
+            let latency_ms = start.elapsed().as_millis() as u64;
+            let msg = if e.is_timeout() {
+                "请求超时，请检查网络或增大超时设置".to_string()
+            } else if e.is_connect() {
+                "无法连接到服务器，请检查 API Base URL".to_string()
+            } else {
+                format!("连接失败: {}", e)
+            };
+            return ModelTestResult {
+                success: false,
+                error: Some(ProxyError::Connection {
+                    message: format!("{}", e),
+                }),
+                message: msg,
+                latency_ms,
+            };
+        }
+    };
+
+    let latency_ms = start.elapsed().as_millis() as u64;
+    let status = resp.status().as_u16();
+    if !resp.status().is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        let err = ProxyError::from_upstream(status, &body, model);
+        return ModelTestResult {
+            success: false,
+            error: Some(err.clone()),
+            message: err_message(&err),
+            latency_ms,
+        };
+    }
+
+    ModelTestResult {
+        success: true,
+        error: None,
+        message: format!("连接成功（{}ms）", latency_ms),
+        latency_ms,
+    }
 }
 
 /// Test a provider connection. Uses the given flavor to pick a

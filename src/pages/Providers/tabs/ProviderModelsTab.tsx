@@ -82,6 +82,7 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [remoteModels, setRemoteModels] = useState<string[]>([]);
+  const [remoteSearch, setRemoteSearch] = useState('');
   const [fetchingRemote, setFetchingRemote] = useState(false);
   const [bulkPopoverOpen, setBulkPopoverOpen] = useState(false);
   const [bulkValues, setBulkValues] = useState<Record<BulkCapKey, boolean | null>>({
@@ -231,7 +232,14 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
 
   const allSelected = models.length > 0 && selectedIds.size === models.length;
   const addedRemoteSet = useMemo(() => new Set(models.map((m) => m.name.toLowerCase())), [models]);
-  const filteredRemote = remoteModels.filter((n) => !addedRemoteSet.has(n.toLowerCase()));
+  const filteredRemote = useMemo(() => {
+    const keyword = remoteSearch.trim().toLowerCase();
+    return remoteModels.filter((n) => {
+      if (addedRemoteSet.has(n.toLowerCase())) return false;
+      if (!keyword) return true;
+      return n.toLowerCase().includes(keyword);
+    });
+  }, [remoteModels, addedRemoteSet, remoteSearch]);
 
   return (
     <div style={{ padding: '24px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -283,6 +291,15 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
 
       {filteredRemote.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="text"
+              value={remoteSearch}
+              onChange={(e) => setRemoteSearch(e.target.value)}
+              placeholder={'搜索筛选可添加的模型（共 ' + ` + filteredRemote.length + ` + ' 个）'}
+              style={{ ...inputBaseStyle, flex: 1, height: 30 }}
+            />
+          </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {filteredRemote.map((name) => (
               <button
@@ -308,6 +325,11 @@ export const ProviderModelsTab: React.FC<ProviderModelsTabProps> = ({
               </button>
             ))}
           </div>
+          {filteredRemote.length === 0 && remoteModels.length > 0 && (
+            <div style={{ fontSize: 'var(--body-sm-font-size)', color: 'var(--text-tertiary)', padding: '4px 2px' }}>
+              没有匹配「{remoteSearch.trim()}」的可添加模型
+            </div>
+          )}
           <Button variant="ghost" size="sm" onClick={addAllRemote} style={{ alignSelf: 'flex-start' }}>
             全部加入
           </Button>

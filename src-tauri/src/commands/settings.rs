@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Melody Hub — Settings command (single source of truth)
+// OneHub — Settings command (single source of truth)
 // ═══════════════════════════════════════════════════════════════
 // AppSettings is the persisted mirror of all configuration. On
 // save it is projected into the proxy AppState sub-states

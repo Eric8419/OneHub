@@ -44,7 +44,8 @@ export const ModelInventory: React.FC = () => {
   const t = useT();
   const providers = useProviderStore((s) => s.providers);
   const aggregations = useAggregationStore((s) => s.aggregations);
-  const [showAll, setShowAll] = useState(false);
+  // 默认展开全部模型，用户通过页面滚动查看全部条目。
+  const [showAll, setShowAll] = useState(true);
 
   const kindLabel = (sources: MappingSource[]): string => {
     const hasDirect = sources.some((s) => s.kind === 'direct');
@@ -58,9 +59,8 @@ export const ModelInventory: React.FC = () => {
   };
 
   // Build the full list of externally-exposed names by merging:
-  //   1. Every model's `name` (direct exposure)
-  //   2. Every model's `alias` (alias exposure, if set and != name)
-  //   3. Every enabled aggregation's `name` (aggregation exposure)
+  //   1. Every model's exposed name (alias if set, otherwise `name`)
+  //   2. Every enabled aggregation's `name` (aggregation exposure)
   const entries = useMemo(() => {
     const map = new Map<string, ExposedEntry>();
     // 已禁用的供应商不应在模型配置里暴露其模型。
@@ -77,19 +77,9 @@ export const ModelInventory: React.FC = () => {
 
     for (const provider of activeProviders) {
       for (const model of provider.models) {
-        // Direct exposure via model.name
-        if (model.name) {
-          ensure(model.name).sources.push({
-            kind: 'direct',
-            providerName: provider.name,
-            providerId: provider.id,
-            modelName: model.name,
-            model: { ...model },
-            matchedBy: 'name',
-          });
-        }
-        // Alias exposure
         const alias = model.alias?.trim();
+        // 设置了别名时，统一以别名参与聚合与展示（原名不再单独暴露），
+        // 这样不同供应商中别名相同的模型会聚合到同一个条目下。
         if (alias && alias !== model.name) {
           ensure(alias).sources.push({
             kind: 'alias',
@@ -98,6 +88,15 @@ export const ModelInventory: React.FC = () => {
             modelName: model.name,
             model: { ...model },
             matchedBy: 'alias',
+          });
+        } else if (model.name) {
+          ensure(model.name).sources.push({
+            kind: 'direct',
+            providerName: provider.name,
+            providerId: provider.id,
+            modelName: model.name,
+            model: { ...model },
+            matchedBy: 'name',
           });
         }
       }

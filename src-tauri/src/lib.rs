@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Melody Hub — Application bootstrap
+// OneHub — Application bootstrap
 // ═══════════════════════════════════════════════════════════════
 // Startup sequence (single source of truth for wiring settings
 // into the proxy runtime):
@@ -77,6 +77,7 @@ pub fn run() {
             // Provider profiles + connection test
             commands::providers::list_provider_profiles,
             commands::providers::test_provider_connection,
+            commands::providers::test_model_connection,
             commands::providers::fetch_provider_models,
             // Proxy control
             commands::providers::start_proxy,

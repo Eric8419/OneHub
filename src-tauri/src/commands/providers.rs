@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Melody Hub — Provider & aggregation commands
+// OneHub — Provider & aggregation commands
 // ═══════════════════════════════════════════════════════════════
 // Thin Tauri command wrappers around the storage + proxy layers.
 // Persistence (with API-key encryption) lives in `storage.rs`;
@@ -36,6 +36,22 @@ pub async fn test_provider_connection(
     let configured = state.runtime.read().await.api_timeout_secs;
     let timeout_secs = configured.clamp(5, 15);
     Ok(adapter::test_connection(&flavor, &api_base, &api_key, timeout_secs).await)
+}
+
+/// Test connectivity to a specific model by sending a minimal
+/// 1-token request. Used from the model-config sources table so
+/// users can verify each provider's model works end to end.
+#[tauri::command]
+pub async fn test_model_connection(
+    flavor: String,
+    api_base: String,
+    api_key: String,
+    model: String,
+    state: tauri::State<'_, SharedAppState>,
+) -> Result<adapter::ModelTestResult, String> {
+    let configured = state.runtime.read().await.api_timeout_secs;
+    let timeout_secs = configured.clamp(5, 20);
+    Ok(adapter::test_model(&flavor, &api_base, &api_key, &model, timeout_secs).await)
 }
 
 /// Fetch available models from providers that expose a model-list

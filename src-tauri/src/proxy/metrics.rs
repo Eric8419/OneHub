@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Melody Hub — Metrics store
+// OneHub — Metrics store
 // ═══════════════════════════════════════════════════════════════
 // Owns request-record accumulation and JSONL persistence. On
 // startup it loads recent history back from disk so the dashboard
@@ -251,7 +251,7 @@ mod tests {
     #[test]
     fn load_recent_handles_missing_dir() {
         let recs =
-            load_recent_from_disk(&PathBuf::from("/nonexistent/melody-hub-test"), 100);
+            load_recent_from_disk(&PathBuf::from("/nonexistent/onehub-test"), 100);
         assert!(recs.is_empty());
     }
 }

@@ -12,6 +12,25 @@ const modelTagStyle: Record<string, { variant: 'brand' | 'green' | 'danger'; cus
   'Qwen 2.5': { variant: 'green', customColor: 'var(--accent-amber)' },
 };
 
+// 生成窗口化的页码序列（含省略号），避免页数很多时横向撑爆页面。
+// 例如共 100 页、当前第 50 页时返回 [0, '…', 48, 49, 50, 51, 52, '…', 99]。
+function pageWindow(current: number, total: number, radius = 2): Array<number | '…'> {
+  if (total <= 1) return [0];
+  const pages = new Set<number>([0, total - 1]);
+  for (let i = current - radius; i <= current + radius; i++) {
+    if (i >= 0 && i < total) pages.add(i);
+  }
+  const sorted = [...pages].sort((a, b) => a - b);
+  const out: Array<number | '…'> = [];
+  let prev = -1;
+  for (const p of sorted) {
+    if (prev >= 0 && p - prev > 1) out.push('…');
+    out.push(p);
+    prev = p;
+  }
+  return out;
+}
+
 export const RecentRequests: React.FC = () => {
   const t = useT();
   const recentRequests = useStatsStore((s) => s.recentRequests);
@@ -41,7 +60,16 @@ export const RecentRequests: React.FC = () => {
   const safePage = Math.min(page, totalPages - 1);
   const paged = recentRequests.slice(safePage * pageSize, (safePage + 1) * pageSize);
 
-  const formatTimestamp = (timestamp: string) => timestamp;
+  // 后端记录的是 UTC 时间（"YYYY-MM-DD HH:mm:ss"），这里补上时区标记
+  // 后转成本地时区显示，避免仪表盘时间比实际慢 8 小时之类的问题。
+  const formatTimestamp = (timestamp: string) => {
+    if (!timestamp) return '';
+    const iso = timestamp.includes('T') ? timestamp : timestamp.replace(' ', 'T') + 'Z';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return timestamp;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + ' ' + pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
+  };
 
   // Loading skeleton
   if (loading && recentRequests.length === 0) {
@@ -144,7 +172,7 @@ export const RecentRequests: React.FC = () => {
       ) : (
         <>
           <div className="ds-table-card" style={{ overflowX: 'auto' }}>
-            <table className="ds-table" style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse' }}>
+            <table className="ds-table" style={{ width: '100%', minWidth: 820, borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   <th
@@ -242,8 +270,36 @@ export const RecentRequests: React.FC = () => {
                       textTransform: 'uppercase',
                       letterSpacing: 'var(--body-md-letter-spacing)',
                     }}
+                 >
+                   {t('dashboard.table.latency')}
+                 </th>
+                  <th
+                    style={{
+                      padding: 'var(--spacer-16) var(--spacer-8)',
+                      borderBottom: '1px solid var(--border-neutral-l1)',
+                      textAlign: 'right',
+                      fontSize: 'var(--body-md-font-size)',
+                      color: 'var(--text-tertiary)',
+                      fontWeight: 'var(--font-weight-medium)',
+                      textTransform: 'uppercase',
+                      letterSpacing: 'var(--body-md-letter-spacing)',
+                    }}
                   >
-                    {t('dashboard.table.latency')}
+                    {t('dashboard.table.firstToken')}
+                  </th>
+                  <th
+                    style={{
+                      padding: 'var(--spacer-16) var(--spacer-8)',
+                      borderBottom: '1px solid var(--border-neutral-l1)',
+                      textAlign: 'right',
+                      fontSize: 'var(--body-md-font-size)',
+                      color: 'var(--text-tertiary)',
+                      fontWeight: 'var(--font-weight-medium)',
+                      textTransform: 'uppercase',
+                      letterSpacing: 'var(--body-md-letter-spacing)',
+                    }}
+                  >
+                    {t('dashboard.table.speed')}
                   </th>
                 </tr>
               </thead>
@@ -356,10 +412,30 @@ export const RecentRequests: React.FC = () => {
                           textAlign: 'right',
                           fontFamily: 'var(--font-family-metric)',
                         }}
+                     >
+                       {(req.latencyMs / 1000).toFixed(2)}s
+                     </td>
+                      <td
+                        style={{
+                          padding: 'var(--spacer-12) var(--spacer-8)',
+                          borderBottom: '1px solid var(--border-neutral-l1)',
+                          textAlign: 'right',
+                          fontFamily: 'var(--font-family-metric)',
+                        }}
                       >
-                        {(req.latencyMs / 1000).toFixed(2)}s
+                        {req.firstTokenMs != null ? (req.firstTokenMs / 1000).toFixed(2) + 's' : '—'}
                       </td>
-                    </tr>
+                      <td
+                        style={{
+                          padding: 'var(--spacer-12) var(--spacer-8)',
+                          borderBottom: '1px solid var(--border-neutral-l1)',
+                          textAlign: 'right',
+                          fontFamily: 'var(--font-family-metric)',
+                        }}
+                      >
+                        {req.latencyMs > 0 ? Math.round(req.tokens / (req.latencyMs / 1000)).toLocaleString() + ' tok/s' : '—'}
+                      </td>
+                   </tr>
                   );
                 })}
               </tbody>
@@ -376,6 +452,7 @@ export const RecentRequests: React.FC = () => {
                 justifyContent: 'center',
                 gap: 'var(--spacer-4)',
                 marginTop: 'var(--spacer-16)',
+                flexWrap: 'wrap',
               }}
             >
               <button
@@ -405,35 +482,52 @@ export const RecentRequests: React.FC = () => {
               >
                 <ChevronLeft size={16} />
               </button>
-              {Array.from({ length: totalPages }, (_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setPage(i)}
-                  style={{
-                    minWidth: 32,
-                    height: 32,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: i === safePage ? 'var(--bg-overlay-l3)' : 'transparent',
-                    color: i === safePage ? 'var(--text-default)' : 'var(--text-secondary)',
-                    border: '1px solid var(--border-neutral-l1)',
-                    borderRadius: 'var(--radius-8)',
-                    font: 'inherit',
-                    fontSize: 'var(--body-base-font-size)',
-                    cursor: 'pointer',
-                    transition: 'background var(--transition-fast, 0.12s ease)',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (i !== safePage) e.currentTarget.style.background = 'var(--bg-overlay-l1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (i !== safePage) e.currentTarget.style.background = 'transparent';
-                  }}
-                >
-                  {i + 1}
-                </button>
-              ))}
+              {pageWindow(safePage, totalPages).map((item, idx) =>
+                item === '…' ? (
+                  <span
+                    key={'ellipsis-' + idx}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minWidth: 28,
+                      height: 32,
+                      color: 'var(--text-tertiary)',
+                      fontSize: 'var(--body-base-font-size)',
+                    }}
+                  >
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => setPage(item)}
+                    style={{
+                      minWidth: 32,
+                      height: 32,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: item === safePage ? 'var(--bg-overlay-l3)' : 'transparent',
+                      color: item === safePage ? 'var(--text-default)' : 'var(--text-secondary)',
+                      border: '1px solid var(--border-neutral-l1)',
+                      borderRadius: 'var(--radius-8)',
+                      font: 'inherit',
+                      fontSize: 'var(--body-base-font-size)',
+                      cursor: 'pointer',
+                      transition: 'background var(--transition-fast, 0.12s ease)',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (item !== safePage) e.currentTarget.style.background = 'var(--bg-overlay-l1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (item !== safePage) e.currentTarget.style.background = 'transparent';
+                    }}
+                  >
+                    {item + 1}
+                  </button>
+                ),
+              )}
               <button
                 disabled={safePage >= totalPages - 1}
                 onClick={() => setPage(safePage + 1)}

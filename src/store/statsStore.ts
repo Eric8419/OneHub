@@ -149,8 +149,10 @@ export const useStatsStore = create<StatsStore>((set, get) => ({
       // Wire format is already camelCase; no manual remapping.
       const timeRange = get().timeRange;
       const reqs = await desktopApi.getRecentRequests(1000, timeRange);
+      // 最新记录排在最前（原接口按时间正序返回）。
+      const sorted = [...reqs].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
       set({
-        recentRequests: reqs,
+        recentRequests: sorted,
         modelBreakdown: computeModelBreakdown(reqs),
         requestsLoading: false,
       });

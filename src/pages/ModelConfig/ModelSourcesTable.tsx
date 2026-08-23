@@ -4,7 +4,8 @@ import { Dropdown } from '../../components/ui/Dropdown';
 import { Button } from '../../components/ui/Button';
 import { ProviderLogo } from '../../components/ui/ProviderLogo';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
-import { Trash2, RotateCcw } from 'lucide-react';
+import { desktopApi } from '../../lib/desktopApi';
+import { Trash2, RotateCcw, PlugZap, CircleCheck, CircleX, Loader2 } from 'lucide-react';
 import type { Model, Provider } from '../../types/provider';
 
 const cellInputStyle: React.CSSProperties = {
@@ -73,6 +74,42 @@ export const ModelSourcesTable: React.FC<ModelSourcesTableProps> = ({
   hasEdits,
 }) => {
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [testStates, setTestStates] = useState<
+    Record<string, { testing: boolean; ok: boolean | null; message: string; latencyMs?: number }>
+  >({});
+
+  const handleTest = async (row: SourceRow) => {
+    setTestStates((prev) => ({
+      ...prev,
+      [row.providerId]: { testing: true, ok: null, message: '' },
+    }));
+    try {
+      const result = await desktopApi.testModelConnection(
+        row.provider.apiFlavor || 'openai-compatible',
+        row.provider.apiBase,
+        row.provider.apiKey,
+        row.model.name,
+      );
+      setTestStates((prev) => ({
+        ...prev,
+        [row.providerId]: {
+          testing: false,
+          ok: result.success,
+          message: result.message,
+          latencyMs: result.latencyMs,
+        },
+      }));
+    } catch (e) {
+      setTestStates((prev) => ({
+        ...prev,
+        [row.providerId]: {
+          testing: false,
+          ok: false,
+          message: e instanceof Error ? e.message : String(e),
+        },
+      }));
+    }
+  };
 
   const handleChange = (providerId: string, patch: ModelPatch) => {
     const existing = pendingEdits.get(providerId) ?? {};
@@ -157,6 +194,7 @@ export const ModelSourcesTable: React.FC<ModelSourcesTableProps> = ({
           {rows.map((row) => {
             const m = applyPatch(row.model, pendingEdits.get(row.providerId));
             const hasPatch = pendingEdits.has(row.providerId);
+            const test = testStates[row.providerId];
             return (
               <div
                 key={row.providerId}
@@ -173,6 +211,55 @@ export const ModelSourcesTable: React.FC<ModelSourcesTableProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <ProviderLogo providerId={row.provider.id} name={row.provider.name} size={20} />
                   <span style={{ fontSize: 'var(--body-sm-font-size)', fontWeight: 500 }}>{row.provider.name}</span>
+                  <button
+                    type="button"
+                    title={test?.message ? test.message : '测试该供应商模型的连通性'}
+                    onClick={() => handleTest(row)}
+                    disabled={test?.testing}
+                    style={{
+                      width: 24,
+                      height: 24,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: 'none',
+                      border: 'none',
+                      borderRadius: 6,
+                      cursor: test?.testing ? 'wait' : 'pointer',
+                      color:
+                        test?.ok === true
+                          ? 'var(--status-success-default)'
+                          : test?.ok === false
+                            ? 'var(--status-error-default)'
+                            : 'var(--text-tertiary)',
+                      fontSize: 'var(--body-xs-font-size)',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {test?.testing ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : test?.ok === true ? (
+                      <CircleCheck size={13} />
+                    ) : test?.ok === false ? (
+                      <CircleX size={13} />
+                    ) : (
+                      <PlugZap size={13} />
+                    )}
+                  </button>
+                  {test?.ok != null && !test.testing && (
+                    <span
+                      style={{
+                        fontSize: 'var(--body-xs-font-size)',
+                        color: test.ok ? 'var(--status-success-default)' : 'var(--status-error-default)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: 140,
+                      }}
+                    >
+                      {test.message}
+                    </span>
+                  )}
                   {hasPatch && (
                     <span
                       style={{ width: 3, height: 16, borderRadius: 2, background: 'var(--bg-brand)', marginLeft: 4 }}

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Melody Hub — Shared domain types
+// OneHub — Shared domain types
 // ═══════════════════════════════════════════════════════════════
 // All structs crossing the Tauri IPC boundary use camelCase serde
 // so the frontend TypeScript types mirror the wire format exactly,
@@ -315,6 +315,11 @@ pub struct RequestRecord {
     pub tokens: i64,
     pub status: String,
     pub latency_ms: i64,
+    /// Time to first token in milliseconds (streaming requests
+    /// only). `None` for non-streaming / failed-before-response
+    /// requests. Serialized as `firstTokenMs` on the wire.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_token_ms: Option<i64>,
     #[serde(default)]
     pub error_category: String,
     /// How many times the request failed over to a different

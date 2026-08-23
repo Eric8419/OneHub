@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Melody Hub — Local LLM API Proxy (module root)
+// OneHub — Local LLM API Proxy (module root)
 // ═══════════════════════════════════════════════════════════════
 // The proxy is split into focused submodules:
 //   - adapter:  per-provider API translation

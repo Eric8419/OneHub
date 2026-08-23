@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="./public/brand/app-icon-1024.png" alt="Melody Hub" width="112" />
+  <img src="./public/brand/app-icon-1024.png" alt="OneHub" width="112" />
 </p>
 
-<h1 align="center">Melody Hub</h1>
+<h1 align="center">OneHub</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-0.1.11-blue?style=flat-square" alt="version" />
-  <img src="https://github.com/Lhy723/MelodyHub/actions/workflows/ci.yml/badge.svg" alt="ci" />
+  <img src="https://github.com/Eric8419/OneHub/actions/workflows/ci.yml/badge.svg" alt="ci" />
   <img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square" alt="tauri" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square" alt="react" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license" />
@@ -19,7 +19,7 @@
 
 ## Overview
 
-Melody Hub is built with Tauri, React, and Rust. It unifies OpenAI, Anthropic, DeepSeek, and other OpenAI-compatible services behind a single local address. Manage providers and models, compose routing rules, and monitor request volumes, token usage, latency, and upstream health — all from a desktop interface.
+OneHub is built with Tauri, React, and Rust. It unifies OpenAI, Anthropic, DeepSeek, and other OpenAI-compatible services behind a single local address. Manage providers and models, compose routing rules, and monitor request volumes, token usage, latency, and upstream health — all from a desktop interface.
 
 **Core Features:**
 
@@ -37,19 +37,19 @@ Melody Hub is built with Tauri, React, and Rust. It unifies OpenAI, Anthropic, D
 
 | Dashboard | Models | Settings |
 |---|---|---|
-| <img src="./docs/screenshots/dashboard.png" alt="Melody Hub Dashboard" width="280" /> | <img src="./docs/screenshots/models.png" alt="Melody Hub Models" width="280" /> | <img src="./docs/screenshots/settings.png" alt="Melody Hub Settings" width="280" /> |
+| <img src="./docs/screenshots/dashboard.png" alt="OneHub Dashboard" width="280" /> | <img src="./docs/screenshots/models.png" alt="OneHub Models" width="280" /> | <img src="./docs/screenshots/settings.png" alt="OneHub Settings" width="280" /> |
 
 
 ## Installation
 
-Download the appropriate installer from [GitHub Releases](https://github.com/Lhy723/MelodyHub/releases/latest):
+Download the appropriate installer from [GitHub Releases](https://github.com/Eric8419/OneHub/releases/latest):
 
 | Platform | File |
 |----------|------|
-| macOS (Apple Silicon) | `MelodyHub_*_aarch64.dmg` |
-| macOS (Intel) | `MelodyHub_*_x64.dmg` |
-| Windows | `MelodyHub_*_x64-setup.exe` |
-| Linux | `melody-hub_*_amd64.deb` or `*.AppImage` |
+| macOS (Apple Silicon) | `OneHub_*_aarch64.dmg` |
+| macOS (Intel) | `OneHub_*_x64.dmg` |
+| Windows | `OneHub_*_x64-setup.exe` |
+| Linux | `onehub_*_amd64.deb` or `*.AppImage` |
 
 On macOS, if you see "cannot be opened because the developer cannot be verified", go to System Settings → Privacy & Security and click "Open Anyway".
 
@@ -66,11 +66,11 @@ See [Development](#development) for build-from-source requirements.
 
 ### Quick Start
 
-1. Launch Melody Hub.
+1. Launch OneHub.
 2. In "API Providers", configure providers with Base URL, API Key, and model list.
 3. In "Model Config", view and manage aggregation rules to combine multiple models into routable logical models.
 4. In "Settings", confirm the local proxy port, auth token, concurrency, and timeout settings.
-5. In your client application, point the API Base URL to the Melody Hub local proxy and use the auth token from the Settings page.
+5. In your client application, point the API Base URL to the OneHub local proxy and use the auth token from the Settings page.
 
 Default proxy address:
 
@@ -117,7 +117,7 @@ These endpoints do not include Embeddings.
 | Model | A specific model configuration under a Provider. |
 | Aggregation | A routing rule that combines multiple models into a single routable logical model. |
 | Routing Strategy | One of 19 aggregation strategies covering priority, load balancing, cost/quota, intelligent routing, and multi-model orchestration. See the [routing strategy reference](./docs/routing-strategies/README.md). |
-| Proxy Auth Token | The Bearer Token for the Melody Hub local proxy, used to prevent unauthorized access. |
+| Proxy Auth Token | The Bearer Token for the OneHub local proxy, used to prevent unauthorized access. |
 
 ### Routing Strategy Reference
 
@@ -159,8 +159,8 @@ See the [routing strategy index](./docs/routing-strategies/README.md) (Chinese).
 ### Run from Source
 
 ```bash
-git clone https://github.com/Lhy723/MelodyHub.git
-cd MelodyHub
+git clone https://github.com/Eric8419/OneHub.git
+cd OneHub
 
 pnpm install
 pnpm tauri dev
@@ -187,9 +187,9 @@ App data directories:
 
 | Platform | Path |
 |----------|------|
-| Windows | `%APPDATA%/com.melody-hub.app/melody-hub/` |
-| macOS | `~/Library/Application Support/com.melody-hub.app/melody-hub/` |
-| Linux | `~/.local/share/com.melody-hub.app/melody-hub/` |
+| Windows | `%APPDATA%/com.onehub.app/onehub/` |
+| macOS | `~/Library/Application Support/com.onehub.app/onehub/` |
+| Linux | `~/.local/share/com.onehub.app/onehub/` |
 
 
 ## Changelog

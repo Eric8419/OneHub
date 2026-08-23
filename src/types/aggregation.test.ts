@@ -34,7 +34,7 @@ describe('routing strategies', () => {
     ]);
   });
 
-  it('keeps new keys stable and migrates old MelodyHub values', () => {
+  it('keeps new keys stable and migrates old OneHub values', () => {
     for (const strategy of ROUTING_STRATEGY_VALUES) {
       expect(normalizeStrategyKey(strategy)).toBe(strategy);
     }

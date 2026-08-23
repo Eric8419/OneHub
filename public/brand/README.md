@@ -1,4 +1,4 @@
-# Melody Hub Brand Assets
+# OneHub Brand Assets
 
 Design direction: rounded-square soft pixel AI gateway.
 

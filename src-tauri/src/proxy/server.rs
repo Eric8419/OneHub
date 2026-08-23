@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Melody Hub — HTTP server
+// OneHub — HTTP server
 // ═══════════════════════════════════════════════════════════════
 // Axum router + request handlers. Auth, rate-limiting and
 // concurrency are enforced here; the actual upstream call is
@@ -946,6 +946,7 @@ async fn proxy_request(
                 tokens: 0,
                 status: "error".into(),
                 latency_ms: 0,
+                first_token_ms: None,
                 error_category: "missing_api_key".into(),
                 failover_count,
                 original_provider: original_provider.to_string(),
@@ -1124,6 +1125,7 @@ async fn proxy_request(
                     tokens: 0,
                     status: "error".into(),
                     latency_ms: start.elapsed().as_millis() as i64,
+                    first_token_ms: None,
                     error_category: "upstream_connection_error".into(),
                     failover_count,
                     original_provider: original_provider.to_string(),
@@ -1184,6 +1186,7 @@ async fn proxy_request(
                 tokens: 0,
                 status: format!("upstream_{}", status.as_u16()),
                 latency_ms,
+                first_token_ms: None,
                 error_category: "upstream_error".into(),
                 failover_count,
                 original_provider: original_provider.to_string(),
@@ -1242,6 +1245,7 @@ async fn proxy_request(
             let mut total_upstream_bytes: usize = 0;
             let mut total_sent_bytes: usize = 0;
             let mut chunk_count: usize = 0;
+            let mut first_token_ms: Option<i64> = None;
             let has_converter = stream_source != stream_target;
             eprintln!(
                 "[proxy] streaming task started: source={:?} target={:?} has_converter={}",
@@ -1262,6 +1266,10 @@ async fn proxy_request(
                         chunk_count += 1;
                         total_upstream_bytes += bytes.len();
                         buffer.extend_from_slice(&bytes);
+                        // 记录首字用时：第一个上游数据块到达的时间。
+                        if first_token_ms.is_none() {
+                            first_token_ms = Some(start_clone.elapsed().as_millis() as i64);
+                        }
                         let outgoing = if let Some(converter) = converter.as_mut() {
                             match converter.push(&bytes) {
                                 Ok(converted) => {
@@ -1362,6 +1370,7 @@ async fn proxy_request(
                         "success".into()
                     },
                     latency_ms: start_clone.elapsed().as_millis() as i64,
+                    first_token_ms,
                     error_category: if had_error {
                         "stream_io_error".into()
                     } else {
@@ -1453,6 +1462,7 @@ async fn proxy_request(
             tokens,
             status: "success".into(),
             latency_ms,
+            first_token_ms: None,
             error_category: String::new(),
             failover_count,
             original_provider: original_provider.to_string(),

@@ -123,18 +123,9 @@ export const ModelDetailPage: React.FC = () => {
     for (const provider of providers) {
       if (provider.status === 'disabled') continue;
       for (const model of provider.models) {
-        if (model.name === decodedName) {
-          result.push({
-            kind: 'direct',
-            providerName: provider.name,
-            providerId: provider.id,
-            modelName: model.name,
-            model: { ...model },
-            matchedBy: 'name',
-          });
-        }
         const alias = model.alias?.trim();
-        if (alias && alias === decodedName && alias !== model.name) {
+        // 设置了别名时以别名参与聚合（与模型清单一致），原名不再单独暴露。
+        if (alias && alias !== model.name && alias === decodedName) {
           result.push({
             kind: 'alias',
             providerName: provider.name,
@@ -142,6 +133,15 @@ export const ModelDetailPage: React.FC = () => {
             modelName: model.name,
             model: { ...model },
             matchedBy: 'alias',
+          });
+        } else if (model.name === decodedName && (!alias || alias === model.name)) {
+          result.push({
+            kind: 'direct',
+            providerName: provider.name,
+            providerId: provider.id,
+            modelName: model.name,
+            model: { ...model },
+            matchedBy: 'name',
           });
         }
       }
@@ -176,7 +176,9 @@ export const ModelDetailPage: React.FC = () => {
     for (const p of providers) {
       if (p.status === 'disabled') continue;
       for (const m of p.models) {
-        if (m.name === decodedName || m.alias === decodedName) {
+        const alias = m.alias?.trim();
+        const exposedName = alias && alias !== m.name ? alias : m.name;
+        if (exposedName === decodedName) {
           if (!seenProviderIds.has(p.id)) {
             rows.push({ providerId: p.id, provider: p, model: m });
             seenProviderIds.add(p.id);

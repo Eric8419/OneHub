@@ -6,7 +6,8 @@ import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConfirmDialog } from './ConfirmDialog';
 
-const styles = readFileSync('src/index.css', 'utf8');
+// 统一为 LF 行尾，兼容 Windows checkout（core.autocrlf）下的 CRLF 文件。
+const styles = readFileSync('src/index.css', 'utf8').replace(/\r\n/g, '\n');
 
 interface PendingAnimation {
   finished: Promise<void>;

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Melody Hub — Centralized application paths
+// OneHub — Centralized application paths
 // ═══════════════════════════════════════════════════════════════
 // Single source of truth for on-disk locations. Eliminates the
 // duplicate `data_dir()` helpers that previously existed in
@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use tauri::Manager;
 
 /// Subdirectory under the platform app-data dir that holds all
-/// Melody Hub persistent state.
+/// OneHub persistent state.
 const APP_SUBDIR: &str = "onehub";
 
 /// Encryption key filename (stored beside the config files).

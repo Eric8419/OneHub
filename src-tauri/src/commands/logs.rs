@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Melody Hub — Log commands
+// OneHub — Log commands
 // ═══════════════════════════════════════════════════════════════
 // Export + open-log-dir helpers. Paths now flow through the
 // shared `paths` module; metrics flushing uses the new
