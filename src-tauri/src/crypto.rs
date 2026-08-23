@@ -50,7 +50,6 @@ fn decode_key(encoded: &str) -> Option<[u8; KEY_LEN]> {
 fn write_key_backup(path: &std::path::Path, b64: &str) {
     if let Err(e) = std::fs::write(path, b64) {
         eprintln!("[crypto] Failed to write key backup file: {}", e);
-        return;
     }
     #[cfg(unix)]
     {

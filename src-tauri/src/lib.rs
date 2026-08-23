@@ -316,7 +316,7 @@ fn init_tray(app: &tauri::AppHandle) {
     let version_i = match MenuItem::with_id(
         app,
         "version",
-                format!("OneHub v{}", version),
+        format!("OneHub v{}", version),
         false,
         None::<&str>,
     ) {
@@ -326,14 +326,14 @@ fn init_tray(app: &tauri::AppHandle) {
             return;
         }
     };
-    let quit_i =
-        match MenuItem::with_id(app, "quit", "退出 OneHub", true, None::<&str>) {
-            Ok(i) => i,
-            Err(e) => {
-                eprintln!("[tray] Failed to create quit menu item: {}", e);
-                return;
-            }
-        };
+    let quit_i = match MenuItem::with_id(app, "quit", "退出 OneHub", true, None::<&str>)
+    {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("[tray] Failed to create quit menu item: {}", e);
+            return;
+        }
+    };
     let tray_menu = match Menu::with_items(
         app,
         &[
@@ -466,7 +466,7 @@ fn init_tray(app: &tauri::AppHandle) {
                     format_uptime(status.uptime_secs)
                 )
             } else {
-            format!("OneHub v{}\n代理已停止", version)
+                format!("OneHub v{}\n代理已停止", version)
             }));
         }
     });
